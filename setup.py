@@ -36,19 +36,19 @@ def read(*names, **kwargs):
     ) as fh:
         return fh.read()
 
+with open("README.md") as readme:
+    long_description = readme.read()
 
 setup(
     name='fast-numpy-loops',
     version='0.0.0',
     license='MIT',
     description='Faster loops for NumPy using multithreading and other tricks',
-    long_description='%s\n%s' % (
-        re.compile('^.. start-badges.*^.. end-badges', re.M | re.S).sub('', read('README.rst')),
-        re.sub(':[a-z]+:`~?(.*?)`', r'``\1``', read('CHANGELOG.rst'))
-    ),
+    long_description=long_description,
+    long_description_content_type="text/markdown",
     author='Matti Picus',
     author_email='mattigit@picus.org.il',
-    url='https://github.com/mattip/numpy-threading-extensions',
+    url='https://github.com/Quansight/numpy-threading-extensions',
     packages=find_packages('src'),
     package_dir={'': 'src'},
     py_modules=[splitext(basename(path))[0] for path in glob('src/*.py')],
@@ -56,7 +56,7 @@ setup(
     zip_safe=False,
     classifiers=[
         # complete classifier list: http://pypi.python.org/pypi?%3Aaction=list_classifiers
-        'Development Status :: 5 - Production/Stable',
+        "Development Status :: 4 - Beta",
         'Intended Audience :: Developers',
         'License :: OSI Approved :: MIT License',
         'Operating System :: Unix',
@@ -78,8 +78,8 @@ setup(
         'Topic :: Utilities',
     ],
     project_urls={
-        'Changelog': 'https://github.com/mattip/numpy-threading-extensions/blob/master/CHANGELOG.rst',
-        'Issue Tracker': 'https://github.com/mattip/numpy-threading-extensions/issues',
+        'Changelog': 'https://github.com/Quansight/numpy-threading-extensions/blob/master/CHANGELOG.rst',
+        'Issue Tracker': 'https://github.com/Quansight/numpy-threading-extensions/issues',
     },
     keywords=[
         # eg: 'keyword1', 'keyword2', 'keyword3',
