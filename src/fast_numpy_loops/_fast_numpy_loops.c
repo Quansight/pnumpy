@@ -2,11 +2,10 @@
 #include "Python.h"
 
 static PyObject* initialize(PyObject *self, PyObject *args, PyObject *kwargs) {
-    PyObject *result = NULL, *obj, *dtype=NULL;
+    PyObject *result = NULL, *obj=NULL, *dtype=NULL;
     static char *kwlist[] = {"dtypein", "dtypeout", NULL};
-    if (!PyArg_ParseTupleAndKeywords(
-            args, kwargs, "O|O:initialize", kwlist,
-            &obj, &dtype)) {
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O|O:initialize", kwlist,
+                                     &obj, &dtype)) {
         return NULL;
     }
     result = PyUnicode_FromString("int,int->int");
@@ -18,7 +17,7 @@ static PyObject* initialize(PyObject *self, PyObject *args, PyObject *kwargs) {
 PyDoc_STRVAR(initialize_doc, "Docstring for initialize function.");
 
 static struct PyMethodDef module_functions[] = {
-    {"initialize", (PyCFunction)initialize, METH_VARARGS | METH_VARARGS,
+    {"initialize", (PyCFunction)initialize, METH_VARARGS | METH_KEYWORDS,
      initialize_doc},
     {NULL, NULL}
 };

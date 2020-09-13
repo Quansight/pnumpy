@@ -3,10 +3,6 @@ import numpy as np
 import fast_numpy_loops
 
 
-def test_main():
-    pass
-
-
 def test_initialize():
     ret = fast_numpy_loops.initialize(['add'])
     assert ret == 'int,int->int'
