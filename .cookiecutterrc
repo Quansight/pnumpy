@@ -21,7 +21,7 @@ default_context:
     allow_tests_inside_package: 'yes'
     appveyor:                  'no'
     c_extension_function:      'initialize'
-    c_extension_module:        '_fast-numpy-loops'
+    c_extension_module:        '_fast_numpy_loops'
     c_extension_optional:      'no'
     c_extension_support:       'yes'
     c_extension_test_pypi:     'yes'
