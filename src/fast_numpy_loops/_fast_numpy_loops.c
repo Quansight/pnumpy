@@ -120,7 +120,6 @@ static struct PyMethodDef module_functions[] = {
     {NULL, NULL}
 };
 
-#if PY_MAJOR_VERSION >= 3
 static struct PyModuleDef moduledef = {
     PyModuleDef_HEAD_INIT,
     .m_name = "fast_numpy_loops._fast_numpy_loops",
@@ -128,16 +127,11 @@ static struct PyModuleDef moduledef = {
     .m_size = -1,
     .m_methods = module_functions,
 };
-#endif
 
-static PyObject* moduleinit(void) {
+PyMODINIT_FUNC PyInit__fast_numpy_loops(void) {
     PyObject *module;
 
-#if PY_MAJOR_VERSION >= 3
     module = PyModule_Create(&moduledef);
-#else
-    module = Py_InitModule3(m_doc, module_functions, NULL);
-#endif
 
     if (module == NULL)
         return NULL;
@@ -148,14 +142,3 @@ static PyObject* moduleinit(void) {
     }
     return module;
 }
-
-#if PY_MAJOR_VERSION < 3
-PyMODINIT_FUNC init_fast_numpy_loops(void) {
-    moduleinit();
-}
-#else
-PyMODINIT_FUNC PyInit__fast_numpy_loops(void) {
-    return moduleinit();
-}
-#endif
-
