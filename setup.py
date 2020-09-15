@@ -16,15 +16,16 @@ from os.path import splitext
 from setuptools import Extension
 from setuptools import find_packages
 from setuptools import setup
+import numpy as np
 
 # Enable code coverage for C code: we can't use CFLAGS=-coverage in tox.ini, since that may mess with compiling
 # dependencies (e.g. numpy). Therefore we set SETUPPY_CFLAGS=-coverage in tox.ini and copy it to CFLAGS here (after
 # deps have been safely installed).
 if 'TOX_ENV_NAME' in os.environ and os.environ.get('SETUP_PY_EXT_COVERAGE') == 'yes' and platform.system() == 'Linux':
-    CFLAGS = os.environ['CFLAGS'] = '-fprofile-arcs -ftest-coverage'
+    CFLAGS = os.environ['CFLAGS'] = '-fprofile-arcs -ftest-coverage -DNPY_NO_DEPRECATED_API=NPY_1_7_API_VERSION'
     LFLAGS = os.environ['LFLAGS'] = '-lgcov'
 else:
-    CFLAGS = ''
+    CFLAGS = '-DNPY_NO_DEPRECATED_API=NPY_1_7_API_VERSION'
     LFLAGS = ''
 
 
@@ -88,6 +89,7 @@ setup(
     python_requires='>=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*',
     install_requires=[
         # eg: 'aspectlib==1.1.1', 'six>=1.7',
+        'numpy',
     ],
     extras_require={
         # eg:
@@ -100,7 +102,7 @@ setup(
             sources=[path],
             extra_compile_args=CFLAGS.split(),
             extra_link_args=LFLAGS.split(),
-            include_dirs=[dirname(path)]
+            include_dirs=[dirname(path), np.get_include()]
         )
         for root, _, _ in os.walk('src')
         for path in glob(join(root, '*.c'))
