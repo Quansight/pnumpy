@@ -1,33 +1,46 @@
-# This is a basic workflow to help you get started with Actions
+name: Run tox
 
-name: CI
-
-# Controls when the action will run. Triggers the workflow on push or pull request
-# events but only for the main branch
 on:
   push:
     branches: [ main ]
   pull_request:
     branches: [ main ]
+  #schedule:
+  #  - cron: '0 0 * * 0' # weekly
 
-# A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
-  # This workflow contains a single job called "build"
   build:
-    # The type of runner that the job will run on
-    runs-on: ubuntu-latest
 
-    # Steps represent a sequence of tasks that will be executed as part of the job
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    strategy:
+      fail-fast: true
+      matrix:
+        python-version: [2.7, 3.6, 3.7, 3.8]
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        platform: [x32, x64]
+        exclude:
+          - os: macos-latest  # macos-10.15
+            platform: x32
+          - os: ubuntu-latest
+            platform: x32
+          - os: windows-latest
+            python-version: 2.7  # no more VisualStudio 9.0
     steps:
-      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
-      - uses: actions/checkout@v2
-
-      # Runs a single command using the runners shell
-      - name: Run a one-line script
-        run: echo Hello, world!
-
-      # Runs a set of commands using the runners shell
-      - name: Run a multi-line script
-        run: |
-          echo Add other actions to build,
-          echo test, and deploy your project.
+    - uses: actions/checkout@v2
+      with:
+        submodules: recursive
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v2
+      with:
+        python-version: ${{ matrix.python-version }}
+    - name: Install
+      run: |
+        python -m pip install --upgrade pip
+        python -m pip install --progress-bar=off  -rci/requirements.txt
+    - name: Test
+      run: tox -v
+      env:
+        PLATFORM: ${{ matrix.platform }}

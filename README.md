@@ -42,5 +42,5 @@ Note, to combine the coverage data from all the tox environments run:
  OS | Command
 ----|----
 Windows | `set PYTEST_ADDOPTS=--cov-append`
-        | `tox`
+|        | `tox`
 Other   | `PYTEST_ADDOPTS=--cov-append tox`

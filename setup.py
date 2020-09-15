@@ -6,7 +6,6 @@ from __future__ import print_function
 import io
 import os
 import platform
-import re
 from glob import glob
 from os.path import basename
 from os.path import dirname
@@ -36,8 +35,10 @@ def read(*names, **kwargs):
     ) as fh:
         return fh.read()
 
+
 with open("README.md") as readme:
     long_description = readme.read()
+
 
 setup(
     name='fast-numpy-loops',
