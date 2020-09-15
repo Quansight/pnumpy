@@ -61,6 +61,13 @@ void add_int(char **args, npy_intp const *dimensions, npy_intp const *steps,
     }
 }
 
+int import_api(void);
+
+int import_api() {
+    import_array(); 
+    import_umath();
+    return 0;
+}
 
 static PyObject* initialize(PyObject *self, PyObject *args, PyObject *kwargs) {
     PyObject *result = NULL, *dtype=NULL;
@@ -136,8 +143,9 @@ static PyObject* moduleinit(void) {
         return NULL;
 
     // Initialize numpy's C-API
-    import_array(); 
-    import_umath();
+    if (import_api() != 0) {
+        return NULL;
+    }
     return module;
 }
 
