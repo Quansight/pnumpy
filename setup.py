@@ -92,13 +92,12 @@ setup(
     },
     ext_modules=[
         Extension(
-            splitext(relpath(path, 'src').replace(os.sep, '.'))[0],
-            sources=[path],
+            'fast_numpy_loops._fast_numpy_loops',
+            sources=['src/fast_numpy_loops/_fast_numpy_loops.cpp',
+                    ],
             extra_compile_args=CFLAGS.split(),
             extra_link_args=LFLAGS.split(),
-            include_dirs=[dirname(path), np.get_include()]
+            include_dirs=['src/fast_numpy_loops', np.get_include()]
         )
-        for root, _, _ in os.walk('src')
-        for path in glob(join(root, '*.c'))
     ],
 )
