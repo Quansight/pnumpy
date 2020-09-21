@@ -16,15 +16,16 @@ from os.path import splitext
 from setuptools import Extension
 from setuptools import find_packages
 from setuptools import setup
+import numpy as np
 
 # Enable code coverage for C code: we can't use CFLAGS=-coverage in tox.ini, since that may mess with compiling
 # dependencies (e.g. numpy). Therefore we set SETUPPY_CFLAGS=-coverage in tox.ini and copy it to CFLAGS here (after
 # deps have been safely installed).
 if 'TOX_ENV_NAME' in os.environ and os.environ.get('SETUP_PY_EXT_COVERAGE') == 'yes' and platform.system() == 'Linux':
-    CFLAGS = os.environ['CFLAGS'] = '-fprofile-arcs -ftest-coverage'
+    CFLAGS = os.environ['CFLAGS'] = '-fprofile-arcs -ftest-coverage -DNPY_NO_DEPRECATED_API=NPY_1_7_API_VERSION'
     LFLAGS = os.environ['LFLAGS'] = '-lgcov'
 else:
-    CFLAGS = ''
+    CFLAGS = '-DNPY_NO_DEPRECATED_API=NPY_1_7_API_VERSION'
     LFLAGS = ''
 
 
@@ -64,18 +65,12 @@ setup(
         'Operating System :: POSIX',
         'Operating System :: Microsoft :: Windows',
         'Programming Language :: Python',
-        'Programming Language :: Python :: 2.7',
         'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.5',
         'Programming Language :: Python :: 3.6',
         'Programming Language :: Python :: 3.7',
         'Programming Language :: Python :: 3.8',
         'Programming Language :: Python :: Implementation :: CPython',
         'Programming Language :: Python :: Implementation :: PyPy',
-        # uncomment if you test on these interpreters:
-        # 'Programming Language :: Python :: Implementation :: IronPython',
-        # 'Programming Language :: Python :: Implementation :: Jython',
-        # 'Programming Language :: Python :: Implementation :: Stackless',
         'Topic :: Utilities',
     ],
     project_urls={
@@ -85,9 +80,10 @@ setup(
     keywords=[
         # eg: 'keyword1', 'keyword2', 'keyword3',
     ],
-    python_requires='>=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*',
+    python_requires='>=3.6',
     install_requires=[
         # eg: 'aspectlib==1.1.1', 'six>=1.7',
+        'numpy>=1.19.0',
     ],
     extras_require={
         # eg:
@@ -96,13 +92,13 @@ setup(
     },
     ext_modules=[
         Extension(
-            splitext(relpath(path, 'src').replace(os.sep, '.'))[0],
-            sources=[path],
+            'fast_numpy_loops._fast_numpy_loops',
+            sources=['src/fast_numpy_loops/_fast_numpy_loops.cpp',
+                     'src/fast_numpy_loops/module_init.c',
+                    ],
             extra_compile_args=CFLAGS.split(),
             extra_link_args=LFLAGS.split(),
-            include_dirs=[dirname(path)]
+            include_dirs=['src/fast_numpy_loops', np.get_include()]
         )
-        for root, _, _ in os.walk('src')
-        for path in glob(join(root, '*.c'))
     ],
 )
