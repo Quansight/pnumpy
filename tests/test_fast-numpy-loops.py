@@ -9,6 +9,7 @@ def test_initialize():
 
 
 def test_result(rng):
+    print('numpy version', np.__version__)
     # Set subtract to work with the add loop
     ret = fast_numpy_loops.initialize('subtract')
     assert ret == 'int32,int32->int32'
