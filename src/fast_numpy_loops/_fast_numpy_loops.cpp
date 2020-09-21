@@ -49,7 +49,7 @@ PyObject* initialize(PyObject *self, PyObject *args, PyObject *kwargs) {
     PyObject *ufunc = NULL;
     const char * uname = NULL;
     int ret = 0;
-    int signature[3] = {NPY_INT, NPY_INT, NPY_INT}; // This is actually int32
+    int signature[3] = {NPY_INT32, NPY_INT32, NPY_INT32};
     PyUFuncGenericFunction oldfunc, newfunc;
     // C++ warns on assigning const char * to char *
     const char *kwlist[] = {"dtypein", "dtypeout", NULL};
@@ -57,8 +57,8 @@ PyObject* initialize(PyObject *self, PyObject *args, PyObject *kwargs) {
     if (!PyArg_ParseTupleAndKeywords(args, kwargs, "s|O:initialize", _kwlist,
                                      &uname, &dtype)) {
         return NULL;
-    } 
-    // Initialize numpy's C-API. 
+    }
+    // Initialize numpy's C-API.
     import_array();
     import_umath();
 
@@ -93,7 +93,7 @@ PyObject* initialize(PyObject *self, PyObject *args, PyObject *kwargs) {
 error:
     Py_XDECREF(ufunc);
     Py_XDECREF(dtype);
-    return NULL; 
+    return NULL;
 }
 
 
