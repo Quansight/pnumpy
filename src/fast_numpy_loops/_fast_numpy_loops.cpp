@@ -43,18 +43,25 @@ void add_T(T **args, npy_intp const *dimensions, npy_intp const *steps,
     }
 }
 
-static PyObject* initialize(PyObject *self, PyObject *args, PyObject *kwargs) {
+extern "C"
+PyObject* initialize(PyObject *self, PyObject *args, PyObject *kwargs) {
     PyObject *result = NULL, *dtype=NULL;
     PyObject *ufunc = NULL;
     const char * uname = NULL;
     int ret = 0;
     int signature[3] = {NPY_INT, NPY_INT, NPY_INT}; // This is actually int32
     PyUFuncGenericFunction oldfunc, newfunc;
-    static char *kwlist[3] = {"dtypein", "dtypeout", NULL};
-    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "s|O:initialize", kwlist,
+    // C++ warns on assigning const char * to char *
+    const char *kwlist[] = {"dtypein", "dtypeout", NULL};
+    char **_kwlist = (char **)kwlist;
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "s|O:initialize", _kwlist,
                                      &uname, &dtype)) {
         return NULL;
     } 
+    // Initialize numpy's C-API. 
+    import_array();
+    import_umath();
+
     PyObject *numpy_module = PyImport_ImportModule("numpy");
     if (numpy_module == NULL) {
         goto error;
@@ -89,36 +96,4 @@ error:
     return NULL; 
 }
 
-static char m_doc[] = "Provide methods to override NumPy ufuncs";
 
-
-PyDoc_STRVAR(initialize_doc,
-     "initialize(ufunc_name:");
-
-static struct PyMethodDef module_functions[] = {
-    {"initialize", (PyCFunction)initialize, METH_VARARGS | METH_KEYWORDS,
-     initialize_doc},
-    {NULL, NULL}
-};
-
-static struct PyModuleDef moduledef = {
-    PyModuleDef_HEAD_INIT,
-    .m_name = "fast_numpy_loops._fast_numpy_loops",
-    .m_doc = m_doc,
-    .m_size = -1,
-    .m_methods = module_functions,
-};
-
-PyMODINIT_FUNC PyInit__fast_numpy_loops(void) {
-    PyObject *module;
-
-    module = PyModule_Create(&moduledef);
-
-    if (module == NULL)
-        return NULL;
-
-    // Initialize numpy's C-API. 
-    import_array();
-    import_umath();
-    return module;
-}

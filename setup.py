@@ -94,6 +94,7 @@ setup(
         Extension(
             'fast_numpy_loops._fast_numpy_loops',
             sources=['src/fast_numpy_loops/_fast_numpy_loops.cpp',
+                     'src/fast_numpy_loops/module_init.c',
                     ],
             extra_compile_args=CFLAGS.split(),
             extra_link_args=LFLAGS.split(),
