@@ -3,6 +3,7 @@
 #include <cstdlib>
 #include <limits>
 #include <stdint.h>
+#include <stdio.h>
 
 #if defined(_WIN32) && !defined(__GNUC__)
 #define WIN32_LEAN_AND_MEAN             // Exclude rarely-used stuff from Windows headers
@@ -123,10 +124,13 @@ makes it easier to support new compilers and platforms just by adding the necess
 #endif  /* RT_TARGET_VECTOR_MEMOP_DEFAULT_ALIGNED */
 
 //-------------------------------------------
+//-------------------------------------------
 #define VOID void
 typedef void* PVOID;
+typedef void* LPVOID;
 
 typedef unsigned long       DWORD;
+typedef DWORD* LPDWORD;
 
 typedef long long           INT_PTR, * PINT_PTR;
 typedef unsigned long long  UINT_PTR, * PUINT_PTR;
@@ -136,7 +140,6 @@ typedef unsigned long long  ULONG_PTR, * PULONG_PTR;
 
 typedef ULONG_PTR SIZE_T, * PSIZE_T;
 typedef LONG_PTR  SSIZE_T, * PSSIZE_T;
-
 
 typedef void* HANDLE;
 #define TRUE 1
