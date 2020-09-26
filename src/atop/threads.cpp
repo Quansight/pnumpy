@@ -88,19 +88,19 @@ WorkerThreadFunction(void* lpParam)
 
     // On windows we set the thread affinity mask
     if (g_WaitAddress != NULL) {
-        UINT64 mask = (UINT64)(1) << core;//core number starts from 0
-        UINT64 ret = SetThreadAffinityMask(GetCurrentThread(), mask);
-        //UINT64 ret = SetThreadAffinityMask(GetCurrentThread(), 0xFFFFFFFF);
+        uint64_t mask = (uint64_t)(1) << core;//core number starts from 0
+        uint64_t ret = SetThreadAffinityMask(GetCurrentThread(), mask);
+        //uint64_t ret = SetThreadAffinityMask(GetCurrentThread(), 0xFFFFFFFF);
     }
 
-    INT64 lastWorkItemCompleted = -1;
+    int64_t lastWorkItemCompleted = -1;
 
     //
     // Setting Cancelled will stop all worker threads
     //
     while (pWorkerRing->Cancelled == 0) {
-        INT64 workIndexCompleted;
-        INT64 workIndex;
+        int64_t workIndexCompleted;
+        int64_t workIndex;
 
         workIndex = pWorkerRing->WorkIndex;
         workIndexCompleted = pWorkerRing->WorkIndexCompleted;
@@ -113,7 +113,7 @@ WorkerThreadFunction(void* lpParam)
 
 #if defined(RT_OS_WINDOWS)
             // Windows we check if the work was for our thread
-            INT64 wakeup = InterlockedDecrement64(&pWorkItem->ThreadWakeup);
+            int64_t wakeup = InterlockedDecrement64(&pWorkItem->ThreadWakeup);
             if (wakeup >= 0) {
                 didSomeWork = pWorkItem->DoWork(core, workIndex);
             }
@@ -489,7 +489,7 @@ extern "C" {
         return syscall(SYS_gettid);
 
 #elif defined(RT_OS_DARWIN)
-        uint64_t thread_id;
+        uint64_t_t thread_id;
         return pthread_threadid_np(NULL, &thread_id) ? 0 : (pid_t)thread_id;
 
 #elif defined(RT_OS_FREEBSD)
@@ -515,11 +515,11 @@ extern "C" {
         return gettid();
     }
 
-    UINT64 SetThreadAffinityMask(pid_t hThread, UINT64 dwThreadAffinityMask) {
+    uint64_t SetThreadAffinityMask(pid_t hThread, uint64_t dwThreadAffinityMask) {
 #if defined(RT_OS_LINUX) || defined(RT_OS_FREEBSD)
         cpu_set_t cpuset;
 
-        UINT64 bitpos = 1;
+        uint64_t bitpos = 1;
         int count = 0;
 
         while (!(bitpos & dwThreadAffinityMask)) {
@@ -547,7 +547,7 @@ extern "C" {
             return 0;
     }
 
-    BOOL GetProcessAffinityMask(HANDLE hProcess, UINT64* lpProcessAffinityMask, UINT64* lpSystemAffinityMask) {
+    BOOL GetProcessAffinityMask(HANDLE hProcess, uint64_t* lpProcessAffinityMask, uint64_t* lpSystemAffinityMask) {
 #if defined(RT_OS_LINUX) || defined(RT_OS_FREEBSD)
         cpu_set_t cpuset;
         sched_getaffinity(getpid(), sizeof(cpuset), &cpuset);
@@ -555,7 +555,7 @@ extern "C" {
         *lpProcessAffinityMask = 0;
         *lpSystemAffinityMask = 0;
 
-        UINT64 bitpos = 1;
+        uint64_t bitpos = 1;
         for (int i = 0; i < 63; i++) {
             if (CPU_ISSET(i, &cpuset)) {
                 *lpProcessAffinityMask |= bitpos;
@@ -644,9 +644,9 @@ int GetProcCount() {
 
     HANDLE proc = GetCurrentProcess();
 
-    UINT64 mask1;
-    UINT64 mask2;
-    INT count;
+    uint64_t mask1;
+    uint64_t mask2;
+    int count;
 
     count = 0;
     GetProcessAffinityMask(proc, &mask1, &mask2);
