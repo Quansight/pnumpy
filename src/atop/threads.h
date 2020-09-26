@@ -247,7 +247,7 @@ struct stMATH_WORKER_ITEM {
     FORCE_INLINE int64_t GetNextWorkIndex(int64_t* workBlock) {
         int64_t wBlock = *workBlock = GetWorkBlock();
 
-        //printf("working on block %llu\n", wBlock);
+        //THREADLOGGING("working on block %llu\n", wBlock);
 
         // Make sure something to work on
         if (wBlock < BlockLast) {
@@ -265,7 +265,7 @@ struct stMATH_WORKER_ITEM {
 
         int64_t wBlock = *workBlock = GetWorkBlock();
 
-        //printf("working on block %llu\n", wBlock);
+        //THREADLOGGING("working on block %llu\n", wBlock);
 
         // Make sure something to work on
         if (wBlock < BlockLast) {
@@ -280,7 +280,7 @@ struct stMATH_WORKER_ITEM {
 
                     // This is the last block and may have an odd number of data to process
                     lenWorkBlock = TotalElements & WORK_ITEM_MASK;
-                    //printf("last workblock %llu  %llu  MASK  %llu\n", lenWorkBlock, TotalElements, WORK_ITEM_MASK);
+                    //THREADLOGGING("last workblock %llu  %llu  MASK  %llu\n", lenWorkBlock, TotalElements, WORK_ITEM_MASK);
                 }
             }
             return lenWorkBlock;
@@ -372,7 +372,7 @@ struct stWorkerRing {
         // Linux thread wakeup
         int s = futex((int*)&WorkIndex, FUTEX_WAKE, maxThreadsToWake, NULL, NULL, 0);
         if (s == -1)
-            printf("***error futex-FUTEX_WAKE\n");     // TODO: Change to use fprintf(stderr, msg) instead
+            THREADLOGGING("***error futex-FUTEX_WAKE\n");     // TODO: Change to use fprintf(stderr, msg) instead
 
 #elif defined(__APPLE__)
         // temp remove warning
@@ -962,7 +962,7 @@ public:
             //   outputAdj = BlockSize * workBlock * 1;
             //}
 
-            //printf("workblock %llu   len=%llu  offset=%llu  strideSize %d\n", workBlock, lenX, offsetAdj, strideSize);
+            //MATHLOGGING("workblock %llu   len=%llu  offset=%llu  strideSize %d\n", workBlock, lenX, offsetAdj, strideSize);
 
             switch (OldCallback->FunctionList->TypeOfFunctionCall) {
             case ANY_TWO:
@@ -984,7 +984,7 @@ public:
                     break;
 
                 case BOTH_SCALAR:
-                    printf("** bug both are scalar!\n");
+                    MATHLOGGING("** bug both are scalar!\n");
                     // Process this block of work
                     //FunctionList->AnyTwoStubCall(pDataInX, pDataInX2, pDataOutX + outputAdj, lenX, ScalarMode);
                     break;
@@ -996,7 +996,7 @@ public:
                 OldCallback->FunctionList->AnyOneStubCall(pDataInX + offsetAdj, pDataOutX + outputAdj, lenX, strideSizeIn, strideSizeOut);
                 break;
             default:
-                printf("unknown worker function\n");
+                MATHLOGGING("unknown worker function\n");
                 break;
             }
 
@@ -1005,7 +1005,7 @@ public:
 
             // tell others we completed this work block
             pstWorkerItem->CompleteWorkBlock();
-            //printf("|%d %d", core, (int)workBlock);
+            //MATHLOGGING("|%d %d", core, (int)workBlock);
         }
 
         return didSomeWork;
