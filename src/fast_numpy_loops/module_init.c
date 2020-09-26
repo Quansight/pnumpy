@@ -7,17 +7,18 @@
  */
   
 
-PyObject* initialize(PyObject *self, PyObject *args, PyObject *kwargs);
+PyObject* oldinit(PyObject *self, PyObject *args, PyObject *kwargs);
+PyObject* newinit(PyObject* self, PyObject* args, PyObject* kwargs);
 
 static char m_doc[] = "Provide methods to override NumPy ufuncs";
 
 
 PyDoc_STRVAR(initialize_doc,
-     "initialize(ufunc_name:");
+     "oldinit(ufunc_name:");
 
 static struct PyMethodDef module_functions[] = {
-    {"initialize", (PyCFunction)initialize, METH_VARARGS | METH_KEYWORDS,
-     initialize_doc},
+    {"initialize",       (PyCFunction)newinit, METH_VARARGS | METH_KEYWORDS, "init the atop"},
+    {"oldinit",          (PyCFunction)oldinit, METH_VARARGS | METH_KEYWORDS, initialize_doc},
     {NULL, NULL}
 };
 
