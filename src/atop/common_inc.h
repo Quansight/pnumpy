@@ -373,6 +373,7 @@ static void* GetDefaultForType(int numpyInType) {
         break;
     default:
         //printf("!!! likely problem in GetDefaultForType\n");
+        break;
     }
 
     return pgDefault;
