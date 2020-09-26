@@ -30,7 +30,7 @@ else:
 
 if platform.system() == 'Windows':
     CFLAGS += ' /Ox /Ob2 /Oi /Ot /d2FH4-'
-else
+else:
     CFLAGS += ' -Wc++11-extensions'
 
 def read(*names, **kwargs):
