@@ -55,7 +55,6 @@ void AtopBinaryMathFunction(char** args, const npy_intp* dimensions, const npy_i
         // For a scalar second is2 == 0
         npy_intp is1 = steps[0], is2 = steps[1], os1 = steps[2];
         npy_intp n = dimensions[0];
-        npy_intp i;
         g_UFuncLUT[funcop][atype].pTwoFunc(ip1, ip2, op1, (int64_t)n, is1 == 0 ? SCALAR_MODE::FIRST_ARG_SCALAR : is2 == 0 ? SCALAR_MODE::SECOND_ARG_SCALAR : SCALAR_MODE::NO_SCALARS);
 
     }
@@ -258,6 +257,8 @@ PyObject* newinit(PyObject* self, PyObject* args, PyObject* kwargs) {
             PyObject* result = NULL;
             PyObject* ufunc = NULL;
             const char* ufunc_name = str_ufunc[i];
+            int atop = atop_mathop[i];
+
             ufunc = PyObject_GetAttrString(numpy_module, ufunc_name);
 
             if (ufunc == NULL) {
@@ -274,7 +275,6 @@ PyObject* newinit(PyObject* self, PyObject* args, PyObject* kwargs) {
                 int wantedOut = -1;
 
                 int atype = convert_dtype_to_atop[dtype];
-                int atop = atop_mathop[j];
 
                 ANY_TWO_FUNC pTwoFunc = GetSimpleMathOpFast(atop, atype, atype, atype, &wantedOut);
 
