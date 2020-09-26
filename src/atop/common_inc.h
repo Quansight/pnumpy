@@ -123,6 +123,21 @@ makes it easier to support new compilers and platforms just by adding the necess
 #endif  /* RT_TARGET_VECTOR_MEMOP_DEFAULT_ALIGNED */
 
 //-------------------------------------------
+//-------------------------------------------
+#define VOID void
+typedef void* PVOID;
+
+typedef unsigned long       DWORD;
+
+typedef long long           INT_PTR, * PINT_PTR;
+typedef unsigned long long  UINT_PTR, * PUINT_PTR;
+
+typedef long long           LONG_PTR, * PLONG_PTR;
+typedef unsigned long long  ULONG_PTR, * PULONG_PTR;
+
+typedef ULONG_PTR SIZE_T, * PSIZE_T;
+typedef LONG_PTR  SSIZE_T, * PSSIZE_T;
+
 typedef void* HANDLE;
 #define TRUE 1
 #define FALSE 0
