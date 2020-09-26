@@ -28,6 +28,10 @@ else:
     CFLAGS = '-DNPY_NO_DEPRECATED_API=NPY_1_7_API_VERSION'
     LFLAGS = ''
 
+if platform.system() == 'Windows':
+    CFLAGS += ' /Ox /Ob2 /Oi /Ot /d2FH4-'
+else
+    CFLAGS += ' -Wc++11-extensions'
 
 def read(*names, **kwargs):
     with io.open(
@@ -95,10 +99,14 @@ setup(
             'fast_numpy_loops._fast_numpy_loops',
             sources=['src/fast_numpy_loops/_fast_numpy_loops.cpp',
                      'src/fast_numpy_loops/module_init.c',
+                     'src/atop/atop.cpp',
+                     'src/atop/threads.cpp',
+                     'src/atop/ops_binary.cpp',
+                     'src/atop/ops_unary.cpp',
                     ],
             extra_compile_args=CFLAGS.split(),
             extra_link_args=LFLAGS.split(),
-            include_dirs=['src/fast_numpy_loops', np.get_include()]
+            include_dirs=['src/fast_numpy_loops', 'src/atop', np.get_include()]
         )
     ],
 )
