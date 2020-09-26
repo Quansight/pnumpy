@@ -19,7 +19,8 @@ extern "C" {
     DllExport BOOL atop_init();
 
     // defined in ops_binary.cpp
-    DllExport ANY_TWO_FUNC GetSimpleMathOpFast(int func, int atopInType1, int atopInType2, int atopOutType, int* wantedOutType);
+    DllExport ANY_TWO_FUNC GetSimpleMathOpFast(int func, int atopInType1, int atopInType2, int* wantedOutType);
 
+    DllExport ANY_TWO_FUNC GetComparisonOpFast(int func, int atopInType1, int atopInType2, int* wantedOutType);
 }
 

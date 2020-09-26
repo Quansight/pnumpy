@@ -512,8 +512,10 @@ public:
         NoCaching = FALSE;
 
         pWorkerRing = (stWorkerRing*)ALIGNED_ALLOC(sizeof(stWorkerRing), 64);
-        memset(pWorkerRing, 0, sizeof(stWorkerRing));
-        pWorkerRing->Init();
+        if (pWorkerRing) {
+            memset(pWorkerRing, 0, sizeof(stWorkerRing));
+            pWorkerRing->Init();
+        }
 
         for (int i = 0; i < WorkerThreadCount; i++) {
 
@@ -523,7 +525,7 @@ public:
     };
 
     ~CMathWorker() {
-        pWorkerRing->Cancel();
+        if (pWorkerRing) pWorkerRing->Cancel();
         Sleep(100);
         KillWorkerThreads();
         // DO NOT DEALLOCATE DO TO threads not exiting 
@@ -784,7 +786,7 @@ public:
     //------------------------------------------------------------------------------
     // Returns NULL if work item is too small or threading turned off
     // Otherwise returns a work item
-    stMATH_WORKER_ITEM* GetWorkItem(int64_t len) {
+    inline stMATH_WORKER_ITEM* GetWorkItem(int64_t len) {
         // If it is a small work item, process it immediately
         if (len < WORK_ITEM_BIG || NoThreading) {
             return NULL;
@@ -979,22 +981,22 @@ public:
             case ANY_TWO:
             {
                 switch (OldCallback->ScalarMode) {
-                case NO_SCALARS:
+                case SCALAR_MODE::NO_SCALARS:
                     // Process this block of work
                     OldCallback->FunctionList->AnyTwoStubCall(pDataInX + offsetAdj, pDataInX2 + offsetAdj, pDataOutX + outputAdj, lenX, OldCallback->ScalarMode);
                     break;
 
-                case FIRST_ARG_SCALAR:
+                case SCALAR_MODE::FIRST_ARG_SCALAR:
                     // Process this block of work
                     OldCallback->FunctionList->AnyTwoStubCall(pDataInX, pDataInX2 + offsetAdj, pDataOutX + outputAdj, lenX, OldCallback->ScalarMode);
                     break;
 
-                case SECOND_ARG_SCALAR:
+                case SCALAR_MODE::SECOND_ARG_SCALAR:
                     // Process this block of work
                     OldCallback->FunctionList->AnyTwoStubCall(pDataInX + offsetAdj, pDataInX2, pDataOutX + outputAdj, lenX, OldCallback->ScalarMode);
                     break;
 
-                case BOTH_SCALAR:
+                case SCALAR_MODE::BOTH_SCALAR:
                     MATHLOGGING("** bug both are scalar!\n");
                     // Process this block of work
                     //FunctionList->AnyTwoStubCall(pDataInX, pDataInX2, pDataOutX + outputAdj, lenX, ScalarMode);

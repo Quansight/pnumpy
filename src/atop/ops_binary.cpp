@@ -425,7 +425,7 @@ inline void SimpleMathOpFastSymmetric(void* pDataIn1X, void* pDataIn2X, void* pD
 
 
 extern "C"
-ANY_TWO_FUNC GetSimpleMathOpFast(int func, int atopInType1, int atopInType2, int atopOutType, int* wantedOutType) {
+ANY_TWO_FUNC GetSimpleMathOpFast(int func, int atopInType1, int atopInType2, int* wantedOutType) {
     LOGGING("GetSimpleMathOpFastFunc %d %d\n", atopInType1, func);
 
     switch (func) {
