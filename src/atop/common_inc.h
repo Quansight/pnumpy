@@ -372,7 +372,7 @@ static void* GetDefaultForType(int numpyInType) {
     case ATOP_UNICODE: pgDefault = &gString;
         break;
     default:
-        printf("!!! likely problem in GetDefaultForType\n");
+        //printf("!!! likely problem in GetDefaultForType\n");
     }
 
     return pgDefault;

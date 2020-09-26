@@ -74,6 +74,17 @@ extern pthread_cond_t  g_WakeupCond;
 //-------------------------------------------------------------------
 //
 // global scope
+#define VOID void
+typedef void* PVOID;
+
+typedef unsigned long       DWORD;
+
+typedef long long           LONG_PTR, * PLONG_PTR;
+typedef unsigned long long  ULONG_PTR, * PULONG_PTR;
+
+typedef ULONG_PTR SIZE_T, * PSIZE_T;
+typedef LONG_PTR  SSIZE_T, * PSSIZE_T;
+
 typedef VOID(WINAPI* WakeSingleAddress)(PVOID);
 typedef VOID(WINAPI* WakeAllAddress)(PVOID);
 typedef BOOL(WINAPI* WaitAddress)(volatile VOID*, PVOID, SIZE_T, DWORD);
@@ -126,20 +137,20 @@ struct OLD_CALLBACK {
     // Total number of array elements
     union {
         //INT64             TotalElements;
-        INT64             IndexSize;
+        int64_t             IndexSize;
 
         // strlen is for sorting strings
-        INT64             StrLen;
+        int64_t             StrLen;
     };
 
     union {
-        INT32             ScalarMode;
-        INT32             MergeBlocks;
+        int32_t             ScalarMode;
+        int32_t             MergeBlocks;
     };
 
     union {
-        INT64             TotalElements2;
-        INT64             ValSize;
+        int64_t             TotalElements2;
+        int64_t             ValSize;
     };
 
     // Default value to fill
