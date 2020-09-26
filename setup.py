@@ -31,7 +31,7 @@ else:
 if platform.system() == 'Windows':
     CFLAGS += ' /Ox /Ob2 /Oi /Ot /d2FH4-'
 else:
-    CFLAGS += ' -Wc++11-extensions'
+    CFLAGS += ' -mavx2 -fpermissive -Wno-unused-variable -std=c++11 -pthread -falign-functions=32'
 
 def read(*names, **kwargs):
     with io.open(
