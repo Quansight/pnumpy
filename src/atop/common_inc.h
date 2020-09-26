@@ -4,6 +4,7 @@
 #include <limits>
 #include <stdint.h>
 #include <stdio.h>
+#include <string.h>
 
 #if defined(_WIN32) && !defined(__GNUC__)
 #define WIN32_LEAN_AND_MEAN             // Exclude rarely-used stuff from Windows headers
