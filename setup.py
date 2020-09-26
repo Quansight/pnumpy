@@ -102,6 +102,7 @@ setup(
                      'src/atop/atop.cpp',
                      'src/atop/threads.cpp',
                      'src/atop/ops_binary.cpp',
+                     'src/atop/ops_compare.cpp',
                      'src/atop/ops_unary.cpp',
                     ],
             extra_compile_args=CFLAGS.split(),
