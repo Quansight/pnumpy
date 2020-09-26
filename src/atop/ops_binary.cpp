@@ -89,14 +89,14 @@ static const inline __m256i ANDNOT_OP_256(__m256i x, __m256i y) { return _mm256_
 //=====================================================================================================
 // Not symmetric -- arg1 must be first, arg2 must be second
 template<typename T, typename U256, const T MATH_OP(T, T), const U256 MATH_OP256(U256, U256)>
-inline void SimpleMathOpFast(void* pDataIn1X, void* pDataIn2X, void* pDataOutX, INT64 datalen, INT32 scalarMode) {
+inline void SimpleMathOpFast(void* pDataIn1X, void* pDataIn2X, void* pDataOutX, int64_t datalen, int32_t scalarMode) {
     T* pDataOut = (T*)pDataOutX;
     T* pDataIn1 = (T*)pDataIn1X;
     T* pDataIn2 = (T*)pDataIn2X;
 
-    const INT64 NUM_LOOPS_UNROLLED = 1;
-    const INT64 chunkSize = NUM_LOOPS_UNROLLED * (sizeof(U256) / sizeof(T));
-    INT64 perReg = sizeof(U256) / sizeof(T);
+    const int64_t NUM_LOOPS_UNROLLED = 1;
+    const int64_t chunkSize = NUM_LOOPS_UNROLLED * (sizeof(U256) / sizeof(T));
+    int64_t perReg = sizeof(U256) / sizeof(T);
 
     LOGGING("mathopfast datalen %llu  chunkSize %llu  perReg %llu\n", datalen, chunkSize, perReg);
 
@@ -130,7 +130,7 @@ inline void SimpleMathOpFast(void* pDataIn1X, void* pDataIn2X, void* pDataOutX, 
         }
 
         datalen = datalen & (chunkSize - 1);
-        for (INT64 i = 0; i < datalen; i++) {
+        for (int64_t i = 0; i < datalen; i++) {
             pDataOut[i] = MATH_OP(pDataIn1[i], pDataIn2[i]);
         }
 
@@ -167,7 +167,7 @@ inline void SimpleMathOpFast(void* pDataIn1X, void* pDataIn2X, void* pDataOutX, 
             pDataOut = (T*)pOut_256;
         }
         datalen = datalen & (chunkSize - 1);
-        for (INT64 i = 0; i < datalen; i++) {
+        for (int64_t i = 0; i < datalen; i++) {
             pDataOut[i] = MATH_OP(arg1, pDataIn2[i]);
         }
         break;
@@ -180,12 +180,12 @@ inline void SimpleMathOpFast(void* pDataIn1X, void* pDataIn2X, void* pDataOutX, 
         if (pDataOut == pDataIn1) {
 
             // align the load to 32 byte boundary
-            INT64 babylen = (INT64)pDataIn1 & 31;
+            int64_t babylen = (int64_t)pDataIn1 & 31;
             if (babylen != 0) {
                 // calc how much to align data
                 babylen = (32 - babylen) / sizeof(T);
                 if (babylen <= datalen) {
-                    for (INT64 i = 0; i < babylen; i++) {
+                    for (int64_t i = 0; i < babylen; i++) {
                         pDataIn1[i] = MATH_OP(pDataIn1[i], arg2);
                     }
                     pDataIn1 += babylen;
@@ -212,7 +212,7 @@ inline void SimpleMathOpFast(void* pDataIn1X, void* pDataIn2X, void* pDataOutX, 
                 pDataIn1 = (T*)pIn1_256;
             }
             datalen = datalen & (chunkSize - 1);
-            for (INT64 i = 0; i < datalen; i++) {
+            for (int64_t i = 0; i < datalen; i++) {
                 pDataIn1[i] = MATH_OP(pDataIn1[i], arg2);
             }
 
@@ -242,7 +242,7 @@ inline void SimpleMathOpFast(void* pDataIn1X, void* pDataIn2X, void* pDataOutX, 
                 pDataOut = (T*)pOut_256;
             }
             datalen = datalen & (chunkSize - 1);
-            for (INT64 i = 0; i < datalen; i++) {
+            for (int64_t i = 0; i < datalen; i++) {
                 pDataOut[i] = MATH_OP(pDataIn1[i], arg2);
             }
         }
@@ -256,14 +256,14 @@ inline void SimpleMathOpFast(void* pDataIn1X, void* pDataIn2X, void* pDataOutX, 
 //=====================================================================================================
 // symmetric -- arg1 and arg2 can be swapped and the operation will return the same result (like addition or multiplication)
 template<typename T, typename U256, const T MATH_OP(T, T), const U256 MATH_OP256(U256, U256)>
-inline void SimpleMathOpFastSymmetric(void* pDataIn1X, void* pDataIn2X, void* pDataOutX, INT64 datalen, INT32 scalarMode) {
+inline void SimpleMathOpFastSymmetric(void* pDataIn1X, void* pDataIn2X, void* pDataOutX, int64_t datalen, int32_t scalarMode) {
     T* pDataOut = (T*)pDataOutX;
     T* pDataIn1 = (T*)pDataIn1X;
     T* pDataIn2 = (T*)pDataIn2X;
 
-    const INT64 NUM_LOOPS_UNROLLED = 1;
-    const INT64 chunkSize = NUM_LOOPS_UNROLLED * (sizeof(U256) / sizeof(T));
-    INT64 perReg = sizeof(U256) / sizeof(T);
+    const int64_t NUM_LOOPS_UNROLLED = 1;
+    const int64_t chunkSize = NUM_LOOPS_UNROLLED * (sizeof(U256) / sizeof(T));
+    int64_t perReg = sizeof(U256) / sizeof(T);
 
     LOGGING("mathopfast datalen %llu  chunkSize %llu  perReg %llu\n", datalen, chunkSize, perReg);
 
@@ -296,7 +296,7 @@ inline void SimpleMathOpFastSymmetric(void* pDataIn1X, void* pDataIn2X, void* pD
         }
 
         datalen = datalen & (chunkSize - 1);
-        for (INT64 i = 0; i < datalen; i++) {
+        for (int64_t i = 0; i < datalen; i++) {
             pDataOut[i] = MATH_OP(pDataIn1[i], pDataIn2[i]);
         }
 
@@ -333,7 +333,7 @@ inline void SimpleMathOpFastSymmetric(void* pDataIn1X, void* pDataIn2X, void* pD
             pDataOut = (T*)pOut_256;
         }
         datalen = datalen & (chunkSize - 1);
-        for (INT64 i = 0; i < datalen; i++) {
+        for (int64_t i = 0; i < datalen; i++) {
             pDataOut[i] = MATH_OP(arg1, pDataIn2[i]);
         }
         break;
@@ -346,12 +346,12 @@ inline void SimpleMathOpFastSymmetric(void* pDataIn1X, void* pDataIn2X, void* pD
         if (pDataOut == pDataIn1) {
 
             // align the load to 32 byte boundary
-            INT64 babylen = (INT64)pDataIn1 & 31;
+            int64_t babylen = (int64_t)pDataIn1 & 31;
             if (babylen != 0) {
                 // calc how much to align data
                 babylen = (32 - babylen) / sizeof(T);
                 if (babylen <= datalen) {
-                    for (INT64 i = 0; i < babylen; i++) {
+                    for (int64_t i = 0; i < babylen; i++) {
                         pDataIn1[i] = MATH_OP(pDataIn1[i], arg2);
                     }
                     pDataIn1 += babylen;
@@ -379,7 +379,7 @@ inline void SimpleMathOpFastSymmetric(void* pDataIn1X, void* pDataIn2X, void* pD
                 pDataIn1 = (T*)pIn1_256;
             }
             datalen = datalen & (chunkSize - 1);
-            for (INT64 i = 0; i < datalen; i++) {
+            for (int64_t i = 0; i < datalen; i++) {
                 pDataIn1[i] = MATH_OP(pDataIn1[i], arg2);
             }
 
@@ -412,7 +412,7 @@ inline void SimpleMathOpFastSymmetric(void* pDataIn1X, void* pDataIn2X, void* pD
                 pDataOut = (T*)pOut_256;
             }
             datalen = datalen & (chunkSize - 1);
-            for (INT64 i = 0; i < datalen; i++) {
+            for (int64_t i = 0; i < datalen; i++) {
                 pDataOut[i] = MATH_OP(pDataIn1[i], arg2);
             }
         }
@@ -432,33 +432,33 @@ ANY_TWO_FUNC GetSimpleMathOpFast(int func, int atopInType1, int atopInType2, int
     case MATH_OPERATION::ADD:
         *wantedOutType = atopInType1;
         switch (*wantedOutType) {
-        case ATOP_BOOL:   return SimpleMathOpFastSymmetric<INT8, __m256i, OrOp<INT8>, OR_OP_256>;
+        case ATOP_BOOL:   return SimpleMathOpFastSymmetric<int8_t, __m256i, OrOp<int8_t>, OR_OP_256>;
         case ATOP_FLOAT:  return SimpleMathOpFastSymmetric<float, __m256, AddOp<float>, ADD_OP_256f32>;
         case ATOP_DOUBLE: return SimpleMathOpFastSymmetric<double, __m256d, AddOp<double>, ADD_OP_256f64>;
             // proof of concept for i32 addition loop
-        case ATOP_INT32:  return SimpleMathOpFastSymmetric<INT32, __m256i, AddOp<INT32>, ADD_OP_256i32>;
-        case ATOP_INT64:  return SimpleMathOpFastSymmetric<INT64, __m256i, AddOp<INT64>, ADD_OP_256i64>;
-        case ATOP_INT16:  return SimpleMathOpFastSymmetric<INT16, __m256i, AddOp<INT16>, ADD_OP_256i16>;
-        case ATOP_INT8:   return SimpleMathOpFastSymmetric<INT8, __m256i, AddOp<INT8>, ADD_OP_256i8>;
+        case ATOP_INT32:  return SimpleMathOpFastSymmetric<int32_t, __m256i, AddOp<int32_t>, ADD_OP_256i32>;
+        case ATOP_INT64:  return SimpleMathOpFastSymmetric<int64_t, __m256i, AddOp<int64_t>, ADD_OP_256i64>;
+        case ATOP_INT16:  return SimpleMathOpFastSymmetric<int16_t, __m256i, AddOp<int16_t>, ADD_OP_256i16>;
+        case ATOP_INT8:   return SimpleMathOpFastSymmetric<int8_t, __m256i, AddOp<int8_t>, ADD_OP_256i8>;
         }
         return NULL;
 
     case MATH_OPERATION::MUL:
         *wantedOutType = atopInType1;
         switch (*wantedOutType) {
-        case ATOP_BOOL:   return SimpleMathOpFastSymmetric<INT8, __m256i, AndOp<INT8>, AND_OP_256>;
+        case ATOP_BOOL:   return SimpleMathOpFastSymmetric<int8_t, __m256i, AndOp<int8_t>, AND_OP_256>;
         case ATOP_FLOAT:  return SimpleMathOpFastSymmetric<float, __m256, MulOp<float>, MUL_OP_256f32>;
         case ATOP_DOUBLE: return SimpleMathOpFastSymmetric<double, __m256d, MulOp<double>, MUL_OP_256f64>;
-        case ATOP_INT32:  return SimpleMathOpFastSymmetric<INT32, __m256i, MulOp<INT32>, MUL_OP_256i32>;
+        case ATOP_INT32:  return SimpleMathOpFastSymmetric<int32_t, __m256i, MulOp<int32_t>, MUL_OP_256i32>;
 
-            //CASE_ATOP_INT64:  return SimpleMathOpFast<INT64, __m256i, MulOp<INT64>, MUL_OP_256i64>;
-        case ATOP_INT16:  return SimpleMathOpFastSymmetric<INT16, __m256i, MulOp<INT16>, MUL_OP_256i16>;
+            //CASE_ATOP_INT64:  return SimpleMathOpFast<int64_t, __m256i, MulOp<int64_t>, MUL_OP_256i64>;
+        case ATOP_INT16:  return SimpleMathOpFastSymmetric<int16_t, __m256i, MulOp<int16_t>, MUL_OP_256i16>;
 
             // Below the intrinsic to multiply is slower so we disabled it (really wants 32bit -> 64bit)
             //CASE_ATOP_UINT32:  return SimpleMathOpFastMul<UINT32, __m256i>;
             // TODO: 64bit multiply can be done with algo..
             // lo1 * lo2 + (lo1 * hi2) << 32 + (hi1 *lo2) << 32)
-        case ATOP_UINT64: return SimpleMathOpFastSymmetric<UINT64, __m256i, MulOp<UINT64>, MUL_OP_256u64>;
+        case ATOP_UINT64: return SimpleMathOpFastSymmetric<uint64_t, __m256i, MulOp<uint64_t>, MUL_OP_256u64>;
         }
         return NULL;
 
@@ -467,10 +467,10 @@ ANY_TWO_FUNC GetSimpleMathOpFast(int func, int atopInType1, int atopInType2, int
         switch (*wantedOutType) {
         case ATOP_FLOAT:  return SimpleMathOpFast<float, __m256, SubOp<float>, SUB_OP_256f32>;
         case ATOP_DOUBLE: return SimpleMathOpFast<double, __m256d, SubOp<double>, SUB_OP_256f64>;
-        case ATOP_INT32:  return SimpleMathOpFast<INT32, __m256i, SubOp<INT32>, SUB_OP_256i32>;
-        case ATOP_INT64:  return SimpleMathOpFast<INT64, __m256i, SubOp<INT64>, SUB_OP_256i64>;
-        case ATOP_INT16:  return SimpleMathOpFast<INT16, __m256i, SubOp<INT16>, SUB_OP_256i16>;
-        case ATOP_INT8:   return SimpleMathOpFast<INT8, __m256i, SubOp<INT8>, SUB_OP_256i8>;
+        case ATOP_INT32:  return SimpleMathOpFast<int32_t, __m256i, SubOp<int32_t>, SUB_OP_256i32>;
+        case ATOP_INT64:  return SimpleMathOpFast<int64_t, __m256i, SubOp<int64_t>, SUB_OP_256i64>;
+        case ATOP_INT16:  return SimpleMathOpFast<int16_t, __m256i, SubOp<int16_t>, SUB_OP_256i16>;
+        case ATOP_INT8:   return SimpleMathOpFast<int8_t, __m256i, SubOp<int8_t>, SUB_OP_256i8>;
         }
         return NULL;
     }
