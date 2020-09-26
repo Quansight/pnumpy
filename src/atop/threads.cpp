@@ -489,7 +489,7 @@ extern "C" {
         return syscall(SYS_gettid);
 
 #elif defined(RT_OS_DARWIN)
-        uint64_t_t thread_id;
+        uint64_t thread_id;
         return pthread_threadid_np(NULL, &thread_id) ? 0 : (pid_t)thread_id;
 
 #elif defined(RT_OS_FREEBSD)
