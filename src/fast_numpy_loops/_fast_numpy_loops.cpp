@@ -6,6 +6,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include "../atop/atop.h"
+#include "../atop/threads.h"
 
 #define RETURN_NONE Py_INCREF(Py_None); return Py_None;
 
@@ -33,32 +34,157 @@ int convert_dtype_to_atop[]={
      ATOP_VOID                          //NPY_VOID,
 };
 
+
+int convert_atop_to_dtype[] = {
+     NPY_BOOL,                         //NPY_BOOL = 0,
+     NPY_INT8, NPY_UINT8,              //NPY_BYTE, NPY_UBYTE,
+     NPY_INT16, NPY_UINT16,            //NPY_SHORT, NPY_USHORT,
+     NPY_INT32, NPY_UINT32,            //NPY_INT, NPY_UINT,
+     NPY_INT64, NPY_UINT64,            //NPY_LONG, NPY_ULONG,
+     NPY_LONGLONG, NPY_ULONGLONG,      // Really INT128
+     NPY_FLOAT, NPY_DOUBLE, NPY_LONGDOUBLE,    //NPY_FLOAT, NPY_DOUBLE, NPY_LONGDOUBLE,
+     NPY_STRING, NPY_UNICODE,         //NPY_STRING, NPY_UNICODE,
+     NPY_VOID                          //NPY_VOID,
+};
+
 struct stUFunc {
     ANY_TWO_FUNC            pTwoFunc;
     PyUFuncGenericFunction  pOldFunc;
 };
 
-// 
-stUFunc  g_UFuncLUT[MATH_OPERATION::ADD][ATOP_LAST];
+// set to 0 to disable
+int32_t  g_AtopEnabled = 1;
 
+// global lookup tables for math opcode enum + dtype enum
+stUFunc  g_UFuncLUT[MATH_OPERATION::MATH_LAST][ATOP_LAST];
+stUFunc  g_CompFuncLUT[COMP_OPERATION::CMP_LAST][ATOP_LAST];
+
+// For binary math functions like add, sbutract, multiply.
+// 2 inputs and 1 output
 void AtopBinaryMathFunction(char** args, const npy_intp* dimensions, const npy_intp* steps, void* innerloop, int funcop, int atype) {
     //LOGGING("called with %d %d   funcp: %p\n", funcop, atype, g_UFuncLUT[funcop][atype].pOldFunc);
+    if (g_AtopEnabled) {
 
-    if (IS_BINARY_REDUCE) {
-        g_UFuncLUT[funcop][atype].pOldFunc(args, dimensions, steps, innerloop);
+        if (IS_BINARY_REDUCE) {
+            g_UFuncLUT[funcop][atype].pOldFunc(args, dimensions, steps, innerloop);
+        }
+        else {
+            char* ip1 = (char*)args[0];
+            char* ip2 = (char*)args[1];
+            char* op1 = (char*)args[2];
+            // For a scalar first is1 ==0
+            // For a scalar second is2 == 0
+            npy_intp is1 = steps[0], is2 = steps[1], os1 = steps[2];
+            npy_intp n = dimensions[0];
+            g_UFuncLUT[funcop][atype].pTwoFunc(ip1, ip2, op1, (int64_t)n, is1 == 0 ? SCALAR_MODE::FIRST_ARG_SCALAR : is2 == 0 ? SCALAR_MODE::SECOND_ARG_SCALAR : SCALAR_MODE::NO_SCALARS);
+
+        }
     }
     else {
+        g_UFuncLUT[funcop][atype].pOldFunc(args, dimensions, steps, innerloop);
+    }
+};
+
+//------------------------------------------------------------------------------
+//  Concurrent callback from multiple threads
+static BOOL CompareThreadCallbackStrided(struct stMATH_WORKER_ITEM* pstWorkerItem, int core, int64_t workIndex) {
+    BOOL didSomeWork = FALSE;
+    COMPARE_CALLBACK* Callback = (COMPARE_CALLBACK*)pstWorkerItem->WorkCallbackArg;
+
+    char* pDataIn1 = Callback->pDataIn1;
+    char* pDataIn2 = Callback->pDataIn2;
+    char* pDataOut = Callback->pDataOut;
+    int64_t lenX;
+    int64_t workBlock;
+
+    // As long as there is work to do
+    while ((lenX = pstWorkerItem->GetNextWorkBlock(&workBlock)) > 0) {
+
+        int64_t inputAdj1 = pstWorkerItem->BlockSize * workBlock * Callback->itemSizeIn1;
+        int64_t inputAdj2 = pstWorkerItem->BlockSize * workBlock * Callback->itemSizeIn2;
+        int64_t outputAdj = pstWorkerItem->BlockSize * workBlock * Callback->itemSizeOut;
+
+        // LOGGING("[%d] working on %lld with len %lld   block: %lld\n", core, workIndex, lenX, workBlock);
+        Callback->pTwoFunc(pDataIn1 + inputAdj1, pDataIn2 + inputAdj2, pDataOut + outputAdj, lenX, Callback->scalarmode);
+
+        // Indicate we completed a block
+        didSomeWork = TRUE;
+
+        // tell others we completed this work block
+        pstWorkerItem->CompleteWorkBlock();
+        //printf("|%d %d", core, (int)workBlock);
+    }
+
+    return didSomeWork;
+}
+
+
+// For binary math functions like add, sbutract, multiply.
+// 2 inputs and 1 output
+void AtopCompareMathFunction(char** args, const npy_intp* dimensions, const npy_intp* steps, void* innerloop, int funcop, int atype) {
+    // LOGGING("comparison called with %d %d   funcp: %p  len: %lld\n", funcop, atype, g_CompFuncLUT[funcop][atype].pOldFunc, (long long)dimensions[0]);
+
+    if (g_AtopEnabled) {
+        ANY_TWO_FUNC pTwoFunc = g_CompFuncLUT[funcop][atype].pTwoFunc;
+
         char* ip1 = (char*)args[0];
         char* ip2 = (char*)args[1];
         char* op1 = (char*)args[2];
+
         // For a scalar first is1 ==0
         // For a scalar second is2 == 0
         npy_intp is1 = steps[0], is2 = steps[1], os1 = steps[2];
-        npy_intp n = dimensions[0];
-        g_UFuncLUT[funcop][atype].pTwoFunc(ip1, ip2, op1, (int64_t)n, is1 == 0 ? SCALAR_MODE::FIRST_ARG_SCALAR : is2 == 0 ? SCALAR_MODE::SECOND_ARG_SCALAR : SCALAR_MODE::NO_SCALARS);
+        int64_t n = (int64_t)dimensions[0];
+        int scalarmode = is1 == 0 ? SCALAR_MODE::FIRST_ARG_SCALAR : is2 == 0 ? SCALAR_MODE::SECOND_ARG_SCALAR : SCALAR_MODE::NO_SCALARS;
+
+        stMATH_WORKER_ITEM* pWorkItem = THREADER->GetWorkItem(n);
+
+        if (pWorkItem == NULL) {
+
+            // Threading not allowed for this work item, call it directly from main thread
+            pTwoFunc(ip1, ip2, op1, n, scalarmode);
+        }
+        else {
+            COMPARE_CALLBACK stCallback;
+
+            // Each thread will call this routine with the callbackArg
+            pWorkItem->DoWorkCallback = CompareThreadCallbackStrided;
+            pWorkItem->WorkCallbackArg = &stCallback;
+
+            stCallback.pTwoFunc = pTwoFunc;
+            stCallback.pDataOut = op1;
+            stCallback.pDataIn1 = ip1;
+            stCallback.pDataIn2 = ip2;
+            stCallback.itemSizeIn1 = is1;
+            stCallback.itemSizeIn2 = is2;
+            stCallback.itemSizeOut = os1;
+            stCallback.scalarmode = scalarmode;
+
+            // This will notify the worker threads of a new work item
+            // most functions are so fast, we do not need more than 4 worker threads
+            THREADER->WorkMain(pWorkItem, n,  4);
+        }
+
+    }
+    else {
+        g_CompFuncLUT[funcop][atype].pOldFunc(args, dimensions, steps, innerloop);
 
     }
 };
+
+
+// For unary math functions like abs, sqrt
+// 1 input and 1 output
+void AtopUnaryMathFunction(char** args, const npy_intp* dimensions, const npy_intp* steps, void* innerloop, int funcop, int atype) {
+    char* ip1 = (char*)args[0];
+    char* op1 = (char*)args[1];
+    npy_intp is1 = steps[0], os1 = steps[1];
+    npy_intp n = dimensions[0];
+    //g_UFuncLUT[funcop][atype].pTwoFunc(ip1, ip2, op1, (int64_t)n, is1 == 0 ? SCALAR_MODE::FIRST_ARG_SCALAR : is2 == 0 ? SCALAR_MODE::SECOND_ARG_SCALAR : SCALAR_MODE::NO_SCALARS);
+
+    
+}
+
 
 // Ugly macro exapnsion to handle which ufunc
 // TODO: the ufunc callback needs to use enums
@@ -119,7 +245,7 @@ DEF_GEN_USTUB_EXPAND(19)
     FATOP_DOUBLE##_FUNC_, \
     FATOP_LONGDOUBLE##_FUNC_ 
 
-PyUFuncGenericFunction g_UFuncGenericLUT[MATH_OPERATION::LAST][ATOP_LAST] =
+PyUFuncGenericFunction g_UFuncGenericLUT[MATH_OPERATION::MATH_LAST][ATOP_LAST] =
 {
 {DEF_GEN_USTUB_NAME(0)},
 {DEF_GEN_USTUB_NAME(1)},
@@ -142,6 +268,59 @@ PyUFuncGenericFunction g_UFuncGenericLUT[MATH_OPERATION::LAST][ATOP_LAST] =
 {DEF_GEN_USTUB_NAME(18)},
 {DEF_GEN_USTUB_NAME(19)},
 };
+
+
+#define DEF_COMP_USTUB(_FUNC_, _ATYPE_) void COMPF##_ATYPE_##_FUNC_(char **args, const npy_intp *dimensions, const npy_intp *steps, void*innerloop) { \
+    return AtopCompareMathFunction(args, dimensions, steps, innerloop, _FUNC_, _ATYPE_);}
+
+#define DEF_COMP_USTUB_EXPAND(_FUNC_) \
+    DEF_COMP_USTUB(_FUNC_, ATOP_BOOL); \
+    DEF_COMP_USTUB(_FUNC_, ATOP_INT8); \
+    DEF_COMP_USTUB(_FUNC_, ATOP_UINT8); \
+    DEF_COMP_USTUB(_FUNC_, ATOP_INT16); \
+    DEF_COMP_USTUB(_FUNC_, ATOP_UINT16); \
+    DEF_COMP_USTUB(_FUNC_, ATOP_INT32); \
+    DEF_COMP_USTUB(_FUNC_, ATOP_UINT32); \
+    DEF_COMP_USTUB(_FUNC_, ATOP_INT64); \
+    DEF_COMP_USTUB(_FUNC_, ATOP_UINT64); \
+    DEF_COMP_USTUB(_FUNC_, ATOP_INT128); \
+    DEF_COMP_USTUB(_FUNC_, ATOP_UINT128); \
+    DEF_COMP_USTUB(_FUNC_, ATOP_FLOAT); \
+    DEF_COMP_USTUB(_FUNC_, ATOP_DOUBLE); \
+    DEF_COMP_USTUB(_FUNC_, ATOP_LONGDOUBLE);
+
+// For however many functions there are
+DEF_COMP_USTUB_EXPAND(0)
+DEF_COMP_USTUB_EXPAND(1)
+DEF_COMP_USTUB_EXPAND(2)
+DEF_COMP_USTUB_EXPAND(3)
+DEF_COMP_USTUB_EXPAND(4)
+DEF_COMP_USTUB_EXPAND(5)
+
+#define DEF_COMP_USTUB_NAME(_FUNC_) \
+    COMPFATOP_BOOL##_FUNC_, \
+    COMPFATOP_INT8##_FUNC_, \
+    COMPFATOP_UINT8##_FUNC_, \
+    COMPFATOP_INT16##_FUNC_, \
+    COMPFATOP_UINT16##_FUNC_, \
+    COMPFATOP_INT32##_FUNC_, \
+    COMPFATOP_UINT32##_FUNC_, \
+    COMPFATOP_INT64##_FUNC_, \
+    COMPFATOP_UINT64##_FUNC_, \
+    COMPFATOP_INT128##_FUNC_, \
+    COMPFATOP_UINT128##_FUNC_, \
+    COMPFATOP_FLOAT##_FUNC_, \
+    COMPFATOP_DOUBLE##_FUNC_, \
+    COMPFATOP_LONGDOUBLE##_FUNC_ 
+
+PyUFuncGenericFunction g_UFuncCompareLUT[COMP_OPERATION::CMP_LAST][ATOP_LAST] =
+{
+{DEF_COMP_USTUB_NAME(0)},
+{DEF_COMP_USTUB_NAME(1)},
+{DEF_COMP_USTUB_NAME(2)},
+{DEF_COMP_USTUB_NAME(3)},
+{DEF_COMP_USTUB_NAME(4)},
+{DEF_COMP_USTUB_NAME(5)}};
 
 
 template <class T>
@@ -234,10 +413,8 @@ PyObject* oldinit(PyObject *self, PyObject *args, PyObject *kwargs) {
 
 extern "C"
 PyObject* newinit(PyObject* self, PyObject* args, PyObject* kwargs) {
-    //int dtypes[] = { NPY_BOOL, NPY_INT8, NPY_UINT8,  NPY_INT16, NPY_UINT16,  NPY_INT32, NPY_UINT32,  NPY_INT64, NPY_UINT64, NPY_FLOAT32, NPY_FLOAT64 };
-    int dtypes[] = {  NPY_INT32,  NPY_INT64};
-    const char* str_ufunc[] = { "add","subtract" };
-    int   atop_mathop[] = { MATH_OPERATION::ADD, MATH_OPERATION::SUB };
+    int dtypes[] = { NPY_BOOL, NPY_INT8, NPY_UINT8,  NPY_INT16, NPY_UINT16,  NPY_INT32, NPY_UINT32,  NPY_INT64, NPY_UINT64, NPY_FLOAT32, NPY_FLOAT64 };
+    //int dtypes[] = {  NPY_INT32,  NPY_INT64};
 
     // Init atop: array threading operations
     if (atop_init()) {
@@ -250,6 +427,9 @@ PyObject* newinit(PyObject* self, PyObject* args, PyObject* kwargs) {
         if (numpy_module == NULL) {
             return NULL;
         }
+
+        const char* str_ufunc[] = { "add","subtract" };
+        int   atop_mathop[] = { MATH_OPERATION::ADD, MATH_OPERATION::SUB };
 
         // Loop over all ufuncs we want to replace
         int64_t num_ufuncs = sizeof(str_ufunc) / sizeof(char*);
@@ -272,24 +452,84 @@ PyObject* newinit(PyObject* self, PyObject* args, PyObject* kwargs) {
                 PyUFuncGenericFunction oldFunc;
                 int dtype = dtypes[j];
                 int signature[3] = { dtype, dtype, dtype };
-                int wantedOut = -1;
 
                 int atype = convert_dtype_to_atop[dtype];
 
-                ANY_TWO_FUNC pTwoFunc = GetSimpleMathOpFast(atop, atype, atype, atype, &wantedOut);
+                ANY_TWO_FUNC pTwoFunc = GetSimpleMathOpFast(atop, atype, atype, &signature[2]);
+                signature[2] = convert_atop_to_dtype[signature[2]];
 
                 if (pTwoFunc) {
                     int ret = PyUFunc_ReplaceLoopBySignature((PyUFuncObject*)ufunc, g_UFuncGenericLUT[atop][atype], signature, &oldFunc);
 
                     if (ret < 0) {
-                        return PyErr_Format(PyExc_TypeError, "Failed with %d. func %s must be the name of a ufunc", ret, ufunc_name);
+                        return PyErr_Format(PyExc_TypeError, "Math failed with %d. func %s must be the name of a ufunc.  atop:%d   atype:%d  sigs:%d, %d, %d", ret, ufunc_name, atop, atype, signature[0], signature[1], signature[2]);
                     }
 
+                    // Store the new function to call and the previous ufunc
                     g_UFuncLUT[atop][atype].pOldFunc = oldFunc;
                     g_UFuncLUT[atop][atype].pTwoFunc = pTwoFunc;
                 }
             }
         }
+
+        const char* str_comp_func[] = { "equal","not_equal","greater","greater_equal","less", "less_equal" };
+        int atop_compop[] = { COMP_OPERATION::CMP_EQ, COMP_OPERATION::CMP_NE, COMP_OPERATION::CMP_GT, COMP_OPERATION::CMP_GTE, COMP_OPERATION::CMP_LT, COMP_OPERATION::CMP_LTE};
+
+        // Loop over all ufuncs we want to replace
+        num_ufuncs = sizeof(str_comp_func) / sizeof(char*);
+        for (int64_t i = 0; i < num_ufuncs; i++) {
+            PyObject* result = NULL;
+            PyObject* ufunc = NULL;
+            const char* ufunc_name = str_comp_func[i];
+            int atop = atop_compop[i];
+
+            ufunc = PyObject_GetAttrString(numpy_module, ufunc_name);
+
+            if (ufunc == NULL) {
+                Py_XDECREF(ufunc);
+                return PyErr_Format(PyExc_TypeError, "func %s must be the name of a ufunc", ufunc_name);
+            }
+
+            // Loop over all dtypes we support for the ufunc
+            int64_t num_dtypes = sizeof(dtypes) / sizeof(int);
+            for (int64_t j = 0; j < num_dtypes; j++) {
+                PyUFuncGenericFunction oldFunc;
+                int dtype = dtypes[j];
+                int signature[3] = { dtype, dtype, dtype };
+
+                int atype = convert_dtype_to_atop[dtype];
+
+                ANY_TWO_FUNC pTwoFunc = GetComparisonOpFast(atop, atype, atype, &signature[2]);
+                signature[2] = convert_atop_to_dtype[signature[2]];
+
+                if (pTwoFunc) {
+                    int ret = PyUFunc_ReplaceLoopBySignature((PyUFuncObject*)ufunc, g_UFuncCompareLUT[atop][atype], signature, &oldFunc);
+
+                    if (ret < 0) {
+                        return PyErr_Format(PyExc_TypeError, "Comparison failed with %d. func %s must be the name of a ufunc.  atop:%d   atype:%d  sigs:%d, %d, %d", ret, ufunc_name, atop, atype, signature[0], signature[1], signature[2]);
+                    }
+
+                    // Store the new function to call and the previous ufunc
+                    g_CompFuncLUT[atop][atype].pOldFunc = oldFunc;
+                    g_CompFuncLUT[atop][atype].pTwoFunc = pTwoFunc;
+                }
+            }
+        }
+
+        //printf("going for abs\n");
+        //PyObject* ufunc = PyObject_GetAttrString(numpy_module, "abs");
+        //if (ufunc) {
+        //    PyUFuncGenericFunction oldFunc;
+        //    int signature[2] = { NPY_FLOAT, NPY_INT32 };
+        //    int ret = PyUFunc_ReplaceLoopBySignature((PyUFuncObject*)ufunc, NULL, signature, &oldFunc);
+        //    printf("got abs %d\n" ,ret);
+
+        //    if (ret < 0) {
+        //        return PyErr_Format(PyExc_TypeError, "Failed with %d. func %s must be the name of a ufunc", ret, "abs");
+        //    }
+
+        //}
+
         RETURN_NONE;
     }
     return PyErr_Format(PyExc_ImportError, "atop was either already loaded or failed to load");

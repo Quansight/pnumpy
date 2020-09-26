@@ -13,19 +13,19 @@ extern "C" PyObject* newinit(PyObject* self, PyObject* args, PyObject* kwargs);
 static char m_doc[] = "Provide methods to override NumPy ufuncs";
 
 
-PyDoc_STRVAR(initialize_doc,
+PyDoc_STRVAR(oldinit_doc,
      "oldinit(ufunc_name:");
 
 static PyMethodDef module_functions[] = {
     {"initialize",       (PyCFunction)newinit, METH_VARARGS | METH_KEYWORDS, "init the atop"},
-    {"oldinit",          (PyCFunction)oldinit, METH_VARARGS | METH_KEYWORDS, initialize_doc},
-    {NULL, NULL}
+    {"oldinit",          (PyCFunction)oldinit, METH_VARARGS | METH_KEYWORDS, oldinit_doc},
+    {NULL, NULL, 0,  NULL}
 };
 
 
 static PyModuleDef moduledef = {
    PyModuleDef_HEAD_INIT,
-   "fast_numpy_loops._fast_numpy_loops", // Module name
+   "fast_numpy_loops",                  // Module name
    m_doc,  // Module description
    0,
    module_functions,                     // Structure that defines the methods
@@ -34,7 +34,8 @@ static PyModuleDef moduledef = {
    NULL,                                 // GC
    NULL                                  // freefunc
 };
-PyMODINIT_FUNC PyInit__fast_numpy_loops(void) {
+
+PyMODINIT_FUNC PyInit_fast_numpy_loops(void) {
     PyObject *module;
 
     module = PyModule_Create(&moduledef);
