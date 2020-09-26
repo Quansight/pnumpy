@@ -13,7 +13,7 @@
         && (steps[0] == steps[2])\
         && (steps[0] == 0))
 
-int convert_dtype_to_atop[]{
+int convert_dtype_to_atop[]={
      ATOP_BOOL,                         //NPY_BOOL = 0,
      ATOP_INT8, ATOP_UINT8,             //NPY_BYTE, NPY_UBYTE,
      ATOP_INT16, ATOP_UINT16,           //NPY_SHORT, NPY_USHORT,
@@ -237,7 +237,7 @@ extern "C"
 PyObject* newinit(PyObject* self, PyObject* args, PyObject* kwargs) {
     //int dtypes[] = { NPY_BOOL, NPY_INT8, NPY_UINT8,  NPY_INT16, NPY_UINT16,  NPY_INT32, NPY_UINT32,  NPY_INT64, NPY_UINT64, NPY_FLOAT32, NPY_FLOAT64 };
     int dtypes[] = {  NPY_INT32,  NPY_INT64};
-    char* str_ufunc[] = { "add","subtract" };
+    const char* str_ufunc[] = { "add","subtract" };
     int   atop_mathop[] = { MATH_OPERATION::ADD, MATH_OPERATION::SUB };
 
     // Init atop: array threading operations
