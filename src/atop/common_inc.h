@@ -332,7 +332,7 @@ static uint8_t  gDefaultUInt8 = 0xFF;
 static float  gDefaultFloat = std::numeric_limits<float>::quiet_NaN();
 static double gDefaultDouble = std::numeric_limits<double>::quiet_NaN();
 static long double gDefaultLongDouble = std::numeric_limits<long double>::quiet_NaN();
-static INT8   gDefaultBool = 0;
+static int8_t gDefaultBool = 0;
 static char   gString[1024] = { 0,0,0,0 };
 
 //----------------------------------------------------
