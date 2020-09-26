@@ -98,7 +98,7 @@ setup(
         Extension(
             'fast_numpy_loops._fast_numpy_loops',
             sources=['src/fast_numpy_loops/_fast_numpy_loops.cpp',
-                     'src/fast_numpy_loops/module_init.c',
+                     'src/fast_numpy_loops/module_init.cpp',
                      'src/atop/atop.cpp',
                      'src/atop/threads.cpp',
                      'src/atop/ops_binary.cpp',
