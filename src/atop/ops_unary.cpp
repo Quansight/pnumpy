@@ -894,7 +894,7 @@ static void UnaryOpSlow_ISNANORZERO(void* pDataIn1, void* pDataOut, int64_t len,
 template<typename T>
 static void UnaryOpSlow_ISINVALID(void* pDataIn1, void* pDataOut, int64_t len, int64_t strideIn, int64_t strideOut) {
     T* pIn = (T*)pDataIn1;
-    T invalid = *(T*)GetInvalid<T>();
+    T invalid = GetInvalid((T)0);
     int8_t* pOut = (int8_t*)pDataOut;
     int8_t* pLastOut = (int8_t*)((char*)pOut + (strideOut * len));
 
@@ -914,7 +914,7 @@ static void UnaryOpSlow_ISINVALID(void* pDataIn1, void* pDataOut, int64_t len, i
 template<typename T>
 static void UnaryOpSlow_ISINVALIDORZERO(void* pDataIn1, void* pDataOut, int64_t len, int64_t strideIn, int64_t strideOut) {
     T* pIn = (T*)pDataIn1;
-    T invalid = *(T*)GetInvalid<T>();
+    T invalid = GetInvalid((T)0);
     int8_t* pOut = (int8_t*)pDataOut;
     int8_t* pLastOut = (int8_t*)((char*)pOut + (strideOut * len));
 
@@ -934,7 +934,7 @@ static void UnaryOpSlow_ISINVALIDORZERO(void* pDataIn1, void* pDataOut, int64_t 
 template<typename T>
 static void UnaryOpSlow_ISNOTINVALID(void* pDataIn1, void* pDataOut, int64_t len, int64_t strideIn, int64_t strideOut) {
     T* pIn = (T*)pDataIn1;
-    T invalid = *(T*)GetInvalid<T>();
+    T invalid = GetInvalid((T)0);
     int8_t* pOut = (int8_t*)pDataOut;
     int8_t* pLastOut = (int8_t*)((char*)pOut + (strideOut * len));
 

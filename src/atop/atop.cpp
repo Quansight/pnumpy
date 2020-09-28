@@ -1,7 +1,7 @@
 #include "atop.h"
 #include "threads.h"
 
-#define LOGGING
+#define LOGGING(...)
 #define LOGERROR printf
 
 //----------------------------------------------------------------------------------

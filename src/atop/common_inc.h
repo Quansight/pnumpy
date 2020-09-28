@@ -341,113 +341,20 @@ enum MATH_OPERATION {
     MATH_LAST = 73,
 };
 
+// For when integers have an invalid predefined
+static const int8_t  GetInvalid(int8_t x) { return (int8_t)(0x80); };
+static const int16_t GetInvalid(int16_t x) { return (int16_t)(0x8000); };
+static const int32_t GetInvalid(int32_t x) { return (int32_t)(0x800000000000); };
+static const int64_t GetInvalid(int64_t x) { return (int64_t)(0x8000000000000000); };
 
-static int64_t  gDefaultInt64 = 0x8000000000000000;
-static int32_t  gDefaultInt32 = 0x80000000;
-static uint16_t  gDefaultInt16 = 0x8000;
-static uint8_t   gDefaultInt8 = 0x80;
+static const uint8_t  GetInvalid(uint8_t x) { return (uint8_t)(0xFF); };
+static const uint16_t GetInvalid(uint16_t x) { return (uint16_t)(0xFFFF); };
+static const uint32_t GetInvalid(uint32_t x) { return (uint32_t)(0xFFFFFFFF); };
+static const uint64_t GetInvalid(uint64_t x) { return (uint64_t)(0xFFFFFFFFFFFFFFFF); };
 
-static uint64_t gDefaultUInt64 = 0xFFFFFFFFFFFFFFFF;
-static uint32_t gDefaultUInt32 = 0xFFFFFFFF;
-static uint16_t gDefaultUInt16 = 0xFFFF;
-static uint8_t  gDefaultUInt8 = 0xFF;
-
-static float  gDefaultFloat = std::numeric_limits<float>::quiet_NaN();
-static double gDefaultDouble = std::numeric_limits<double>::quiet_NaN();
-static long double gDefaultLongDouble = std::numeric_limits<long double>::quiet_NaN();
-static int8_t gDefaultBool = 0;
-static char   gString[1024] = { 0,0,0,0 };
-
-//----------------------------------------------------
-// returns pointer to a data type (of same size in memory) that holds the invalid value for the type
-// does not yet handle strings
-static void* GetDefaultForType(int numpyInType) {
-    void* pgDefault = &gDefaultInt64;
-
-    switch (numpyInType) {
-    case ATOP_FLOAT:  pgDefault = &gDefaultFloat;
-        break;
-    case ATOP_DOUBLE: pgDefault = &gDefaultDouble;
-        break;
-    case ATOP_LONGDOUBLE: pgDefault = &gDefaultLongDouble;
-        break;
-    // BOOL should not really have an invalid value inhabiting the type
-    case ATOP_BOOL:   pgDefault = &gDefaultBool;
-        break;
-    case ATOP_INT8:   pgDefault = &gDefaultInt8;
-        break;
-    case ATOP_INT16:  pgDefault = &gDefaultInt16;
-        break;
-    case ATOP_INT32:  pgDefault = &gDefaultInt32;
-        break;
-    case ATOP_INT64:  pgDefault = &gDefaultInt64;
-        break;
-    case ATOP_UINT8:  pgDefault = &gDefaultUInt8;
-        break;
-    case ATOP_UINT16: pgDefault = &gDefaultUInt16;
-        break;
-    case ATOP_UINT32: pgDefault = &gDefaultUInt32;
-        break;
-    case ATOP_UINT64: pgDefault = &gDefaultUInt64;
-        break;
-    case ATOP_STRING: pgDefault = &gString;
-        break;
-    case ATOP_UNICODE: pgDefault = &gString;
-        break;
-    default:
-        //printf("!!! likely problem in GetDefaultForType\n");
-        break;
-    }
-
-    return pgDefault;
-}
-
-static const int GetMaoType(bool value) {
-    return ATOP_BOOL;
-}
-static const int GetMaoType(int8_t value) {
-    return ATOP_INT8;
-}
-static const int GetMaoType(int16_t value) {
-    return ATOP_INT16;
-}
-static const int GetMaoType(int32_t value) {
-    return ATOP_INT32;
-}
-static const int GetMaoType(int64_t value) {
-    return ATOP_INT64;
-}
-static const int GetMaoType(uint8_t value) {
-    return ATOP_UINT8;
-}
-static const int GetMaoType(uint16_t value) {
-    return ATOP_UINT16;
-}
-static const int GetMaoType(uint32_t value) {
-    return ATOP_UINT32;
-}
-
-static const int GetMaoType(uint64_t value) {
-    return ATOP_UINT64;
-}
-static const int GetMaoType(float value) {
-    return ATOP_FLOAT;
-}
-static const int GetMaoType(double value) {
-    return ATOP_DOUBLE;
-}
-static const int GetMaoType(long double value) {
-    return ATOP_LONGDOUBLE;
-}
-static const int GetMaoType(char* value) {
-    return ATOP_STRING;
-}
-
-
-template <typename T>
-static void* GetInvalid() {
-    return GetDefaultForType(GetMaoType((T)0));
-}
+static const float GetInvalid(float x) { return std::numeric_limits<float>::quiet_NaN(); };
+static const double GetInvalid(double x) { return std::numeric_limits<double>::quiet_NaN(); };
+static const long double GetInvalid(long double x) { return std::numeric_limits<long double>::quiet_NaN(); };
 
 //----------------------------------------------------------------------------------
 // Lookup to go from 1 byte to 8 byte boolean values

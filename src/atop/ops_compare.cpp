@@ -16,7 +16,7 @@
 /* GCC 4.1, 4.2, and 4.3 do not have x86intrin.h, directly include SSE2 header */
 #include <emmintrin.h>
 #endif
-
+#pragma GCC diagnostic ignored "-Wunused-function"
 #endif
 
 
