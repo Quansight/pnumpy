@@ -601,5 +601,7 @@ PyObject* isenabled(PyObject* self, PyObject* args) {
 
 extern "C"
 PyObject * cpustring(PyObject * self, PyObject * args) {
-    return PyUnicode_FromString(THREADER->CPUString);
+    // threading collects the cpu string
+    if (THREADER) return PyUnicode_FromString(THREADER->CPUString);
+    RETURN_NONE;
 }
