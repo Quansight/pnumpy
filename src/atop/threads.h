@@ -3,7 +3,7 @@
 #include "common_inc.h"
 
 #if defined(__GNUC__)
-//#pragma GCC target "arch=core-avx2,tune=core-avx2"
+#pragma GCC target "arch=core-avx2,tune=core-avx2"
 #if __GNUC_PREREQ(4, 4) || (__clang__ > 0 && __clang_major__ >= 3) || !defined(__GNUC__)
 /* GCC >= 4.4 or clang or non-GCC compilers */
 #include <x86intrin.h>

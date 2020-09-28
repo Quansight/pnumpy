@@ -1,16 +1,5 @@
-#include "threads.h"
+#include "common_inc.h"
 #include <cmath>
-
-#if defined(__GNUC__)
-#pragma GCC target "arch=core-avx2,tune=core-avx2"
-#if __GNUC_PREREQ(4, 4) || (__clang__ > 0 && __clang_major__ >= 3) || !defined(__GNUC__)
-/* GCC >= 4.4 or clang or non-GCC compilers */
-#include <x86intrin.h>
-#elif __GNUC_PREREQ(4, 1)
-/* GCC 4.1, 4.2, and 4.3 do not have x86intrin.h, directly include SSE2 header */
-#include <emmintrin.h>
-#endif
-#endif
 
 //#define LOGGING printf
 #define LOGGING(...)

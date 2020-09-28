@@ -1,4 +1,4 @@
-#include "threads.h"
+#include "common_inc.h"
 #include <cmath>
 
 #if defined(__GNUC__)
@@ -1711,36 +1711,36 @@ static UNARY_FUNC_STRIDED CheckMathOpOneInputStrided(int func, int numpyInType1,
     return pOneFunc;
 }
 
-//------------------------------------------------------------------------------
-//  Concurrent callback from multiple threads
-static BOOL UnaryThreadCallbackStrided(struct stMATH_WORKER_ITEM* pstWorkerItem, int core, int64_t workIndex) {
-    BOOL didSomeWork = FALSE;
-    UNARY_CALLBACK* Callback = (UNARY_CALLBACK*)pstWorkerItem->WorkCallbackArg;
-
-    char* pDataIn = (char*)Callback->pDataIn;
-    char* pDataOut = (char*)Callback->pDataOut;
-    int64_t lenX;
-    int64_t workBlock;
-
-    // As long as there is work to do
-    while ((lenX = pstWorkerItem->GetNextWorkBlock(&workBlock)) > 0) {
-
-        int64_t inputAdj = pstWorkerItem->BlockSize * workBlock * Callback->itemSizeIn;
-        int64_t outputAdj = pstWorkerItem->BlockSize * workBlock * Callback->itemSizeOut;
-
-        LOGGING("[%d] working on %lld with len %lld   block: %lld\n", core, workIndex, lenX, workBlock);
-        Callback->pUnaryCallbackStrided(pDataIn + inputAdj, pDataOut + outputAdj, lenX, Callback->itemSizeIn, Callback->itemSizeOut);
-
-        // Indicate we completed a block
-        didSomeWork = TRUE;
-
-        // tell others we completed this work block
-        pstWorkerItem->CompleteWorkBlock();
-        //printf("|%d %d", core, (int)workBlock);
-    }
-
-    return didSomeWork;
-}
+////------------------------------------------------------------------------------
+////  Concurrent callback from multiple threads
+//static BOOL UnaryThreadCallbackStrided(struct stMATH_WORKER_ITEM* pstWorkerItem, int core, int64_t workIndex) {
+//    BOOL didSomeWork = FALSE;
+//    UNARY_CALLBACK* Callback = (UNARY_CALLBACK*)pstWorkerItem->WorkCallbackArg;
+//
+//    char* pDataIn = (char*)Callback->pDataIn;
+//    char* pDataOut = (char*)Callback->pDataOut;
+//    int64_t lenX;
+//    int64_t workBlock;
+//
+//    // As long as there is work to do
+//    while ((lenX = pstWorkerItem->GetNextWorkBlock(&workBlock)) > 0) {
+//
+//        int64_t inputAdj = pstWorkerItem->BlockSize * workBlock * Callback->itemSizeIn;
+//        int64_t outputAdj = pstWorkerItem->BlockSize * workBlock * Callback->itemSizeOut;
+//
+//        LOGGING("[%d] working on %lld with len %lld   block: %lld\n", core, workIndex, lenX, workBlock);
+//        Callback->pUnaryCallbackStrided(pDataIn + inputAdj, pDataOut + outputAdj, lenX, Callback->itemSizeIn, Callback->itemSizeOut);
+//
+//        // Indicate we completed a block
+//        didSomeWork = TRUE;
+//
+//        // tell others we completed this work block
+//        pstWorkerItem->CompleteWorkBlock();
+//        //printf("|%d %d", core, (int)workBlock);
+//    }
+//
+//    return didSomeWork;
+//}
 
 #if defined(__clang__)
 #pragma clang attribute pop
