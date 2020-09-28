@@ -1,6 +1,15 @@
 #include "threads.h"
 #include <cmath>
 
+#if defined(__GNUC__)
+#pragma GCC target "arch=core-avx2,tune=core-avx2"
+#endif
+
+#if defined(__clang__)
+#pragma clang diagnostic ignored "-Wmissing-braces"
+#pragma clang diagnostic ignored "-Wunused-function"
+#pragma clang attribute push (__attribute__((target("avx""))), apply_to=function)
+#endif
 
 //#define LOGGING printf
 #define LOGGING(...)
@@ -1726,3 +1735,6 @@ static BOOL UnaryThreadCallbackStrided(struct stMATH_WORKER_ITEM* pstWorkerItem,
     return didSomeWork;
 }
 
+#if defined(__clang__)
+#pragma clang attribute pop
+#endif

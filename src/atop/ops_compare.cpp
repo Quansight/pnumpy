@@ -1,6 +1,16 @@
 #include "threads.h"
 #include <cmath>
 
+#if defined(__GNUC__)
+#pragma GCC target "arch=core-avx2,tune=core-avx2"
+#endif
+
+#if defined(__clang__)
+#pragma clang diagnostic ignored "-Wmissing-braces"
+#pragma clang diagnostic ignored "-Wunused-function"
+#pragma clang attribute push (__attribute__((target("avx""))), apply_to=function)
+#endif
+
 //#define LOGGING printf
 #define LOGGING(...)
 
@@ -894,3 +904,6 @@ ANY_TWO_FUNC GetComparisonOpFast(int func, int atopInType1, int atopInType2, int
 }
 
 
+#if defined(__clang__)
+#pragma clang attribute pop
+#endif

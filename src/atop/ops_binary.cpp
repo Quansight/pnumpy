@@ -1,13 +1,20 @@
 #include "threads.h"
 #include <cmath>
 
+#if defined(__GNUC__)
+#pragma GCC target "arch=core-avx2,tune=core-avx2"
+#endif
+
 //#define LOGGING printf
 #define LOGGING(...)
 
 #if defined(__clang__)
 #pragma clang diagnostic ignored "-Wmissing-braces"
 #pragma clang diagnostic ignored "-Wunused-function"
+#pragma clang attribute push (__attribute__((target("avx""))), apply_to=function)
 #endif
+
+
 
 static const inline __m256d LOADU(__m256d* x) { return _mm256_loadu_pd((double const*)x); };
 static const inline __m256 LOADU(__m256* x) { return _mm256_loadu_ps((float const*)x); };
@@ -476,3 +483,8 @@ ANY_TWO_FUNC GetSimpleMathOpFast(int func, int atopInType1, int atopInType2, int
     }
     return NULL;
 }
+
+
+#if defined(__clang__)
+#pragma clang attribute pop
+#endif
