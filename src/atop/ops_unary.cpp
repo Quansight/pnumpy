@@ -1,6 +1,12 @@
 #include "common_inc.h"
 #include <cmath>
 
+#if defined(__clang__)
+#pragma clang diagnostic ignored "-Wmissing-braces"
+#pragma clang diagnostic ignored "-Wunused-function"
+#pragma clang attribute push (__attribute__((target("avx"))), apply_to=function)
+#endif
+
 #if defined(__GNUC__)
 #pragma GCC target "arch=core-avx2,tune=core-avx2"
 #if __GNUC_PREREQ(4, 4) || (__clang__ > 0 && __clang_major__ >= 3) || !defined(__GNUC__)
@@ -12,11 +18,6 @@
 #endif
 #endif
 
-#if defined(__clang__)
-#pragma clang diagnostic ignored "-Wmissing-braces"
-#pragma clang diagnostic ignored "-Wunused-function"
-#pragma clang attribute push (__attribute__((target("avx""))), apply_to=function)
-#endif
 
 //#define LOGGING printf
 #define LOGGING(...)
