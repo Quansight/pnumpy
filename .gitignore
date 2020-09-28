@@ -2,22 +2,22 @@
 __pycache__
 
 # msvc
-.sln
-.vcxproj
-.tlog
-.db
-.opedb
-.idb
-.pdb
-.ipch
-.json
-.sqlite
-.suo
-.obj
-.filters
-.user
-.cod
-.lastbuildstate
+*.sln
+*.vcxproj
+*.tlog
+*.db
+*.opedb
+*.idb
+*.pdb
+*.ipch
+*.json
+*.sqlite
+*.suo
+*.obj
+*.filters
+*.user
+*.cod
+*.lastbuildstate
 
 # C extensions
 *.so
