@@ -1,5 +1,15 @@
 #include "threads.h"
 
+#if defined(__GNUC__)
+#if __GNUC_PREREQ(4, 4) || (__clang__ > 0 && __clang_major__ >= 3) || !defined(__GNUC__)
+/* GCC >= 4.4 or clang or non-GCC compilers */
+#include <x86intrin.h>
+#elif __GNUC_PREREQ(4, 1)
+/* GCC 4.1, 4.2, and 4.3 do not have x86intrin.h, directly include SSE2 header */
+#include <emmintrin.h>
+#endif
+#endif
+
 // to debug thread wakeup allow LOGGING to printf
 //#define LOGGING printf
 #define LOGGING(...)
