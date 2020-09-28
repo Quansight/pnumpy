@@ -5,8 +5,9 @@ __pycache__
 *.sln
 *.vcxproj
 *.tlog
+*.log
 *.db
-*.opedb
+*.opendb
 *.idb
 *.pdb
 *.ipch
