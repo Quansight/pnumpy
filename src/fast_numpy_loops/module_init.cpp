@@ -25,7 +25,7 @@ static PyMethodDef module_functions[] = {
 
 static PyModuleDef moduledef = {
    PyModuleDef_HEAD_INIT,
-   "fast_numpy_loops",                  // Module name
+   "fast_numpy_loops._fast_numpy_loops",                  // Module name
    m_doc,  // Module description
    0,
    module_functions,                     // Structure that defines the methods
@@ -35,7 +35,7 @@ static PyModuleDef moduledef = {
    NULL                                  // freefunc
 };
 
-PyMODINIT_FUNC PyInit_fast_numpy_loops(void) {
+extern "C" PyMODINIT_FUNC PyInit__fast_numpy_loops(void) {
     PyObject *module;
 
     module = PyModule_Create(&moduledef);

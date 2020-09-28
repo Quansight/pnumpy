@@ -96,7 +96,7 @@ setup(
     },
     ext_modules=[
         Extension(
-            'fast_numpy_loops',
+            'fast_numpy_loops._fast_numpy_loops',
             sources=['src/fast_numpy_loops/_fast_numpy_loops.cpp',
                      'src/fast_numpy_loops/module_init.cpp',
                      'src/atop/atop.cpp',
