@@ -22,11 +22,6 @@
 //#define LOGGING printf
 #define LOGGING(...)
 
-#if defined(__clang__)
-#pragma clang diagnostic ignored "-Wmissing-braces"
-#pragma clang diagnostic ignored "-Wunused-function"
-#endif
-
 static const inline __m256d LOADU(__m256d* x) { return _mm256_loadu_pd((double const*)x); };
 static const inline __m256 LOADU(__m256* x) { return _mm256_loadu_ps((float const*)x); };
 static const inline __m256i LOADU(__m256i* x) { return _mm256_loadu_si256((__m256i const*)x); };
