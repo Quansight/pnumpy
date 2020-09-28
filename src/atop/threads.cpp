@@ -249,14 +249,8 @@ THANDLE StartThread(stWorkerRing* pWorkerRing)
 
 typedef unsigned int U32;
 
-typedef struct {
-    U32 f1c;
-    U32 f1d;
-    U32 f7b;
-    U32 f7c;
-} ZSTD_cpuid_t;
-
-MEM_STATIC ZSTD_cpuid_t ZSTD_cpuid(void) {
+// Taken from the ZSTD project
+MEM_STATIC ATOP_cpuid_t ATOP_cpuid(void) {
     U32 f1c = 0;
     U32 f1d = 0;
     U32 f7b = 0;
@@ -325,7 +319,7 @@ MEM_STATIC ZSTD_cpuid_t ZSTD_cpuid(void) {
     }
 #endif
     {
-        ZSTD_cpuid_t cpuid;
+        ATOP_cpuid_t cpuid;
         cpuid.f1c = f1c;
         cpuid.f1d = f1d;
         cpuid.f7b = f7b;
@@ -335,7 +329,7 @@ MEM_STATIC ZSTD_cpuid_t ZSTD_cpuid(void) {
 }
 
 #define X(name, r, bit)                                                        \
-  MEM_STATIC int ZSTD_cpuid_##name(ZSTD_cpuid_t const cpuid) {                 \
+  MEM_STATIC int ATOP_cpuid_##name(ATOP_cpuid_t const cpuid) {                 \
     return ((cpuid.r) & (1U << bit)) != 0;                                     \
   }
 
@@ -437,12 +431,15 @@ C(avx512vbmi, 1)
 
 #undef X
 
-int g_bmi2 = 0;
-int g_avx2 = 0;
+extern "C" {
+    int g_bmi2 = 0;
+    int g_avx2 = 0;
+    ATOP_cpuid_t   g_cpuid;
+};
 
 #if defined(RT_OS_WINDOWS)
 
-void PrintCPUInfo() {
+void PrintCPUInfo(char* buffer, size_t buffercount) {
     int CPUInfo[4] = { -1 };
     unsigned   nExIds, i = 0;
     char CPUBrandString[0x40];
@@ -461,11 +458,13 @@ void PrintCPUInfo() {
             memcpy(CPUBrandString + 32, CPUInfo, sizeof(CPUInfo));
     }
     // NEW CODE
-    g_bmi2 = ZSTD_cpuid_bmi2(ZSTD_cpuid());
-    g_avx2 = ZSTD_cpuid_avx2(ZSTD_cpuid());
+    g_cpuid = ATOP_cpuid();
 
-    //printf("**CPU: %s  AVX2:%d  BMI2:%d\n", CPUBrandString, g_avx2, g_bmi2);
-    if (g_bmi2 == 0 || g_avx2 == 0) {
+    g_bmi2 = ATOP_cpuid_bmi2(g_cpuid);
+    g_avx2 = ATOP_cpuid_avx2(g_cpuid);
+
+    snprintf(buffer, buffercount, "**CPU: %s  AVX2:%d  BMI2:%d\n", CPUBrandString, g_avx2, g_bmi2);
+    if (g_avx2 == 0) {
         printf("!!!NOTE: this system does not support AVX2 or BMI2 instructions, and will not work!\n");
     }
 
@@ -603,7 +602,7 @@ extern "C" {
 
 #include <cpuid.h>
 
-void PrintCPUInfo() {
+void PrintCPUInfo(char* buffer, size_t buffercount) {
     char CPUBrandString[0x40];
     unsigned int CPUInfo[4] = { 0,0,0,0 };
 
@@ -625,12 +624,13 @@ void PrintCPUInfo() {
     }
     //printf("**CPU: %s\n", CPUBrandString);
 
-    // NEW CODE
-    g_bmi2 = ZSTD_cpuid_bmi2(ZSTD_cpuid());
-    g_avx2 = ZSTD_cpuid_avx2(ZSTD_cpuid());
+    g_cpuid = ATOP_cpuid();
 
-    //printf("**CPU: %s  AVX2:%d  BMI2:%d\n", CPUBrandString, g_avx2, g_bmi2);
-    if (g_bmi2 == 0 || g_avx2 == 0) {
+    g_bmi2 = ATOP_cpuid_bmi2(g_cpuid);
+    g_avx2 = ATOP_cpuid_avx2(g_cpuid);
+
+    snprintf(buffer, buffercount, "**CPU: %s  AVX2:%d  BMI2:%d\n", CPUBrandString, g_avx2, g_bmi2);
+    if (g_avx2 == 0) {
         printf("!!!NOTE: this system does not support AVX2 or BMI2 instructions, and will not work!\n");
     }
 

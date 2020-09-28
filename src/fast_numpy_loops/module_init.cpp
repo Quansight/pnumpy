@@ -9,6 +9,10 @@
 
 extern "C" PyObject* oldinit(PyObject *self, PyObject *args, PyObject *kwargs);
 extern "C" PyObject* newinit(PyObject* self, PyObject* args, PyObject* kwargs);
+extern "C" PyObject* enable(PyObject * self, PyObject * args);
+extern "C" PyObject* disable(PyObject * self, PyObject * args);
+extern "C" PyObject* isenabled(PyObject * self, PyObject * args);
+extern "C" PyObject* cpustring(PyObject * self, PyObject * args);
 
 static char m_doc[] = "Provide methods to override NumPy ufuncs";
 
@@ -18,6 +22,10 @@ PyDoc_STRVAR(oldinit_doc,
 
 static PyMethodDef module_functions[] = {
     {"initialize",       (PyCFunction)newinit, METH_VARARGS | METH_KEYWORDS, "init the atop"},
+    {"enable",           (PyCFunction)enable,  METH_VARARGS, "enable the atop"},
+    {"disable",          (PyCFunction)disable,  METH_VARARGS, "disable the atop"},
+    {"isenabled",        (PyCFunction)isenabled,  METH_VARARGS, "returns True or False"},
+    {"cpustring",        (PyCFunction)cpustring,  METH_VARARGS, "cpu brand string plus features"},
     {"oldinit",          (PyCFunction)oldinit, METH_VARARGS | METH_KEYWORDS, oldinit_doc},
     {NULL, NULL, 0,  NULL}
 };

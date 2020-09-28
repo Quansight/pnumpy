@@ -22,5 +22,11 @@ extern "C" {
     DllExport ANY_TWO_FUNC GetSimpleMathOpFast(int func, int atopInType1, int atopInType2, int* wantedOutType);
 
     DllExport ANY_TWO_FUNC GetComparisonOpFast(int func, int atopInType1, int atopInType2, int* wantedOutType);
+
+    // CPUID capabilities
+    extern DllExport int g_bmi2;
+    extern DllExport int g_avx2;
+    extern DllExport ATOP_cpuid_t   g_cpuid;
+
 }
 

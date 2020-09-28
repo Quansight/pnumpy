@@ -463,7 +463,7 @@ PyObject* newinit(PyObject* self, PyObject* args, PyObject* kwargs) {
     //int dtypes[] = {  NPY_INT32,  NPY_INT64};
 
     // Init atop: array threading operations
-    if (atop_init()) {
+    if (atop_init() && g_avx2) {
         memset(g_UFuncLUT, 0, sizeof(g_UFuncLUT));
 
         // Initialize numpy's C-API.
@@ -474,8 +474,7 @@ PyObject* newinit(PyObject* self, PyObject* args, PyObject* kwargs) {
             return NULL;
         }
 
-
-        // Loop over all ufuncs we want to replace
+        // Loop over all binary ufuncs we want to replace
         int64_t num_ufuncs = sizeof(gBinaryMapping) / sizeof(stUFuncToAtop);
         for (int64_t i = 0; i < num_ufuncs; i++) {
             PyObject* result = NULL;
@@ -517,7 +516,7 @@ PyObject* newinit(PyObject* self, PyObject* args, PyObject* kwargs) {
             }
         }
 
-        // Loop over all ufuncs we want to replace
+        // Loop over all compare ufuncs we want to replace
         num_ufuncs = sizeof(gCompareMapping) / sizeof(stUFuncToAtop);
         for (int64_t i = 0; i < num_ufuncs; i++) {
             PyObject* result = NULL;
@@ -578,3 +577,29 @@ PyObject* newinit(PyObject* self, PyObject* args, PyObject* kwargs) {
     return PyErr_Format(PyExc_ImportError, "atop was either already loaded or failed to load");
 }
 
+extern "C"
+PyObject * enable(PyObject * self, PyObject * args) {
+    g_AtopEnabled = TRUE;
+    RETURN_NONE;
+}
+
+extern "C"
+PyObject * disable(PyObject * self, PyObject * args) {
+    g_AtopEnabled = FALSE;
+    RETURN_NONE;
+}
+
+extern "C"
+PyObject* isenabled(PyObject* self, PyObject* args) {
+    if (g_AtopEnabled) {
+        Py_XINCREF(Py_True);
+        return Py_True;
+    }
+    Py_XINCREF(Py_False);
+    return Py_False;
+}
+
+extern "C"
+PyObject * cpustring(PyObject * self, PyObject * args) {
+    return PyUnicode_FromString(THREADER->CPUString);
+}

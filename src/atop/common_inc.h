@@ -235,6 +235,15 @@ FORCEINLINE void* aligned_alloc(size_t alignment, size_t size)
 
 #endif
 
+// To detect CPU features like AVX-256
+typedef struct {
+    uint32_t f1c;
+    uint32_t f1d;
+    uint32_t f7b;
+    uint32_t f7c;
+} ATOP_cpuid_t;
+
+
 enum ATOP_TYPES {
     ATOP_BOOL = 0,
     ATOP_INT8, ATOP_UINT8,

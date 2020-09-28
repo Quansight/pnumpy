@@ -428,7 +428,7 @@ extern "C" {
     typedef PTHREAD_START_ROUTINE LPTHREAD_START_ROUTINE;
 
 
-    extern void PrintCPUInfo();
+    extern void PrintCPUInfo(char * buffer, size_t buffercount);
 
 #if defined(_WIN32)
 
@@ -497,15 +497,15 @@ public:
 
     //------------------------------------------------------------------------------
     // Data Members 
-    stWorkerRing* pWorkerRing;
+    stWorkerRing*   pWorkerRing;
 
-    THANDLE      WorkerThreadHandles[MAX_WORKER_HANDLES];
-
+    THANDLE         WorkerThreadHandles[MAX_WORKER_HANDLES];
+    char            CPUString[512];
     //------------------------------------------------------------------------------
     // Data Members 
     CMathWorker() {
 
-        PrintCPUInfo();
+        PrintCPUInfo(CPUString, sizeof(CPUString));
 
         WorkerThreadCount = GetProcCount();
         NoThreading = FALSE;
