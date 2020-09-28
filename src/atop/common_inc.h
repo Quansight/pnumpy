@@ -158,7 +158,6 @@ typedef unsigned char       BYTE;
 #define InterlockedDecrement64 _InterlockedDecrement64
 #define InterlockedIncrement64 _InterlockedIncrement64
 
-#define YieldProcessor _mm_pause
 #define InterlockedIncrement _InterlockedIncrement
 
 #define FMInterlockedOr(X,Y) _InterlockedOr64((int64_t*)X,Y)
@@ -185,7 +184,6 @@ typedef unsigned char       BYTE;
 // consider sync_add_and_fetch
 #define InterlockedAdd64(val, len) (__sync_fetch_and_add(val, len) + len)
 #define InterlockedIncrement64(val) (__sync_fetch_and_add(val, 1) + 1)
-#define YieldProcessor _mm_pause
 #define InterlockedIncrement(val) (__sync_fetch_and_add(val, 1) + 1)
 #define FMInterlockedOr(val, bitpos) (__sync_fetch_and_or(val, bitpos))
 
