@@ -4,7 +4,7 @@
 #if defined(__clang__)
 #pragma clang diagnostic ignored "-Wmissing-braces"
 #pragma clang diagnostic ignored "-Wunused-function"
-#pragma clang attribute push (__attribute__((target("avx"))), apply_to=function)
+#pragma clang attribute push (__attribute__((target("avx2"))), apply_to=function)
 #endif
 
 #if defined(__GNUC__)

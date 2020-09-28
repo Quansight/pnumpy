@@ -7,12 +7,12 @@
 #if defined(__clang__)
 #pragma clang diagnostic ignored "-Wmissing-braces"
 #pragma clang diagnostic ignored "-Wunused-function"
-#pragma clang attribute push (__attribute__((target("avx"))), apply_to=function)
+#pragma clang attribute push (__attribute__((target("avx2"))), apply_to=function)
 #endif
 
 
 #if defined(__GNUC__)
-#pragma GCC target "arch=core-avx2,tune=core-avx2"
+//#pragma GCC target "arch=core-avx2,tune=core-avx2"
 #if __GNUC_PREREQ(4, 4) || (__clang__ > 0 && __clang_major__ >= 3) || !defined(__GNUC__)
 /* GCC >= 4.4 or clang or non-GCC compilers */
 #include <x86intrin.h>

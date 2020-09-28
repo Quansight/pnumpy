@@ -1,7 +1,10 @@
 import numpy as np
 
+print("before numpy_loops import")
+
 import fast_numpy_loops
 
+print("before numpy_loops init")
 # only init once
 fast_numpy_loops.initialize()
 
