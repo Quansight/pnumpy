@@ -14,6 +14,7 @@
         && (steps[0] == steps[2])\
         && (steps[0] == 0))
 
+// Conversion from numpy dtype to atop dtype
 int convert_dtype_to_atop[]={
      ATOP_BOOL,                         //NPY_BOOL = 0,
      ATOP_INT8, ATOP_UINT8,             //NPY_BYTE, NPY_UBYTE,
@@ -34,7 +35,7 @@ int convert_dtype_to_atop[]={
      ATOP_VOID                          //NPY_VOID,
 };
 
-
+// Reverse conversion from atop dtype to numpy dtype
 int convert_atop_to_dtype[] = {
      NPY_BOOL,                         //NPY_BOOL = 0,
      NPY_INT8, NPY_UINT8,              //NPY_BYTE, NPY_UBYTE,
@@ -47,17 +48,61 @@ int convert_atop_to_dtype[] = {
      NPY_VOID                          //NPY_VOID,
 };
 
-struct stUFunc {
-    ANY_TWO_FUNC            pTwoFunc;
-    PyUFuncGenericFunction  pOldFunc;
+struct stUFuncToAtop {
+    const char*     str_ufunc_name;
+    const int       atop_op;
 };
 
-// set to 0 to disable
-int32_t  g_AtopEnabled = 1;
+// Binary function mapping
+static stUFuncToAtop gBinaryMapping[]={
+    {"add",           MATH_OPERATION::ADD},
+    {"subtract",      MATH_OPERATION::SUB } };
+
+// Compare function mapping
+static stUFuncToAtop gCompareMapping[]={
+    {"equal",         COMP_OPERATION::CMP_EQ},
+    {"not_equal",     COMP_OPERATION::CMP_NE},
+    {"greater",       COMP_OPERATION::CMP_GT},
+    {"greater_equal", COMP_OPERATION::CMP_GTE},
+    {"less",          COMP_OPERATION::CMP_LT},
+    {"less_equal",    COMP_OPERATION::CMP_LTE } };
+
+
+//--------------------------------------------------------------------
+// multithreaded struct used for calling unary op codes
+struct COMPARE_CALLBACK {
+    union {
+        ANY_TWO_FUNC        pBinaryFunc;
+        UNARY_FUNC_STRIDED  pUnaryCallbackStrided;
+    };
+
+    char* pDataIn1;
+    char* pDataIn2;
+    char* pDataOut;
+
+    int64_t itemSizeIn1;
+    int64_t itemSizeIn2;
+    int64_t itemSizeOut;
+    int32_t scalarmode;
+};
+
+struct stUFunc {
+    union {
+        ANY_TWO_FUNC            pBinaryFunc;
+        UNARY_FUNC              pUnaryFunc;
+    };
+
+    PyUFuncGenericFunction  pOldFunc;
+    int32_t                 MaxThreads;
+    int32_t                 Reserved;
+};
 
 // global lookup tables for math opcode enum + dtype enum
 stUFunc  g_UFuncLUT[MATH_OPERATION::MATH_LAST][ATOP_LAST];
 stUFunc  g_CompFuncLUT[COMP_OPERATION::CMP_LAST][ATOP_LAST];
+
+// set to 0 to disable
+int32_t  g_AtopEnabled = 1;
 
 // For binary math functions like add, sbutract, multiply.
 // 2 inputs and 1 output
@@ -76,7 +121,7 @@ void AtopBinaryMathFunction(char** args, const npy_intp* dimensions, const npy_i
             // For a scalar second is2 == 0
             npy_intp is1 = steps[0], is2 = steps[1], os1 = steps[2];
             npy_intp n = dimensions[0];
-            g_UFuncLUT[funcop][atype].pTwoFunc(ip1, ip2, op1, (int64_t)n, is1 == 0 ? SCALAR_MODE::FIRST_ARG_SCALAR : is2 == 0 ? SCALAR_MODE::SECOND_ARG_SCALAR : SCALAR_MODE::NO_SCALARS);
+            g_UFuncLUT[funcop][atype].pBinaryFunc(ip1, ip2, op1, (int64_t)n, is1 == 0 ? SCALAR_MODE::FIRST_ARG_SCALAR : is2 == 0 ? SCALAR_MODE::SECOND_ARG_SCALAR : SCALAR_MODE::NO_SCALARS);
 
         }
     }
@@ -105,7 +150,7 @@ static BOOL CompareThreadCallbackStrided(struct stMATH_WORKER_ITEM* pstWorkerIte
         int64_t outputAdj = pstWorkerItem->BlockSize * workBlock * Callback->itemSizeOut;
 
         // LOGGING("[%d] working on %lld with len %lld   block: %lld\n", core, workIndex, lenX, workBlock);
-        Callback->pTwoFunc(pDataIn1 + inputAdj1, pDataIn2 + inputAdj2, pDataOut + outputAdj, lenX, Callback->scalarmode);
+        Callback->pBinaryFunc(pDataIn1 + inputAdj1, pDataIn2 + inputAdj2, pDataOut + outputAdj, lenX, Callback->scalarmode);
 
         // Indicate we completed a block
         didSomeWork = TRUE;
@@ -125,7 +170,8 @@ void AtopCompareMathFunction(char** args, const npy_intp* dimensions, const npy_
     // LOGGING("comparison called with %d %d   funcp: %p  len: %lld\n", funcop, atype, g_CompFuncLUT[funcop][atype].pOldFunc, (long long)dimensions[0]);
 
     if (g_AtopEnabled) {
-        ANY_TWO_FUNC pTwoFunc = g_CompFuncLUT[funcop][atype].pTwoFunc;
+        ANY_TWO_FUNC pBinaryFunc = g_CompFuncLUT[funcop][atype].pBinaryFunc;
+        int32_t      maxThreads = g_CompFuncLUT[funcop][atype].MaxThreads;
 
         char* ip1 = (char*)args[0];
         char* ip2 = (char*)args[1];
@@ -142,7 +188,7 @@ void AtopCompareMathFunction(char** args, const npy_intp* dimensions, const npy_
         if (pWorkItem == NULL) {
 
             // Threading not allowed for this work item, call it directly from main thread
-            pTwoFunc(ip1, ip2, op1, n, scalarmode);
+            pBinaryFunc(ip1, ip2, op1, n, scalarmode);
         }
         else {
             COMPARE_CALLBACK stCallback;
@@ -151,7 +197,7 @@ void AtopCompareMathFunction(char** args, const npy_intp* dimensions, const npy_
             pWorkItem->DoWorkCallback = CompareThreadCallbackStrided;
             pWorkItem->WorkCallbackArg = &stCallback;
 
-            stCallback.pTwoFunc = pTwoFunc;
+            stCallback.pBinaryFunc = pBinaryFunc;
             stCallback.pDataOut = op1;
             stCallback.pDataIn1 = ip1;
             stCallback.pDataIn2 = ip2;
@@ -162,7 +208,7 @@ void AtopCompareMathFunction(char** args, const npy_intp* dimensions, const npy_
 
             // This will notify the worker threads of a new work item
             // most functions are so fast, we do not need more than 4 worker threads
-            THREADER->WorkMain(pWorkItem, n,  4);
+            THREADER->WorkMain(pWorkItem, n, maxThreads);
         }
 
     }
@@ -180,7 +226,7 @@ void AtopUnaryMathFunction(char** args, const npy_intp* dimensions, const npy_in
     char* op1 = (char*)args[1];
     npy_intp is1 = steps[0], os1 = steps[1];
     npy_intp n = dimensions[0];
-    //g_UFuncLUT[funcop][atype].pTwoFunc(ip1, ip2, op1, (int64_t)n, is1 == 0 ? SCALAR_MODE::FIRST_ARG_SCALAR : is2 == 0 ? SCALAR_MODE::SECOND_ARG_SCALAR : SCALAR_MODE::NO_SCALARS);
+    //g_UFuncLUT[funcop][atype].pBinaryFunc(ip1, ip2, op1, (int64_t)n, is1 == 0 ? SCALAR_MODE::FIRST_ARG_SCALAR : is2 == 0 ? SCALAR_MODE::SECOND_ARG_SCALAR : SCALAR_MODE::NO_SCALARS);
 
     
 }
@@ -188,48 +234,48 @@ void AtopUnaryMathFunction(char** args, const npy_intp* dimensions, const npy_in
 
 // Ugly macro exapnsion to handle which ufunc
 // TODO: the ufunc callback needs to use enums
-#define DEF_GEN_USTUB(_FUNC_, _ATYPE_) void F##_ATYPE_##_FUNC_(char **args, const npy_intp *dimensions, const npy_intp *steps, void*innerloop) { \
+#define DEF_BINARY_USTUB(_FUNC_, _ATYPE_) void F##_ATYPE_##_FUNC_(char **args, const npy_intp *dimensions, const npy_intp *steps, void*innerloop) { \
     return AtopBinaryMathFunction(args, dimensions, steps, innerloop, _FUNC_, _ATYPE_);}
 
-#define DEF_GEN_USTUB_EXPAND(_FUNC_) \
-    DEF_GEN_USTUB(_FUNC_, ATOP_BOOL); \
-    DEF_GEN_USTUB(_FUNC_, ATOP_INT8); \
-    DEF_GEN_USTUB(_FUNC_, ATOP_UINT8); \
-    DEF_GEN_USTUB(_FUNC_, ATOP_INT16); \
-    DEF_GEN_USTUB(_FUNC_, ATOP_UINT16); \
-    DEF_GEN_USTUB(_FUNC_, ATOP_INT32); \
-    DEF_GEN_USTUB(_FUNC_, ATOP_UINT32); \
-    DEF_GEN_USTUB(_FUNC_, ATOP_INT64); \
-    DEF_GEN_USTUB(_FUNC_, ATOP_UINT64); \
-    DEF_GEN_USTUB(_FUNC_, ATOP_INT128); \
-    DEF_GEN_USTUB(_FUNC_, ATOP_UINT128); \
-    DEF_GEN_USTUB(_FUNC_, ATOP_FLOAT); \
-    DEF_GEN_USTUB(_FUNC_, ATOP_DOUBLE); \
-    DEF_GEN_USTUB(_FUNC_, ATOP_LONGDOUBLE);
+#define DEF_BINARY_USTUB_EXPAND(_FUNC_) \
+    DEF_BINARY_USTUB(_FUNC_, ATOP_BOOL); \
+    DEF_BINARY_USTUB(_FUNC_, ATOP_INT8); \
+    DEF_BINARY_USTUB(_FUNC_, ATOP_UINT8); \
+    DEF_BINARY_USTUB(_FUNC_, ATOP_INT16); \
+    DEF_BINARY_USTUB(_FUNC_, ATOP_UINT16); \
+    DEF_BINARY_USTUB(_FUNC_, ATOP_INT32); \
+    DEF_BINARY_USTUB(_FUNC_, ATOP_UINT32); \
+    DEF_BINARY_USTUB(_FUNC_, ATOP_INT64); \
+    DEF_BINARY_USTUB(_FUNC_, ATOP_UINT64); \
+    DEF_BINARY_USTUB(_FUNC_, ATOP_INT128); \
+    DEF_BINARY_USTUB(_FUNC_, ATOP_UINT128); \
+    DEF_BINARY_USTUB(_FUNC_, ATOP_FLOAT); \
+    DEF_BINARY_USTUB(_FUNC_, ATOP_DOUBLE); \
+    DEF_BINARY_USTUB(_FUNC_, ATOP_LONGDOUBLE);
 
 // For however many functions there are
-DEF_GEN_USTUB_EXPAND(0)
-DEF_GEN_USTUB_EXPAND(1)
-DEF_GEN_USTUB_EXPAND(2)
-DEF_GEN_USTUB_EXPAND(3)
-DEF_GEN_USTUB_EXPAND(4)
-DEF_GEN_USTUB_EXPAND(5)
-DEF_GEN_USTUB_EXPAND(6)
-DEF_GEN_USTUB_EXPAND(7)
-DEF_GEN_USTUB_EXPAND(8)
-DEF_GEN_USTUB_EXPAND(9)
-DEF_GEN_USTUB_EXPAND(10)
-DEF_GEN_USTUB_EXPAND(11)
-DEF_GEN_USTUB_EXPAND(12)
-DEF_GEN_USTUB_EXPAND(13)
-DEF_GEN_USTUB_EXPAND(14)
-DEF_GEN_USTUB_EXPAND(15)
-DEF_GEN_USTUB_EXPAND(16)
-DEF_GEN_USTUB_EXPAND(17)
-DEF_GEN_USTUB_EXPAND(18)
-DEF_GEN_USTUB_EXPAND(19)
+DEF_BINARY_USTUB_EXPAND(0)
+DEF_BINARY_USTUB_EXPAND(1)
+DEF_BINARY_USTUB_EXPAND(2)
+DEF_BINARY_USTUB_EXPAND(3)
+DEF_BINARY_USTUB_EXPAND(4)
+DEF_BINARY_USTUB_EXPAND(5)
+DEF_BINARY_USTUB_EXPAND(6)
+DEF_BINARY_USTUB_EXPAND(7)
+DEF_BINARY_USTUB_EXPAND(8)
+DEF_BINARY_USTUB_EXPAND(9)
+DEF_BINARY_USTUB_EXPAND(10)
+DEF_BINARY_USTUB_EXPAND(11)
+DEF_BINARY_USTUB_EXPAND(12)
+DEF_BINARY_USTUB_EXPAND(13)
+DEF_BINARY_USTUB_EXPAND(14)
+DEF_BINARY_USTUB_EXPAND(15)
+DEF_BINARY_USTUB_EXPAND(16)
+DEF_BINARY_USTUB_EXPAND(17)
+DEF_BINARY_USTUB_EXPAND(18)
+DEF_BINARY_USTUB_EXPAND(19)
 
-#define DEF_GEN_USTUB_NAME(_FUNC_) \
+#define DEF_BINARY_USTUB_NAME(_FUNC_) \
     FATOP_BOOL##_FUNC_, \
     FATOP_INT8##_FUNC_, \
     FATOP_UINT8##_FUNC_, \
@@ -247,26 +293,26 @@ DEF_GEN_USTUB_EXPAND(19)
 
 PyUFuncGenericFunction g_UFuncGenericLUT[MATH_OPERATION::MATH_LAST][ATOP_LAST] =
 {
-{DEF_GEN_USTUB_NAME(0)},
-{DEF_GEN_USTUB_NAME(1)},
-{DEF_GEN_USTUB_NAME(2)},
-{DEF_GEN_USTUB_NAME(3)},
-{DEF_GEN_USTUB_NAME(4)},
-{DEF_GEN_USTUB_NAME(5)},
-{DEF_GEN_USTUB_NAME(6)},
-{DEF_GEN_USTUB_NAME(7)},
-{DEF_GEN_USTUB_NAME(8)},
-{DEF_GEN_USTUB_NAME(9)},
-{DEF_GEN_USTUB_NAME(10)},
-{DEF_GEN_USTUB_NAME(11)},
-{DEF_GEN_USTUB_NAME(12)},
-{DEF_GEN_USTUB_NAME(13)},
-{DEF_GEN_USTUB_NAME(14)},
-{DEF_GEN_USTUB_NAME(15)},
-{DEF_GEN_USTUB_NAME(16)},
-{DEF_GEN_USTUB_NAME(17)},
-{DEF_GEN_USTUB_NAME(18)},
-{DEF_GEN_USTUB_NAME(19)},
+{DEF_BINARY_USTUB_NAME(0)},
+{DEF_BINARY_USTUB_NAME(1)},
+{DEF_BINARY_USTUB_NAME(2)},
+{DEF_BINARY_USTUB_NAME(3)},
+{DEF_BINARY_USTUB_NAME(4)},
+{DEF_BINARY_USTUB_NAME(5)},
+{DEF_BINARY_USTUB_NAME(6)},
+{DEF_BINARY_USTUB_NAME(7)},
+{DEF_BINARY_USTUB_NAME(8)},
+{DEF_BINARY_USTUB_NAME(9)},
+{DEF_BINARY_USTUB_NAME(10)},
+{DEF_BINARY_USTUB_NAME(11)},
+{DEF_BINARY_USTUB_NAME(12)},
+{DEF_BINARY_USTUB_NAME(13)},
+{DEF_BINARY_USTUB_NAME(14)},
+{DEF_BINARY_USTUB_NAME(15)},
+{DEF_BINARY_USTUB_NAME(16)},
+{DEF_BINARY_USTUB_NAME(17)},
+{DEF_BINARY_USTUB_NAME(18)},
+{DEF_BINARY_USTUB_NAME(19)},
 };
 
 
@@ -428,16 +474,14 @@ PyObject* newinit(PyObject* self, PyObject* args, PyObject* kwargs) {
             return NULL;
         }
 
-        const char* str_ufunc[] = { "add","subtract" };
-        int   atop_mathop[] = { MATH_OPERATION::ADD, MATH_OPERATION::SUB };
 
         // Loop over all ufuncs we want to replace
-        int64_t num_ufuncs = sizeof(str_ufunc) / sizeof(char*);
+        int64_t num_ufuncs = sizeof(gBinaryMapping) / sizeof(stUFuncToAtop);
         for (int64_t i = 0; i < num_ufuncs; i++) {
             PyObject* result = NULL;
             PyObject* ufunc = NULL;
-            const char* ufunc_name = str_ufunc[i];
-            int atop = atop_mathop[i];
+            const char* ufunc_name = gBinaryMapping[i].str_ufunc_name;
+            int atop = gBinaryMapping[i].atop_op;
 
             ufunc = PyObject_GetAttrString(numpy_module, ufunc_name);
 
@@ -455,10 +499,10 @@ PyObject* newinit(PyObject* self, PyObject* args, PyObject* kwargs) {
 
                 int atype = convert_dtype_to_atop[dtype];
 
-                ANY_TWO_FUNC pTwoFunc = GetSimpleMathOpFast(atop, atype, atype, &signature[2]);
+                ANY_TWO_FUNC pBinaryFunc = GetSimpleMathOpFast(atop, atype, atype, &signature[2]);
                 signature[2] = convert_atop_to_dtype[signature[2]];
 
-                if (pTwoFunc) {
+                if (pBinaryFunc) {
                     int ret = PyUFunc_ReplaceLoopBySignature((PyUFuncObject*)ufunc, g_UFuncGenericLUT[atop][atype], signature, &oldFunc);
 
                     if (ret < 0) {
@@ -467,21 +511,19 @@ PyObject* newinit(PyObject* self, PyObject* args, PyObject* kwargs) {
 
                     // Store the new function to call and the previous ufunc
                     g_UFuncLUT[atop][atype].pOldFunc = oldFunc;
-                    g_UFuncLUT[atop][atype].pTwoFunc = pTwoFunc;
+                    g_UFuncLUT[atop][atype].pBinaryFunc = pBinaryFunc;
+                    g_UFuncLUT[atop][atype].MaxThreads = 4;
                 }
             }
         }
 
-        const char* str_comp_func[] = { "equal","not_equal","greater","greater_equal","less", "less_equal" };
-        int atop_compop[] = { COMP_OPERATION::CMP_EQ, COMP_OPERATION::CMP_NE, COMP_OPERATION::CMP_GT, COMP_OPERATION::CMP_GTE, COMP_OPERATION::CMP_LT, COMP_OPERATION::CMP_LTE};
-
         // Loop over all ufuncs we want to replace
-        num_ufuncs = sizeof(str_comp_func) / sizeof(char*);
+        num_ufuncs = sizeof(gCompareMapping) / sizeof(stUFuncToAtop);
         for (int64_t i = 0; i < num_ufuncs; i++) {
             PyObject* result = NULL;
             PyObject* ufunc = NULL;
-            const char* ufunc_name = str_comp_func[i];
-            int atop = atop_compop[i];
+            const char* ufunc_name = gCompareMapping[i].str_ufunc_name;
+            int atop = gCompareMapping[i].atop_op;
 
             ufunc = PyObject_GetAttrString(numpy_module, ufunc_name);
 
@@ -499,10 +541,10 @@ PyObject* newinit(PyObject* self, PyObject* args, PyObject* kwargs) {
 
                 int atype = convert_dtype_to_atop[dtype];
 
-                ANY_TWO_FUNC pTwoFunc = GetComparisonOpFast(atop, atype, atype, &signature[2]);
+                ANY_TWO_FUNC pBinaryFunc = GetComparisonOpFast(atop, atype, atype, &signature[2]);
                 signature[2] = convert_atop_to_dtype[signature[2]];
 
-                if (pTwoFunc) {
+                if (pBinaryFunc) {
                     int ret = PyUFunc_ReplaceLoopBySignature((PyUFuncObject*)ufunc, g_UFuncCompareLUT[atop][atype], signature, &oldFunc);
 
                     if (ret < 0) {
@@ -511,7 +553,8 @@ PyObject* newinit(PyObject* self, PyObject* args, PyObject* kwargs) {
 
                     // Store the new function to call and the previous ufunc
                     g_CompFuncLUT[atop][atype].pOldFunc = oldFunc;
-                    g_CompFuncLUT[atop][atype].pTwoFunc = pTwoFunc;
+                    g_CompFuncLUT[atop][atype].pBinaryFunc = pBinaryFunc;
+                    g_CompFuncLUT[atop][atype].MaxThreads = 4;
                 }
             }
         }

@@ -558,23 +558,6 @@ struct UNARY_CALLBACK {
     int64_t itemSizeOut;
 };
 
-//--------------------------------------------------------------------
-// multithreaded struct used for calling unary op codes
-struct COMPARE_CALLBACK {
-    union {
-        ANY_TWO_FUNC pTwoFunc;
-        UNARY_FUNC_STRIDED pUnaryCallbackStrided;
-    };
-
-    char* pDataIn1;
-    char* pDataIn2;
-    char* pDataOut;
-
-    int64_t itemSizeIn1;
-    int64_t itemSizeIn2;
-    int64_t itemSizeOut;
-    int32_t scalarmode;
-};
 
 //====================================================================
 void* FmAlloc(size_t _Size);
