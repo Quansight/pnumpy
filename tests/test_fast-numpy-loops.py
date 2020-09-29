@@ -4,11 +4,11 @@ import fast_numpy_loops
 
 def test_enable():
     # enable/disable return the previous value
-    old = fast_numpy_loops.isenable()
+    old = fast_numpy_loops.isenabled()
     assert fast_numpy_loops.enable() == old
     assert fast_numpy_loops.disable() == True
     assert fast_numpy_loops.enable() == False
-    old = fast_numpy_loops.isenable()
+    old = fast_numpy_loops.isenabled()
 
 def test_result(rng):
     print('numpy version', np.__version__)
