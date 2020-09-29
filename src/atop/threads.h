@@ -356,6 +356,15 @@ struct stWorkerRing {
         SleepTime = 1;
         // how many threads to wake up on Linux
         FutexWakeCount = FUTEX_WAKE_DEFAULT;
+
+        for (int i = 0; i < RING_BUFFER_SIZE; i++) {
+            WorkerQueue[i].BlockSize = 0;
+            WorkerQueue[i].BlockLast = 0;
+            WorkerQueue[i].TotalElements = 0;
+            WorkerQueue[i].BlockNext = 0;
+            WorkerQueue[i].BlocksCompleted = 0;
+        }
+
     }
 
     FORCE_INLINE void Cancel() {
@@ -525,7 +534,7 @@ public:
 
         pWorkerRing = (stWorkerRing*)ALIGNED_ALLOC(sizeof(stWorkerRing), 64);
         if (pWorkerRing) {
-            memset(pWorkerRing, 0, sizeof(stWorkerRing));
+            pWorkerRing->WorkIndex = 0;
             pWorkerRing->Init();
         }
 

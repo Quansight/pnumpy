@@ -1,5 +1,6 @@
 #include "common_inc.h"
 #include <cmath>
+#include "invalids.h"
 
 #if defined(__clang__)
 #pragma clang diagnostic ignored "-Wmissing-braces"
