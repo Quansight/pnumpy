@@ -452,15 +452,15 @@ void PrintCPUInfo(char* buffer, size_t buffercount) {
         __cpuid(CPUInfo, i);
 
         if (i == 0x80000002) {
-            for (int i = 0; i < sizeof(CPUBrandString); i++)
+            for (size_t i = 0; i < sizeof(CPUInfo); i++)
                 CPUBrandString[i] = ((char*)CPUInfo)[i];
         }
         else if (i == 0x80000003) {
-            for (int i = 0; i < sizeof(CPUBrandString); i++)
+            for (size_t i = 0; i < sizeof(CPUInfo); i++)
                 CPUBrandString[i + 16] = ((char*)CPUInfo)[i];
         }
         else if (i == 0x80000004) {
-            for (int i = 0; i < sizeof(CPUBrandString); i++)
+            for (size_t i = 0; i < sizeof(CPUInfo); i++)
                 CPUBrandString[i + 32] = ((char*)CPUInfo)[i];
         }
     }
@@ -617,7 +617,7 @@ void PrintCPUInfo(char* buffer, size_t buffercount) {
     __cpuid(0x80000000, CPUInfo[0], CPUInfo[1], CPUInfo[2], CPUInfo[3]);
     unsigned int nExIds = CPUInfo[0];
 
-    for (int i = 0; i < sizeof(CPUBrandString); i++) {
+    for (size_t i = 0; i < sizeof(CPUBrandString); i++) {
         CPUBrandString[i] = 0;
     }
 
@@ -626,15 +626,15 @@ void PrintCPUInfo(char* buffer, size_t buffercount) {
         __cpuid(i, CPUInfo[0], CPUInfo[1], CPUInfo[2], CPUInfo[3]);
 
         if (i == 0x80000002) {
-            for (int i = 0; i < sizeof(CPUBrandString); i++)
+            for (size_t i = 0; i < sizeof(CPUInfo); i++)
                 CPUBrandString[i] = ((char*)CPUInfo)[i];
         }
         else if (i == 0x80000003) {
-            for (int i = 0; i < sizeof(CPUBrandString); i++)
+            for (size_t i = 0; i < sizeof(CPUInfo); i++)
                 CPUBrandString[i + 16] = ((char*)CPUInfo)[i];
         }
         else if (i == 0x80000004) {
-            for (int i = 0; i < sizeof(CPUBrandString); i++)
+            for (size_t i = 0; i < sizeof(CPUInfo); i++)
                 CPUBrandString[i + 32] = ((char*)CPUInfo)[i];
         }
     }
