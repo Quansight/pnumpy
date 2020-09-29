@@ -108,6 +108,7 @@ setup(
             extra_compile_args=CFLAGS.split(),
             extra_link_args=LFLAGS.split(),
             include_dirs=['src/fast_numpy_loops', 'src/atop', np.get_include()],
+            py_limited_api=True,
         )
     ],
 )
