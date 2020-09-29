@@ -446,17 +446,25 @@ void PrintCPUInfo(char* buffer, size_t buffercount) {
     // Get the information associated with each extended ID.
     __cpuid(CPUInfo, 0x80000000);
     nExIds = CPUInfo[0];
-    for (i = 0x80000000; i <= nExIds; ++i)
+
+    for (unsigned int i = 0x80000000; i <= nExIds; ++i)
     {
         __cpuid(CPUInfo, i);
-        // Interpret CPU brand string
-        if (i == 0x80000002)
-            memcpy(CPUBrandString, CPUInfo, sizeof(CPUInfo));
-        else if (i == 0x80000003)
-            memcpy(CPUBrandString + 16, CPUInfo, sizeof(CPUInfo));
-        else if (i == 0x80000004)
-            memcpy(CPUBrandString + 32, CPUInfo, sizeof(CPUInfo));
+
+        if (i == 0x80000002) {
+            for (int i = 0; i < sizeof(CPUBrandString); i++)
+                CPUBrandString[i] = ((char*)CPUInfo)[i];
+        }
+        else if (i == 0x80000003) {
+            for (int i = 0; i < sizeof(CPUBrandString); i++)
+                CPUBrandString[i + 16] = ((char*)CPUInfo)[i];
+        }
+        else if (i == 0x80000004) {
+            for (int i = 0; i < sizeof(CPUBrandString); i++)
+                CPUBrandString[i + 32] = ((char*)CPUInfo)[i];
+        }
     }
+
     // NEW CODE
     g_cpuid = ATOP_cpuid();
 
@@ -609,18 +617,26 @@ void PrintCPUInfo(char* buffer, size_t buffercount) {
     __cpuid(0x80000000, CPUInfo[0], CPUInfo[1], CPUInfo[2], CPUInfo[3]);
     unsigned int nExIds = CPUInfo[0];
 
-    memset(CPUBrandString, 0, sizeof(CPUBrandString));
+    for (int i = 0; i < sizeof(CPUBrandString); i++) {
+        CPUBrandString[i] = 0;
+    }
 
     for (unsigned int i = 0x80000000; i <= nExIds; ++i)
     {
         __cpuid(i, CPUInfo[0], CPUInfo[1], CPUInfo[2], CPUInfo[3]);
 
-        if (i == 0x80000002)
-            memcpy(CPUBrandString, CPUInfo, sizeof(CPUInfo));
-        else if (i == 0x80000003)
-            memcpy(CPUBrandString + 16, CPUInfo, sizeof(CPUInfo));
-        else if (i == 0x80000004)
-            memcpy(CPUBrandString + 32, CPUInfo, sizeof(CPUInfo));
+        if (i == 0x80000002) {
+            for (int i = 0; i < sizeof(CPUBrandString); i++)
+                CPUBrandString[i] = ((char*)CPUInfo)[i];
+        }
+        else if (i == 0x80000003) {
+            for (int i = 0; i < sizeof(CPUBrandString); i++)
+                CPUBrandString[i + 16] = ((char*)CPUInfo)[i];
+        }
+        else if (i == 0x80000004) {
+            for (int i = 0; i < sizeof(CPUBrandString); i++)
+                CPUBrandString[i + 32] = ((char*)CPUInfo)[i];
+        }
     }
     //printf("**CPU: %s\n", CPUBrandString);
 
