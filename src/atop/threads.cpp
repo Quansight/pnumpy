@@ -471,7 +471,7 @@ void PrintCPUInfo(char* buffer, size_t buffercount) {
     g_bmi2 = ATOP_cpuid_bmi2(g_cpuid);
     g_avx2 = ATOP_cpuid_avx2(g_cpuid);
 
-    snprintf(buffer, buffercount, "**CPU: %s  AVX2:%d  BMI2:%d\n", CPUBrandString, g_avx2, g_bmi2);
+    snprintf(buffer, buffercount, "**CPU: %s  AVX2:%d  BMI2:%d 0x%.8x 0x%.8x 0x%.8x 0x%.8x", CPUBrandString, g_avx2, g_bmi2, g_cpuid.f1c, g_cpuid.f1d, g_cpuid.f7b, g_cpuid.f7c);
     if (g_avx2 == 0) {
         printf("!!!NOTE: this system does not support AVX2 or BMI2 instructions, and will not work!\n");
     }
@@ -645,7 +645,7 @@ void PrintCPUInfo(char* buffer, size_t buffercount) {
     g_bmi2 = ATOP_cpuid_bmi2(g_cpuid);
     g_avx2 = ATOP_cpuid_avx2(g_cpuid);
 
-    snprintf(buffer, buffercount, "**CPU: %s  AVX2:%d  BMI2:%d\n", CPUBrandString, g_avx2, g_bmi2);
+    snprintf(buffer, buffercount, "**CPU: %s  AVX2:%d  BMI2:%d 0x%.8x 0x%.8x 0x%.8x 0x%.8x", CPUBrandString, g_avx2, g_bmi2, g_cpuid.f1c, g_cpuid.f1d, g_cpuid.f7b, g_cpuid.f7c);
     if (g_avx2 == 0) {
         printf("!!!NOTE: this system does not support AVX2 or BMI2 instructions, and will not work!\n");
     }
