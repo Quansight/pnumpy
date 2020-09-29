@@ -1,12 +1,14 @@
 import numpy as np
-
-print("before numpy_loops import")
-
 import fast_numpy_loops
 
-print("before numpy_loops init")
-# only init once
-fast_numpy_loops.initialize()
+
+def test_enable():
+    # enable/disable return the previous value
+    old = fast_numpy_loops.isenable()
+    assert fast_numpy_loops.enable() == old
+    assert fast_numpy_loops.disable() == True
+    assert fast_numpy_loops.enable() == False
+    old = fast_numpy_loops.isenable()
 
 def test_result(rng):
     print('numpy version', np.__version__)
@@ -17,3 +19,6 @@ def test_result(rng):
         for j in range(m.shape[1]):
             o[i, j] = m[i, j] + m[i, j]
     assert np.all(np.add(m, m) == o)
+
+def test_numpy():
+    np.test()
