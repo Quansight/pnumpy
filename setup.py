@@ -25,7 +25,7 @@ if 'TOX_ENV_NAME' in os.environ and os.environ.get('SETUP_PY_EXT_COVERAGE') == '
     CFLAGS = os.environ['CFLAGS'] = '-fprofile-arcs -ftest-coverage -DNPY_NO_DEPRECATED_API=NPY_1_7_API_VERSION'
     LFLAGS = os.environ['LFLAGS'] = '-lgcov'
 else:
-    CFLAGS = '-DNPY_NO_DEPRECATED_API=NPY_1_7_API_VERSION'
+    CFLAGS = '-DNPY_NO_DEPRECATED_API=NPY_1_7_API_VERSION -DPy_LIMITED_API'
     LFLAGS = ''
 
 if platform.system() == 'Windows':
@@ -107,7 +107,8 @@ setup(
                     ],
             extra_compile_args=CFLAGS.split(),
             extra_link_args=LFLAGS.split(),
-            include_dirs=['src/fast_numpy_loops', 'src/atop', np.get_include()]
+            include_dirs=['src/fast_numpy_loops', 'src/atop', np.get_include()],
+            py_limited_api=True,
         )
     ],
 )
