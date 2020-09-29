@@ -579,24 +579,21 @@ PyObject* newinit(PyObject* self, PyObject* args, PyObject* kwargs) {
 
 extern "C"
 PyObject * enable(PyObject * self, PyObject * args) {
+    int32_t  oldval = g_AtopEnabled;
     g_AtopEnabled = TRUE;
-    RETURN_NONE;
+    return PyBool_FromLong(oldval);
 }
 
 extern "C"
 PyObject * disable(PyObject * self, PyObject * args) {
+    int32_t  oldval = g_AtopEnabled;
     g_AtopEnabled = FALSE;
-    RETURN_NONE;
+    return PyBool_FromLong(oldval);
 }
 
 extern "C"
 PyObject* isenabled(PyObject* self, PyObject* args) {
-    if (g_AtopEnabled) {
-        Py_XINCREF(Py_True);
-        return Py_True;
-    }
-    Py_XINCREF(Py_False);
-    return Py_False;
+    return PyBool_FromLong(g_AtopEnabled);
 }
 
 extern "C"
