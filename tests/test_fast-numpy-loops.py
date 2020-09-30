@@ -2,14 +2,15 @@ import numpy as np
 
 print("before numpy_loops import")
 
-import fast_numpy_loops
+import fast_numpy_loops as fn
 
 print("before numpy_loops init")
 # only init once
-fast_numpy_loops.initialize()
+fn.initialize()
 
 def test_result(rng):
     print('numpy version', np.__version__)
+    print(fn.cpustring())
   
     m = rng.integers(100, size=(10, 10), dtype=np.int32)
     o = np.empty_like(m)

@@ -48,6 +48,18 @@ int convert_atop_to_dtype[] = {
      NPY_VOID                          //NPY_VOID,
 };
 
+// Find out the sizeof() for an atop dtype
+int convert_atop_to_itemsize[] = {
+    1,  1,  1,
+    2,  2,
+    4,  4,
+    8,  8,
+    16, 16,
+    4,  8,  sizeof(long double),
+    1,  4,
+    0
+};
+
 struct stUFuncToAtop {
     const char*     str_ufunc_name;
     const int       atop_op;
@@ -56,7 +68,9 @@ struct stUFuncToAtop {
 // Binary function mapping
 static stUFuncToAtop gBinaryMapping[]={
     {"add",           MATH_OPERATION::ADD},
-    {"subtract",      MATH_OPERATION::SUB } };
+    {"subtract",      MATH_OPERATION::SUB },
+    {"multiply",      MATH_OPERATION::MUL },
+};
 
 // Compare function mapping
 static stUFuncToAtop gCompareMapping[]={
@@ -70,10 +84,11 @@ static stUFuncToAtop gCompareMapping[]={
 
 //--------------------------------------------------------------------
 // multithreaded struct used for calling unary op codes
-struct COMPARE_CALLBACK {
+struct BINARY_CALLBACK {
     union {
         ANY_TWO_FUNC        pBinaryFunc;
         UNARY_FUNC_STRIDED  pUnaryCallbackStrided;
+        REDUCE_FUNC         pReduceFunc;
     };
 
     char* pDataIn1;
@@ -93,8 +108,11 @@ struct stUFunc {
     };
 
     PyUFuncGenericFunction  pOldFunc;
+    REDUCE_FUNC             pReduceFunc;
+
+    // the maximum threads to eploy
     int32_t                 MaxThreads;
-    int32_t                 Reserved;
+    int32_t                 ChunkSize;
 };
 
 // global lookup tables for math opcode enum + dtype enum
@@ -104,37 +122,44 @@ stUFunc  g_CompFuncLUT[COMP_OPERATION::CMP_LAST][ATOP_LAST];
 // set to 0 to disable
 int32_t  g_AtopEnabled = 1;
 
-// For binary math functions like add, sbutract, multiply.
-// 2 inputs and 1 output
-void AtopBinaryMathFunction(char** args, const npy_intp* dimensions, const npy_intp* steps, void* innerloop, int funcop, int atype) {
-    //LOGGING("called with %d %d   funcp: %p\n", funcop, atype, g_UFuncLUT[funcop][atype].pOldFunc);
-    if (g_AtopEnabled) {
 
-        if (IS_BINARY_REDUCE) {
-            g_UFuncLUT[funcop][atype].pOldFunc(args, dimensions, steps, innerloop);
-        }
-        else {
-            char* ip1 = (char*)args[0];
-            char* ip2 = (char*)args[1];
-            char* op1 = (char*)args[2];
-            // For a scalar first is1 ==0
-            // For a scalar second is2 == 0
-            npy_intp is1 = steps[0], is2 = steps[1], os1 = steps[2];
-            npy_intp n = dimensions[0];
-            g_UFuncLUT[funcop][atype].pBinaryFunc(ip1, ip2, op1, (int64_t)n, is1 == 0 ? SCALAR_MODE::FIRST_ARG_SCALAR : is2 == 0 ? SCALAR_MODE::SECOND_ARG_SCALAR : SCALAR_MODE::NO_SCALARS);
-
-        }
-    }
-    else {
-        g_UFuncLUT[funcop][atype].pOldFunc(args, dimensions, steps, innerloop);
-    }
-};
 
 //------------------------------------------------------------------------------
 //  Concurrent callback from multiple threads
-static BOOL CompareThreadCallbackStrided(struct stMATH_WORKER_ITEM* pstWorkerItem, int core, int64_t workIndex) {
+static BOOL ReduceThreadCallbackStrided(struct stMATH_WORKER_ITEM* pstWorkerItem, int core, int64_t workIndex) {
     BOOL didSomeWork = FALSE;
-    COMPARE_CALLBACK* Callback = (COMPARE_CALLBACK*)pstWorkerItem->WorkCallbackArg;
+    BINARY_CALLBACK* Callback = (BINARY_CALLBACK*)pstWorkerItem->WorkCallbackArg;
+
+    char* pDataIn2 = Callback->pDataIn2;
+    char* pDataOut = Callback->pDataOut;
+    int64_t lenX;
+    int64_t workBlock;
+
+    // As long as there is work to do
+    while ((lenX = pstWorkerItem->GetNextWorkBlock(&workBlock)) > 0) {
+
+        int64_t inputAdj2 = pstWorkerItem->BlockSize * workBlock * Callback->itemSizeIn2;
+        int64_t outputAdj = workBlock * Callback->itemSizeOut;
+
+        //printf("[%d] reduce on %lld with len %lld   block: %lld  itemsize: %lld\n", core, workIndex, lenX, workBlock, Callback->itemSizeIn2);
+        Callback->pReduceFunc(pDataIn2 + inputAdj2, pDataOut + outputAdj, lenX, Callback->itemSizeIn2);
+
+        // Indicate we completed a block
+        didSomeWork = TRUE;
+
+        // tell others we completed this work block
+        pstWorkerItem->CompleteWorkBlock();
+    }
+
+    return didSomeWork;
+}
+
+
+//------------------------------------------------------------------------------
+//  Concurrent callback from multiple threads
+static BOOL BinaryThreadCallbackStrided(struct stMATH_WORKER_ITEM* pstWorkerItem, int core, int64_t workIndex) {
+    BOOL didSomeWork = FALSE;
+    BINARY_CALLBACK* Callback = (BINARY_CALLBACK*)pstWorkerItem->WorkCallbackArg;
 
     char* pDataIn1 = Callback->pDataIn1;
     char* pDataIn2 = Callback->pDataIn2;
@@ -163,10 +188,111 @@ static BOOL CompareThreadCallbackStrided(struct stMATH_WORKER_ITEM* pstWorkerIte
     return didSomeWork;
 }
 
+// For binary math functions like add, sbutract, multiply.
+// 2 inputs and 1 output
+static void AtopBinaryMathFunction(char** args, const npy_intp* dimensions, const npy_intp* steps, void* innerloop, int funcop, int atype) {
+    //LOGGING("called with %d %d   funcp: %p\n", funcop, atype, g_UFuncLUT[funcop][atype].pOldFunc);
+    if (g_AtopEnabled) {
+        npy_intp n = dimensions[0];
+        stMATH_WORKER_ITEM* pWorkItem = THREADER->GetWorkItem(n);
+
+        if (IS_BINARY_REDUCE) {
+            // In a numpy binary reduce, the middle array is the real array
+            REDUCE_FUNC pReduceFunc = g_UFuncLUT[funcop][atype].pReduceFunc;
+            int32_t      maxThreads = g_CompFuncLUT[funcop][atype].MaxThreads;
+
+            //printf("pReduce %p   opcode:%d   dtype:%d   %lld %lld %lld %lld\n", pReduceFunc, funcop, atype, (long long)dimensions[1], (long long)steps[0], (long long)steps[1], (long long)steps[2]);
+            if (pReduceFunc) {
+                char* ip2 = (char*)args[1];
+                char* op1 = (char*)args[2];
+                if (!pWorkItem) {
+                    pReduceFunc(ip2, op1, n, steps[1]);
+                }
+                else {
+                    const int64_t maxStackAlloc = 1024 * 1024;  // 1 MB
+                    int64_t itemsize = convert_atop_to_itemsize[atype];
+                    int64_t chunks = 1 + (n -1)  / THREADER->WORK_ITEM_CHUNK;
+                    int64_t allocsize = chunks * itemsize;
+
+                    // try to alloc on stack for speed
+                    char* pSumOfSums = allocsize > maxStackAlloc ? (char*)WORKSPACE_ALLOC(allocsize) : (char*)alloca(allocsize);
+
+                    BINARY_CALLBACK stCallback;
+
+                    // Each thread will call this routine with the callbackArg
+                    pWorkItem->DoWorkCallback = ReduceThreadCallbackStrided;
+                    pWorkItem->WorkCallbackArg = &stCallback;
+
+                    stCallback.pReduceFunc = pReduceFunc;
+                    stCallback.pDataOut = pSumOfSums;
+                    stCallback.pDataIn2 = ip2;
+                    stCallback.itemSizeIn2 = steps[1];
+                    stCallback.itemSizeOut = itemsize; // sizeof(T)
+
+                    // This will notify the worker threads of a new work item
+                    // most functions are so fast, we do not need more than 4 worker threads
+                    THREADER->WorkMain(pWorkItem, n, maxThreads);
+                    pReduceFunc(pSumOfSums, op1, chunks, itemsize);
+
+                    // Free if not on the stack
+                    if (allocsize > maxStackAlloc) WORKSPACE_FREE(pSumOfSums);
+                }
+                return;
+            }
+        }
+        else {
+            ANY_TWO_FUNC pBinaryFunc = g_UFuncLUT[funcop][atype].pBinaryFunc;
+            int32_t      maxThreads = g_CompFuncLUT[funcop][atype].MaxThreads;
+
+            if (pBinaryFunc) {
+                char* ip1 = (char*)args[0];
+                char* ip2 = (char*)args[1];
+                char* op1 = (char*)args[2];
+                // For a scalar first is1 ==0
+                // For a scalar second is2 == 0
+                npy_intp is1 = steps[0], is2 = steps[1], os1 = steps[2];
+                npy_intp n = dimensions[0];
+                int scalarmode = is1 == 0 ? SCALAR_MODE::FIRST_ARG_SCALAR : is2 == 0 ? SCALAR_MODE::SECOND_ARG_SCALAR : SCALAR_MODE::NO_SCALARS;
+
+                if (!pWorkItem) {
+                    pBinaryFunc(ip1, ip2, op1, (int64_t)n, scalarmode);
+                }
+                else {
+                    BINARY_CALLBACK stCallback;
+
+                    // Each thread will call this routine with the callbackArg
+                    pWorkItem->DoWorkCallback = BinaryThreadCallbackStrided;
+                    pWorkItem->WorkCallbackArg = &stCallback;
+
+                    stCallback.pBinaryFunc = pBinaryFunc;
+                    stCallback.pDataOut = op1;
+                    stCallback.pDataIn1 = ip1;
+                    stCallback.pDataIn2 = ip2;
+                    stCallback.itemSizeIn1 = is1;
+                    stCallback.itemSizeIn2 = is2;
+                    stCallback.itemSizeOut = os1;
+                    stCallback.scalarmode = scalarmode;
+
+                    // This will notify the worker threads of a new work item
+                    // most functions are so fast, we do not need more than 4 worker threads
+                    THREADER->WorkMain(pWorkItem, n, maxThreads);
+
+                }
+                return;
+            }
+        }
+        // Thread it the old way
+        g_UFuncLUT[funcop][atype].pOldFunc(args, dimensions, steps, innerloop);
+        return;
+    }
+    // Do it the old way
+    g_UFuncLUT[funcop][atype].pOldFunc(args, dimensions, steps, innerloop);
+};
+
 
 // For binary math functions like add, sbutract, multiply.
 // 2 inputs and 1 output
-void AtopCompareMathFunction(char** args, const npy_intp* dimensions, const npy_intp* steps, void* innerloop, int funcop, int atype) {
+static void AtopCompareMathFunction(char** args, const npy_intp* dimensions, const npy_intp* steps, void* innerloop, int funcop, int atype) {
     // LOGGING("comparison called with %d %d   funcp: %p  len: %lld\n", funcop, atype, g_CompFuncLUT[funcop][atype].pOldFunc, (long long)dimensions[0]);
 
     if (g_AtopEnabled) {
@@ -191,10 +317,10 @@ void AtopCompareMathFunction(char** args, const npy_intp* dimensions, const npy_
             pBinaryFunc(ip1, ip2, op1, n, scalarmode);
         }
         else {
-            COMPARE_CALLBACK stCallback;
+            BINARY_CALLBACK stCallback;
 
             // Each thread will call this routine with the callbackArg
-            pWorkItem->DoWorkCallback = CompareThreadCallbackStrided;
+            pWorkItem->DoWorkCallback = BinaryThreadCallbackStrided;
             pWorkItem->WorkCallbackArg = &stCallback;
 
             stCallback.pBinaryFunc = pBinaryFunc;
@@ -221,7 +347,7 @@ void AtopCompareMathFunction(char** args, const npy_intp* dimensions, const npy_
 
 // For unary math functions like abs, sqrt
 // 1 input and 1 output
-void AtopUnaryMathFunction(char** args, const npy_intp* dimensions, const npy_intp* steps, void* innerloop, int funcop, int atype) {
+static void AtopUnaryMathFunction(char** args, const npy_intp* dimensions, const npy_intp* steps, void* innerloop, int funcop, int atype) {
     char* ip1 = (char*)args[0];
     char* op1 = (char*)args[1];
     npy_intp is1 = steps[0], os1 = steps[1];
@@ -499,6 +625,8 @@ PyObject* newinit(PyObject* self, PyObject* args, PyObject* kwargs) {
                 int atype = convert_dtype_to_atop[dtype];
 
                 ANY_TWO_FUNC pBinaryFunc = GetSimpleMathOpFast(atop, atype, atype, &signature[2]);
+                REDUCE_FUNC  pReduceFunc = GetReduceMathOpFast(atop, atype);
+
                 signature[2] = convert_atop_to_dtype[signature[2]];
 
                 if (pBinaryFunc) {
@@ -511,6 +639,7 @@ PyObject* newinit(PyObject* self, PyObject* args, PyObject* kwargs) {
                     // Store the new function to call and the previous ufunc
                     g_UFuncLUT[atop][atype].pOldFunc = oldFunc;
                     g_UFuncLUT[atop][atype].pBinaryFunc = pBinaryFunc;
+                    g_UFuncLUT[atop][atype].pReduceFunc = pReduceFunc;
                     g_UFuncLUT[atop][atype].MaxThreads = 4;
                 }
             }
@@ -592,6 +721,28 @@ PyObject * disable(PyObject * self, PyObject * args) {
 extern "C"
 PyObject* isenabled(PyObject* self, PyObject* args) {
     if (g_AtopEnabled) {
+        Py_XINCREF(Py_True);
+        return Py_True;
+    }
+    Py_XINCREF(Py_False);
+    return Py_False;
+}
+
+extern "C"
+PyObject * thread_enable(PyObject * self, PyObject * args) {
+    THREADER->NoThreading= FALSE;
+    RETURN_NONE;
+}
+
+extern "C"
+PyObject * thread_disable(PyObject * self, PyObject * args) {
+    THREADER->NoThreading = TRUE;
+    RETURN_NONE;
+}
+
+extern "C"
+PyObject * thread_isenabled(PyObject * self, PyObject * args) {
+    if (!THREADER->NoThreading) {
         Py_XINCREF(Py_True);
         return Py_True;
     }

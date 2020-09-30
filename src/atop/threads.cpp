@@ -471,7 +471,7 @@ void PrintCPUInfo(char* buffer, size_t buffercount) {
     g_bmi2 = ATOP_cpuid_bmi2(g_cpuid);
     g_avx2 = ATOP_cpuid_avx2(g_cpuid);
 
-    snprintf(buffer, buffercount, "**CPU: %s  AVX2:%d  BMI2:%d 0x%.8x 0x%.8x 0x%.8x 0x%.8x", CPUBrandString, g_avx2, g_bmi2, g_cpuid.f1c, g_cpuid.f1d, g_cpuid.f7b, g_cpuid.f7c);
+    snprintf(buffer, buffercount, "**CPU: %s  AVX2:%d  BMI2:%d  f1c:0x%.8x  f1d:0x%.8x  f7b:0x%.8x  f7c:0x%.8x", CPUBrandString, g_avx2, g_bmi2, g_cpuid.f1c, g_cpuid.f1d, g_cpuid.f7b, g_cpuid.f7c);
     if (g_avx2 == 0) {
         printf("!!!NOTE: this system does not support AVX2 or BMI2 instructions, and will not work!\n");
     }

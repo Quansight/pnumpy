@@ -271,11 +271,70 @@ inline void SimpleMathOpFast(void* pDataIn1X, void* pDataIn2X, void* pDataOutX, 
 //=====================================================================================================
 // symmetric -- arg1 and arg2 can be swapped and the operation will return the same result (like addition or multiplication)
 template<typename T, typename U256, const T MATH_OP(T, T), const U256 MATH_OP256(U256, U256)>
+inline void ReduceeMathOpFast(void* pDataIn1X, void* pDataOutX, int64_t datalen, int64_t strideIn) {
+    T* pDataOut = (T*)pDataOutX;
+    T* pDataIn1 = (T*)pDataIn1X;
+    T* pEnd = (T*)((char*)pDataIn1X + (datalen * strideIn));
+
+    // TJD: testing indicates unrolling size of 2 is 3% faster
+    const int64_t NUM_LOOPS_UNROLLED = 2;
+    const int64_t chunkSize = NUM_LOOPS_UNROLLED * (sizeof(U256) / sizeof(T));
+    int64_t perReg = sizeof(U256) / sizeof(T);
+
+    T startval = 0;
+
+    if (strideIn == sizeof(T) && datalen >= chunkSize) {
+        T* pEnd = &pDataIn1[chunkSize * (datalen / chunkSize)];
+        U256* pEnd_256 = (U256*)pEnd;
+        U256* pDataIn256 = (U256*)pDataIn1;
+
+        U256 m0 = LOADU(pDataIn256);
+        U256 m1 = LOADU(pDataIn256 + 1);
+        pDataIn256 += NUM_LOOPS_UNROLLED;
+
+        while (pDataIn256 < pEnd_256) {
+            m0 = MATH_OP256(m0, pDataIn256[0]);
+            m1 = MATH_OP256(m1, pDataIn256[1]);
+            pDataIn256 += NUM_LOOPS_UNROLLED;
+        }
+
+        m0 = MATH_OP256(m0, m1);
+
+        // perform the operationd horizontally in m0
+        union {
+            volatile T  horizontal[1];
+            U256 mathreg[1];
+        };
+
+        mathreg[0] = m0;
+        for (int i = 0; i < perReg; i++) {
+            //printf("startval %lld %lld\n", (long long)startval, (long long)horizontal[i]);
+            startval = MATH_OP(horizontal[i], startval);
+        }
+        pDataIn1 = (T*)pDataIn256;
+    }
+    else {
+        startval = *pDataIn1;
+        pDataIn1 = STRIDE_NEXT(T, pDataIn1, strideIn);
+    }
+
+    while (pDataIn1 != pEnd) {
+        startval = MATH_OP(*pDataIn1, startval);
+        pDataIn1 = STRIDE_NEXT(T, pDataIn1, strideIn);
+    }
+    *pDataOut = startval;
+}
+
+
+//=====================================================================================================
+// symmetric -- arg1 and arg2 can be swapped and the operation will return the same result (like addition or multiplication)
+template<typename T, typename U256, const T MATH_OP(T, T), const U256 MATH_OP256(U256, U256)>
 inline void SimpleMathOpFastSymmetric(void* pDataIn1X, void* pDataIn2X, void* pDataOutX, int64_t datalen, int32_t scalarMode) {
     T* pDataOut = (T*)pDataOutX;
     T* pDataIn1 = (T*)pDataIn1X;
     T* pDataIn2 = (T*)pDataIn2X;
 
+    // To unrool loops
     const int64_t NUM_LOOPS_UNROLLED = 1;
     const int64_t chunkSize = NUM_LOOPS_UNROLLED * (sizeof(U256) / sizeof(T));
     int64_t perReg = sizeof(U256) / sizeof(T);
@@ -486,6 +545,43 @@ ANY_TWO_FUNC GetSimpleMathOpFast(int func, int atopInType1, int atopInType2, int
         case ATOP_INT64:  return SimpleMathOpFast<int64_t, __m256i, SubOp<int64_t>, SUB_OP_256i64>;
         case ATOP_INT16:  return SimpleMathOpFast<int16_t, __m256i, SubOp<int16_t>, SUB_OP_256i16>;
         case ATOP_INT8:   return SimpleMathOpFast<int8_t, __m256i, SubOp<int8_t>, SUB_OP_256i8>;
+        }
+        return NULL;
+    }
+    return NULL;
+}
+
+extern "C"
+REDUCE_FUNC GetReduceMathOpFast(int func, int atopInType1) {
+
+    switch (func) {
+    case MATH_OPERATION::ADD:
+        switch (atopInType1) {
+        case ATOP_BOOL:   return ReduceeMathOpFast<int8_t, __m256i, OrOp<int8_t>, OR_OP_256>;
+        case ATOP_FLOAT:  return ReduceeMathOpFast<float, __m256, AddOp<float>, ADD_OP_256f32>;
+        case ATOP_DOUBLE: return ReduceeMathOpFast<double, __m256d, AddOp<double>, ADD_OP_256f64>;
+            // proof of concept for i32 addition loop
+        case ATOP_INT32:  return ReduceeMathOpFast<int32_t, __m256i, AddOp<int32_t>, ADD_OP_256i32>;
+        case ATOP_INT64:  return ReduceeMathOpFast<int64_t, __m256i, AddOp<int64_t>, ADD_OP_256i64>;
+        case ATOP_INT16:  return ReduceeMathOpFast<int16_t, __m256i, AddOp<int16_t>, ADD_OP_256i16>;
+        case ATOP_INT8:   return ReduceeMathOpFast<int8_t, __m256i, AddOp<int8_t>, ADD_OP_256i8>;
+        }
+        return NULL;
+
+    case MATH_OPERATION::MUL:
+        switch (atopInType1) {
+        case ATOP_BOOL:   return ReduceeMathOpFast<int8_t, __m256i, AndOp<int8_t>, AND_OP_256>;
+        case ATOP_FLOAT:  return ReduceeMathOpFast<float, __m256, MulOp<float>, MUL_OP_256f32>;
+        case ATOP_DOUBLE: return ReduceeMathOpFast<double, __m256d, MulOp<double>, MUL_OP_256f64>;
+        case ATOP_INT32:  return ReduceeMathOpFast<int32_t, __m256i, MulOp<int32_t>, MUL_OP_256i32>;
+
+        case ATOP_INT16:  return ReduceeMathOpFast<int16_t, __m256i, MulOp<int16_t>, MUL_OP_256i16>;
+
+            // Below the intrinsic to multiply is slower so we disabled it (really wants 32bit -> 64bit)
+            //CASE_ATOP_UINT32:  return SimpleMathOpFastMul<UINT32, __m256i>;
+            // TODO: 64bit multiply can be done with algo..
+            // lo1 * lo2 + (lo1 * hi2) << 32 + (hi1 *lo2) << 32)
+        case ATOP_UINT64: return ReduceeMathOpFast<uint64_t, __m256i, MulOp<uint64_t>, MUL_OP_256u64>;
         }
         return NULL;
     }

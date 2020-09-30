@@ -399,6 +399,7 @@ typedef void(*UNARY_FUNC_STRIDED)(void* pDataIn, void* pDataOut, int64_t len, in
 // Used for operations like C = A + B
 typedef void(*ANY_TWO_FUNC)(void* pDataIn, void* pDataIn2, void* pDataOut, int64_t len, int32_t scalarMode);
 typedef void(*GROUPBY_FUNC)(void* pstGroupBy, int64_t index);
+typedef void(*REDUCE_FUNC)(void* pDataIn1X, void* pDataOutX, int64_t datalen, int64_t strideIn);
 
 //-----------------------------------------------------------
 // List of function calls

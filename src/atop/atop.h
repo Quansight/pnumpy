@@ -20,7 +20,7 @@ extern "C" {
 
     // defined in ops_binary.cpp
     DllExport ANY_TWO_FUNC GetSimpleMathOpFast(int func, int atopInType1, int atopInType2, int* wantedOutType);
-
+    DllExport REDUCE_FUNC GetReduceMathOpFast(int func, int atopInType1);
     DllExport ANY_TWO_FUNC GetComparisonOpFast(int func, int atopInType1, int atopInType2, int* wantedOutType);
 
     // CPUID capabilities
