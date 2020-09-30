@@ -1,17 +1,24 @@
 import numpy as np
-import fast_numpy_loops
-
+import fast_numpy_loops as fn
 
 def test_enable():
     # enable/disable return the previous value
-    old = fast_numpy_loops.isenabled()
-    assert fast_numpy_loops.enable() == old
-    assert fast_numpy_loops.disable() == True
-    assert fast_numpy_loops.enable() == False
-    old = fast_numpy_loops.isenabled()
+    old = fn.isenabled()
+    fn.enable()
+    assert fn.isenabled() == True
+    fn.disable()
+    assert fn.isenabled() == False
+
+    # restore prior state
+    if old:
+        fn.enable()
+    else:
+        fn.disable()
+    assert fn.isenabled() == old
 
 def test_result(rng):
     print('numpy version', np.__version__)
+    print(fn.cpustring())
   
     m = rng.integers(100, size=(10, 10), dtype=np.int32)
     o = np.empty_like(m)
