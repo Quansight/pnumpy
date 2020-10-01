@@ -98,7 +98,6 @@ struct BINARY_CALLBACK {
     int64_t itemSizeIn1;
     int64_t itemSizeIn2;
     int64_t itemSizeOut;
-    int32_t scalarmode;
 };
 
 struct stUFunc {
@@ -159,7 +158,7 @@ static BOOL ReduceThreadCallbackStrided(struct stMATH_WORKER_ITEM* pstWorkerItem
 //  Concurrent callback from multiple threads
 static BOOL BinaryThreadCallbackStrided(struct stMATH_WORKER_ITEM* pstWorkerItem, int core, int64_t workIndex) {
     BOOL didSomeWork = FALSE;
-    BINARY_CALLBACK* Callback = (BINARY_CALLBACK*)pstWorkerItem->WorkCallbackArg;
+    const BINARY_CALLBACK* Callback = (const BINARY_CALLBACK*)pstWorkerItem->WorkCallbackArg;
 
     char* pDataIn1 = Callback->pDataIn1;
     char* pDataIn2 = Callback->pDataIn2;
@@ -175,7 +174,7 @@ static BOOL BinaryThreadCallbackStrided(struct stMATH_WORKER_ITEM* pstWorkerItem
         int64_t outputAdj = pstWorkerItem->BlockSize * workBlock * Callback->itemSizeOut;
 
         // LOGGING("[%d] working on %lld with len %lld   block: %lld\n", core, workIndex, lenX, workBlock);
-        Callback->pBinaryFunc(pDataIn1 + inputAdj1, pDataIn2 + inputAdj2, pDataOut + outputAdj, lenX, Callback->scalarmode);
+        Callback->pBinaryFunc(pDataIn1 + inputAdj1, pDataIn2 + inputAdj2, pDataOut + outputAdj, lenX, Callback->itemSizeIn1, Callback->itemSizeIn2, Callback->itemSizeOut);
 
         // Indicate we completed a block
         didSomeWork = TRUE;
@@ -255,7 +254,7 @@ static void AtopBinaryMathFunction(char** args, const npy_intp* dimensions, cons
                 int scalarmode = is1 == 0 ? SCALAR_MODE::FIRST_ARG_SCALAR : is2 == 0 ? SCALAR_MODE::SECOND_ARG_SCALAR : SCALAR_MODE::NO_SCALARS;
 
                 if (!pWorkItem) {
-                    pBinaryFunc(ip1, ip2, op1, (int64_t)n, scalarmode);
+                    pBinaryFunc(ip1, ip2, op1, (int64_t)n, (int64_t)is1, (int64_t)is2, (int64_t)os1);
                 }
                 else {
                     BINARY_CALLBACK stCallback;
@@ -271,7 +270,6 @@ static void AtopBinaryMathFunction(char** args, const npy_intp* dimensions, cons
                     stCallback.itemSizeIn1 = is1;
                     stCallback.itemSizeIn2 = is2;
                     stCallback.itemSizeOut = os1;
-                    stCallback.scalarmode = scalarmode;
 
                     // This will notify the worker threads of a new work item
                     // most functions are so fast, we do not need more than 4 worker threads
@@ -307,14 +305,13 @@ static void AtopCompareMathFunction(char** args, const npy_intp* dimensions, con
         // For a scalar second is2 == 0
         npy_intp is1 = steps[0], is2 = steps[1], os1 = steps[2];
         int64_t n = (int64_t)dimensions[0];
-        int scalarmode = is1 == 0 ? SCALAR_MODE::FIRST_ARG_SCALAR : is2 == 0 ? SCALAR_MODE::SECOND_ARG_SCALAR : SCALAR_MODE::NO_SCALARS;
 
         stMATH_WORKER_ITEM* pWorkItem = THREADER->GetWorkItem(n);
 
         if (pWorkItem == NULL) {
 
             // Threading not allowed for this work item, call it directly from main thread
-            pBinaryFunc(ip1, ip2, op1, n, scalarmode);
+            pBinaryFunc(ip1, ip2, op1, n, is1, is2, os1);
         }
         else {
             BINARY_CALLBACK stCallback;
@@ -330,7 +327,6 @@ static void AtopCompareMathFunction(char** args, const npy_intp* dimensions, con
             stCallback.itemSizeIn1 = is1;
             stCallback.itemSizeIn2 = is2;
             stCallback.itemSizeOut = os1;
-            stCallback.scalarmode = scalarmode;
 
             // This will notify the worker threads of a new work item
             // most functions are so fast, we do not need more than 4 worker threads

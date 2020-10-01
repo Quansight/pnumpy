@@ -397,7 +397,7 @@ typedef void(*UNARY_FUNC)(void* pDataIn, void* pDataOut, int64_t len, int64_t st
 typedef void(*UNARY_FUNC_STRIDED)(void* pDataIn, void* pDataOut, int64_t len, int64_t strideIn, int64_t strideOut);
 // Pass in two vectors and return one vector
 // Used for operations like C = A + B
-typedef void(*ANY_TWO_FUNC)(void* pDataIn, void* pDataIn2, void* pDataOut, int64_t len, int32_t scalarMode);
+typedef void(*ANY_TWO_FUNC)(void* pDataIn, void* pDataIn2, void* pDataOut, int64_t len, int64_t strideIn1, int64_t strideIn2, int64_t strideOut);
 typedef void(*GROUPBY_FUNC)(void* pstGroupBy, int64_t index);
 typedef void(*REDUCE_FUNC)(void* pDataIn1X, void* pDataOutX, int64_t datalen, int64_t strideIn);
 
