@@ -23,6 +23,18 @@
 
 #endif
 
+static FORCE_INLINE const __m256i MM_SET(bool* pData) { return _mm256_set1_epi8(*(int8_t*)pData); }
+static FORCE_INLINE const __m256i MM_SET(int8_t* pData) { return _mm256_set1_epi8(*(int8_t*)pData); }
+static FORCE_INLINE const __m256i MM_SET(uint8_t* pData) { return _mm256_set1_epi8(*(int8_t*)pData); }
+static FORCE_INLINE const __m256i MM_SET(int16_t* pData) { return _mm256_set1_epi16(*(int16_t*)pData); }
+static FORCE_INLINE const __m256i MM_SET(uint16_t* pData) { return _mm256_set1_epi16(*(int16_t*)pData); }
+static FORCE_INLINE const __m256i MM_SET(int32_t* pData) { return _mm256_set1_epi32(*(int32_t*)pData); }
+static FORCE_INLINE const __m256i MM_SET(uint32_t* pData) { return _mm256_set1_epi32(*(int32_t*)pData); }
+static FORCE_INLINE const __m256i MM_SET(int64_t* pData) { return _mm256_set1_epi64x(*(int64_t*)pData); }
+static FORCE_INLINE const __m256i MM_SET(uint64_t* pData) { return _mm256_set1_epi64x(*(int64_t*)pData); }
+static FORCE_INLINE const __m256  MM_SET(float* pData) { return _mm256_set1_ps(*(float*)pData); }
+static FORCE_INLINE const __m256d MM_SET(double* pData) { return _mm256_set1_pd(*(double*)pData); }
+
 
 static const inline __m256d LOADU(__m256d* x) { return _mm256_loadu_pd((double const*)x); };
 static const inline __m256 LOADU(__m256* x) { return _mm256_loadu_ps((float const*)x); };
@@ -100,178 +112,10 @@ static const inline __m256i XOR_OP_256(__m256i x, __m256i y) { return _mm256_xor
 static const inline __m256i ANDNOT_OP_256(__m256i x, __m256i y) { return _mm256_andnot_si256(x, y); }
 
 
-
-//=====================================================================================================
-// Not symmetric -- arg1 must be first, arg2 must be second
-template<typename T, typename U256, const T MATH_OP(T, T), const U256 MATH_OP256(U256, U256)>
-inline void SimpleMathOpFast(void* pDataIn1X, void* pDataIn2X, void* pDataOutX, int64_t datalen, int32_t scalarMode) {
-    T* pDataOut = (T*)pDataOutX;
-    T* pDataIn1 = (T*)pDataIn1X;
-    T* pDataIn2 = (T*)pDataIn2X;
-
-    const int64_t NUM_LOOPS_UNROLLED = 1;
-    const int64_t chunkSize = NUM_LOOPS_UNROLLED * (sizeof(U256) / sizeof(T));
-    int64_t perReg = sizeof(U256) / sizeof(T);
-
-    LOGGING("mathopfast datalen %llu  chunkSize %llu  perReg %llu\n", datalen, chunkSize, perReg);
-
-    switch (scalarMode) {
-    case SCALAR_MODE::NO_SCALARS:
-    {
-        if (datalen >= chunkSize) {
-            T* pEnd = &pDataOut[chunkSize * (datalen / chunkSize)];
-            U256* pEnd_256 = (U256*)pEnd;
-            U256* pIn1_256 = (U256*)pDataIn1;
-            U256* pIn2_256 = (U256*)pDataIn2;
-            U256* pOut_256 = (U256*)pDataOut;
-
-            do {
-                // clang requires LOADU on last operand
-#ifdef RT_COMPILER_MSVC
-            // Microsoft will create the opcode where the second argument is an address
-                STOREU(pOut_256, MATH_OP256(LOADU(pIn1_256), *pIn2_256));
-#else
-                STOREU(pOut_256, MATH_OP256(LOADU(pIn1_256), LOADU(pIn2_256)));
-#endif
-                pOut_256 += NUM_LOOPS_UNROLLED;
-                pIn1_256 += NUM_LOOPS_UNROLLED;
-                pIn2_256 += NUM_LOOPS_UNROLLED;
-            } while (pOut_256 < pEnd_256);
-
-            // update pointers to last location of wide pointers
-            pDataIn1 = (T*)pIn1_256;
-            pDataIn2 = (T*)pIn2_256;
-            pDataOut = (T*)pOut_256;
-        }
-
-        datalen = datalen & (chunkSize - 1);
-        for (int64_t i = 0; i < datalen; i++) {
-            pDataOut[i] = MATH_OP(pDataIn1[i], pDataIn2[i]);
-        }
-
-        break;
-    }
-    case SCALAR_MODE::FIRST_ARG_SCALAR:
-    {
-        // NOTE: the unrolled loop is faster
-        T arg1 = *pDataIn1;
-
-        if (datalen >= chunkSize) {
-            T* pEnd = &pDataOut[chunkSize * (datalen / chunkSize)];
-            U256* pEnd_256 = (U256*)pEnd;
-            U256* pIn1_256 = (U256*)pDataIn1;
-            U256* pIn2_256 = (U256*)pDataIn2;
-            U256* pOut_256 = (U256*)pDataOut;
-
-            const U256 m0 = LOADU(pIn1_256);
-
-            do {
-#ifdef RT_COMPILER_MSVC
-                STOREU(pOut_256, MATH_OP256(m0, *pIn2_256));
-#else
-                STOREU(pOut_256, MATH_OP256(m0, LOADU(pIn2_256)));
-#endif
-
-                pOut_256 += NUM_LOOPS_UNROLLED;
-                pIn2_256 += NUM_LOOPS_UNROLLED;
-
-            } while (pOut_256 < pEnd_256);
-
-            // update pointers to last location of wide pointers
-            pDataIn2 = (T*)pIn2_256;
-            pDataOut = (T*)pOut_256;
-        }
-        datalen = datalen & (chunkSize - 1);
-        for (int64_t i = 0; i < datalen; i++) {
-            pDataOut[i] = MATH_OP(arg1, pDataIn2[i]);
-        }
-        break;
-    }
-    case SCALAR_MODE::SECOND_ARG_SCALAR:
-    {
-        T arg2 = *pDataIn2;
-
-        // Check if the output is the same as the input
-        if (pDataOut == pDataIn1) {
-
-            // align the load to 32 byte boundary
-            int64_t babylen = (int64_t)pDataIn1 & 31;
-            if (babylen != 0) {
-                // calc how much to align data
-                babylen = (32 - babylen) / sizeof(T);
-                if (babylen <= datalen) {
-                    for (int64_t i = 0; i < babylen; i++) {
-                        pDataIn1[i] = MATH_OP(pDataIn1[i], arg2);
-                    }
-                    pDataIn1 += babylen;
-                    datalen -= babylen;
-                }
-            }
-
-            // inplace operation
-            if (datalen >= chunkSize) {
-                T* pEnd = &pDataIn1[chunkSize * (datalen / chunkSize)];
-                U256* pEnd_256 = (U256*)pEnd;
-                U256* pIn1_256 = (U256*)pDataIn1;
-                U256* pIn2_256 = (U256*)pDataIn2;
-
-                const U256 m1 = LOADU(pIn2_256);
-
-                // apply 256bit aligned operations
-                while (pIn1_256 < pEnd_256) {
-                    STOREA(pIn1_256, MATH_OP256(LOADA(pIn1_256), m1));
-                    pIn1_256++;
-                }
-
-                // update pointers to last location of wide pointers
-                pDataIn1 = (T*)pIn1_256;
-            }
-            datalen = datalen & (chunkSize - 1);
-            for (int64_t i = 0; i < datalen; i++) {
-                pDataIn1[i] = MATH_OP(pDataIn1[i], arg2);
-            }
-
-        }
-        else {
-
-            if (datalen >= chunkSize) {
-                T* pEnd = &pDataOut[chunkSize * (datalen / chunkSize)];
-                U256* pEnd_256 = (U256*)pEnd;
-                U256* pIn1_256 = (U256*)pDataIn1;
-                U256* pIn2_256 = (U256*)pDataIn2;
-                U256* pOut_256 = (U256*)pDataOut;
-
-                const U256 m1 = LOADU((U256*)pIn2_256);
-
-                // apply 256bit unaligned operations
-                do {
-                    STOREU(pOut_256, MATH_OP256(LOADU(pIn1_256), m1));
-
-                    pOut_256 += NUM_LOOPS_UNROLLED;
-                    pIn1_256 += NUM_LOOPS_UNROLLED;
-
-                } while (pOut_256 < pEnd_256);
-
-                // update pointers to last location of wide pointers
-                pDataIn1 = (T*)pIn1_256;
-                pDataOut = (T*)pOut_256;
-            }
-            datalen = datalen & (chunkSize - 1);
-            for (int64_t i = 0; i < datalen; i++) {
-                pDataOut[i] = MATH_OP(pDataIn1[i], arg2);
-            }
-        }
-        break;
-    }
-    default:
-        printf("**error - impossible scalar mode\n");
-    }
-}
-
 //=====================================================================================================
 // symmetric -- arg1 and arg2 can be swapped and the operation will return the same result (like addition or multiplication)
 template<typename T, typename U256, const T MATH_OP(T, T), const U256 MATH_OP256(U256, U256)>
-inline void ReduceeMathOpFast(void* pDataIn1X, void* pDataOutX, int64_t datalen, int64_t strideIn) {
+inline void ReduceMathOpFast(void* pDataIn1X, void* pDataOutX, int64_t datalen, int64_t strideIn) {
     T* pDataOut = (T*)pDataOutX;
     T* pDataIn1 = (T*)pDataIn1X;
     T* pEnd = (T*)((char*)pDataIn1X + (datalen * strideIn));
@@ -281,8 +125,9 @@ inline void ReduceeMathOpFast(void* pDataIn1X, void* pDataOutX, int64_t datalen,
     const int64_t chunkSize = NUM_LOOPS_UNROLLED * (sizeof(U256) / sizeof(T));
     int64_t perReg = sizeof(U256) / sizeof(T);
 
-    T startval = 0;
-
+    // NOTE: numpy uses the output val to seed the first input
+    T startval = *pDataOut;
+        
     if (strideIn == sizeof(T) && datalen >= chunkSize) {
         T* pEnd = &pDataIn1[chunkSize * (datalen / chunkSize)];
         U256* pEnd_256 = (U256*)pEnd;
@@ -300,22 +145,19 @@ inline void ReduceeMathOpFast(void* pDataIn1X, void* pDataOutX, int64_t datalen,
 
         m0 = MATH_OP256(m0, m1);
 
-        // perform the operationd horizontally in m0
+        // perform the operation horizontally in m0
         union {
             volatile T  horizontal[1];
             U256 mathreg[1];
         };
 
+        // NOTE: there is a horizontal add, there is a better way to do this
         mathreg[0] = m0;
         for (int i = 0; i < perReg; i++) {
             //printf("startval %lld %lld\n", (long long)startval, (long long)horizontal[i]);
             startval = MATH_OP(horizontal[i], startval);
         }
         pDataIn1 = (T*)pDataIn256;
-    }
-    else {
-        startval = *pDataIn1;
-        pDataIn1 = STRIDE_NEXT(T, pDataIn1, strideIn);
     }
 
     while (pDataIn1 != pEnd) {
@@ -327,174 +169,359 @@ inline void ReduceeMathOpFast(void* pDataIn1X, void* pDataOutX, int64_t datalen,
 
 
 //=====================================================================================================
-// symmetric -- arg1 and arg2 can be swapped and the operation will return the same result (like addition or multiplication)
+// Not symmetric -- arg1 must be first, arg2 must be second
 template<typename T, typename U256, const T MATH_OP(T, T), const U256 MATH_OP256(U256, U256)>
-inline void SimpleMathOpFastSymmetric(void* pDataIn1X, void* pDataIn2X, void* pDataOutX, int64_t datalen, int32_t scalarMode) {
+inline void SimpleMathOpFast(void* pDataIn1X, void* pDataIn2X, void* pDataOutX, int64_t datalen, int64_t strideIn1, int64_t strideIn2, int64_t strideOut) {
     T* pDataOut = (T*)pDataOutX;
     T* pDataIn1 = (T*)pDataIn1X;
     T* pDataIn2 = (T*)pDataIn2X;
 
-    // To unrool loops
-    const int64_t NUM_LOOPS_UNROLLED = 1;
-    const int64_t chunkSize = NUM_LOOPS_UNROLLED * (sizeof(U256) / sizeof(T));
-    int64_t perReg = sizeof(U256) / sizeof(T);
+    if (strideOut == sizeof(T)) {
+        const int64_t NUM_LOOPS_UNROLLED = 1;
+        const int64_t chunkSize = NUM_LOOPS_UNROLLED * (sizeof(U256) / sizeof(T));
+        int64_t perReg = sizeof(U256) / sizeof(T);
 
-    LOGGING("mathopfast datalen %llu  chunkSize %llu  perReg %llu\n", datalen, chunkSize, perReg);
+        LOGGING("mathopfast datalen %llu  chunkSize %llu  perReg %llu\n", datalen, chunkSize, perReg);
 
-    switch (scalarMode) {
-    case SCALAR_MODE::NO_SCALARS:
-    {
-        if (datalen >= chunkSize) {
-            T* pEnd = &pDataOut[chunkSize * (datalen / chunkSize)];
-            U256* pEnd_256 = (U256*)pEnd;
-            U256* pIn1_256 = (U256*)pDataIn1;
-            U256* pIn2_256 = (U256*)pDataIn2;
-            U256* pOut_256 = (U256*)pDataOut;
+        if (strideIn1 != 0 && strideIn2 != 0)
+        {
+            if (strideIn2 == sizeof(T) && strideIn1 == sizeof(T)) {
+                if (datalen >= chunkSize) {
+                    T* pEnd = &pDataOut[chunkSize * (datalen / chunkSize)];
+                    U256* pEnd_256 = (U256*)pEnd;
+                    U256* pIn1_256 = (U256*)pDataIn1;
+                    U256* pIn2_256 = (U256*)pDataIn2;
+                    U256* pOut_256 = (U256*)pDataOut;
 
-            do {
-                // clang requires LOADU on last operand
+                    do {
+                        // clang requires LOADU on last operand
 #ifdef RT_COMPILER_MSVC
-                STOREU(pOut_256, MATH_OP256(LOADU(pIn1_256), *pIn2_256));
+            // Microsoft will create the opcode where the second argument is an address
+                        STOREU(pOut_256, MATH_OP256(LOADU(pIn1_256), *pIn2_256));
 #else
-                STOREU(pOut_256, MATH_OP256(LOADU(pIn1_256), LOADU(pIn2_256)));
+                        STOREU(pOut_256, MATH_OP256(LOADU(pIn1_256), LOADU(pIn2_256)));
 #endif
-                pOut_256 += NUM_LOOPS_UNROLLED;
-                pIn1_256 += NUM_LOOPS_UNROLLED;
-                pIn2_256 += NUM_LOOPS_UNROLLED;
-            } while (pOut_256 < pEnd_256);
+                        pOut_256 += NUM_LOOPS_UNROLLED;
+                        pIn1_256 += NUM_LOOPS_UNROLLED;
+                        pIn2_256 += NUM_LOOPS_UNROLLED;
+                    } while (pOut_256 < pEnd_256);
 
-            // update pointers to last location of wide pointers
-            pDataIn1 = (T*)pIn1_256;
-            pDataIn2 = (T*)pIn2_256;
-            pDataOut = (T*)pOut_256;
+                    // update pointers to last location of wide pointers
+                    pDataIn1 = (T*)pIn1_256;
+                    pDataIn2 = (T*)pIn2_256;
+                    pDataOut = (T*)pOut_256;
+                }
+
+                datalen = datalen & (chunkSize - 1);
+                for (int64_t i = 0; i < datalen; i++) {
+                    pDataOut[i] = MATH_OP(pDataIn1[i], pDataIn2[i]);
+                }
+
+                return;
+            }
         }
+        if (strideIn1 == 0)
+        {
+            if (strideIn2 == sizeof(T)) {
+                // NOTE: the unrolled loop is faster
+                T arg1 = *pDataIn1;
 
-        datalen = datalen & (chunkSize - 1);
-        for (int64_t i = 0; i < datalen; i++) {
-            pDataOut[i] = MATH_OP(pDataIn1[i], pDataIn2[i]);
-        }
+                if (datalen >= chunkSize) {
+                    T* pEnd = &pDataOut[chunkSize * (datalen / chunkSize)];
+                    U256* pEnd_256 = (U256*)pEnd;
+                    U256* pIn2_256 = (U256*)pDataIn2;
+                    U256* pOut_256 = (U256*)pDataOut;
 
-        break;
-    }
-    case SCALAR_MODE::FIRST_ARG_SCALAR:
-    {
-        // NOTE: the unrolled loop is faster
-        T arg1 = *pDataIn1;
+                    const U256 m0 = MM_SET((T*)pDataIn1);
 
-        if (datalen >= chunkSize) {
-            T* pEnd = &pDataOut[chunkSize * (datalen / chunkSize)];
-            U256* pEnd_256 = (U256*)pEnd;
-            U256* pIn1_256 = (U256*)pDataIn1;
-            U256* pIn2_256 = (U256*)pDataIn2;
-            U256* pOut_256 = (U256*)pDataOut;
-
-            const U256 m0 = LOADU(pIn1_256);
-
-            do {
+                    do {
 #ifdef RT_COMPILER_MSVC
-                STOREU(pOut_256, MATH_OP256(m0, *pIn2_256));
+                        STOREU(pOut_256, MATH_OP256(m0, *pIn2_256));
 #else
-                STOREU(pOut_256, MATH_OP256(m0, LOADU(pIn2_256)));
+                        STOREU(pOut_256, MATH_OP256(m0, LOADU(pIn2_256)));
 #endif
 
-                pOut_256 += NUM_LOOPS_UNROLLED;
-                pIn2_256 += NUM_LOOPS_UNROLLED;
+                        pOut_256 += NUM_LOOPS_UNROLLED;
+                        pIn2_256 += NUM_LOOPS_UNROLLED;
 
-            } while (pOut_256 < pEnd_256);
+                    } while (pOut_256 < pEnd_256);
 
-            // update pointers to last location of wide pointers
-            pDataIn2 = (T*)pIn2_256;
-            pDataOut = (T*)pOut_256;
+                    // update pointers to last location of wide pointers
+                    pDataIn2 = (T*)pIn2_256;
+                    pDataOut = (T*)pOut_256;
+                }
+                datalen = datalen & (chunkSize - 1);
+                for (int64_t i = 0; i < datalen; i++) {
+                    pDataOut[i] = MATH_OP(arg1, pDataIn2[i]);
+                }
+                return;
+            }
         }
-        datalen = datalen & (chunkSize - 1);
-        for (int64_t i = 0; i < datalen; i++) {
-            pDataOut[i] = MATH_OP(arg1, pDataIn2[i]);
-        }
-        break;
-    }
-    case SCALAR_MODE::SECOND_ARG_SCALAR:
-    {
-        T arg2 = *pDataIn2;
+        if (strideIn2 == 0)
+        {
+            if (strideIn1 == sizeof(T)) {
+                T arg2 = *pDataIn2;
 
-        // Check if the output is the same as the input
-        if (pDataOut == pDataIn1) {
+                // Check if the output is the same as the input
+                if (pDataOut == pDataIn1) {
 
-            // align the load to 32 byte boundary
-            int64_t babylen = (int64_t)pDataIn1 & 31;
-            if (babylen != 0) {
-                // calc how much to align data
-                babylen = (32 - babylen) / sizeof(T);
-                if (babylen <= datalen) {
-                    for (int64_t i = 0; i < babylen; i++) {
+                    // align the load to 32 byte boundary
+                    int64_t babylen = (int64_t)pDataIn1 & 31;
+                    if (babylen != 0) {
+                        // calc how much to align data
+                        babylen = (32 - babylen) / sizeof(T);
+                        if (babylen <= datalen) {
+                            for (int64_t i = 0; i < babylen; i++) {
+                                pDataIn1[i] = MATH_OP(pDataIn1[i], arg2);
+                            }
+                            pDataIn1 += babylen;
+                            datalen -= babylen;
+                        }
+                    }
+
+                    // inplace operation
+                    if (datalen >= chunkSize) {
+                        T* pEnd = &pDataIn1[chunkSize * (datalen / chunkSize)];
+                        U256* pEnd_256 = (U256*)pEnd;
+                        U256* pIn1_256 = (U256*)pDataIn1;
+                        const U256 m1 = MM_SET((T*)pDataIn2);
+
+                        // apply 256bit aligned operations
+                        while (pIn1_256 < pEnd_256) {
+                            STOREA(pIn1_256, MATH_OP256(LOADA(pIn1_256), m1));
+                            pIn1_256++;
+                        }
+
+                        // update pointers to last location of wide pointers
+                        pDataIn1 = (T*)pIn1_256;
+                    }
+                    datalen = datalen & (chunkSize - 1);
+                    for (int64_t i = 0; i < datalen; i++) {
                         pDataIn1[i] = MATH_OP(pDataIn1[i], arg2);
                     }
-                    pDataIn1 += babylen;
-                    datalen -= babylen;
+
                 }
-            }
+                else {
 
-            // inplace operation
-            if (datalen >= chunkSize) {
-                T* pEnd = &pDataIn1[chunkSize * (datalen / chunkSize)];
-                U256* pEnd_256 = (U256*)pEnd;
-                U256* pIn1_256 = (U256*)pDataIn1;
-                U256* pIn2_256 = (U256*)pDataIn2;
+                    if (datalen >= chunkSize) {
+                        T* pEnd = &pDataOut[chunkSize * (datalen / chunkSize)];
+                        U256* pEnd_256 = (U256*)pEnd;
+                        U256* pIn1_256 = (U256*)pDataIn1;
+                        U256* pOut_256 = (U256*)pDataOut;
 
-                const U256 m1 = LOADU(pIn2_256);
+                        const U256 m1 = MM_SET((T*)pDataIn2);
 
-                // apply 256bit aligned operations
-                while (pIn1_256 < pEnd_256) {
-                    //pin1_256 is aligned
-                    STOREA(pIn1_256, MATH_OP256(m1, *pIn1_256));
-                    pIn1_256++;
+                        // apply 256bit unaligned operations
+                        do {
+                            STOREU(pOut_256, MATH_OP256(LOADU(pIn1_256), m1));
+
+                            pOut_256 += NUM_LOOPS_UNROLLED;
+                            pIn1_256 += NUM_LOOPS_UNROLLED;
+
+                        } while (pOut_256 < pEnd_256);
+
+                        // update pointers to last location of wide pointers
+                        pDataIn1 = (T*)pIn1_256;
+                        pDataOut = (T*)pOut_256;
+                    }
+                    datalen = datalen & (chunkSize - 1);
+                    for (int64_t i = 0; i < datalen; i++) {
+                        pDataOut[i] = MATH_OP(pDataIn1[i], arg2);
+                    }
                 }
-
-                // update pointers to last location of wide pointers
-                pDataIn1 = (T*)pIn1_256;
+                return;
             }
-            datalen = datalen & (chunkSize - 1);
-            for (int64_t i = 0; i < datalen; i++) {
-                pDataIn1[i] = MATH_OP(pDataIn1[i], arg2);
-            }
-
         }
-        else {
+    }
+    // generic rare case
+    for (int64_t i = 0; i < datalen; i++) {
+        *pDataOut = MATH_OP(*pDataIn1, *pDataIn2);
+        pDataIn1 = STRIDE_NEXT(T, pDataIn1, strideIn1);
+        pDataIn2 = STRIDE_NEXT(T, pDataIn2, strideIn2);
+        pDataOut = STRIDE_NEXT(T, pDataOut, strideOut);
+    }
 
-            if (datalen >= chunkSize) {
-                T* pEnd = &pDataOut[chunkSize * (datalen / chunkSize)];
-                U256* pEnd_256 = (U256*)pEnd;
-                U256* pIn1_256 = (U256*)pDataIn1;
-                U256* pIn2_256 = (U256*)pDataIn2;
-                U256* pOut_256 = (U256*)pDataOut;
+}
 
-                const U256 m1 = LOADU((U256*)pIn2_256);
 
-                // apply 256bit unaligned operations
-                do {
+//=====================================================================================================
+// symmetric -- arg1 and arg2 can be swapped and the operation will return the same result (like addition or multiplication)
+template<typename T, typename U256, const T MATH_OP(T, T), const U256 MATH_OP256(U256, U256)>
+inline void SimpleMathOpFastSymmetric(void* pDataIn1X, void* pDataIn2X, void* pDataOutX, int64_t datalen, int64_t strideIn1, int64_t strideIn2, int64_t strideOut) {
+    T* pDataOut = (T*)pDataOutX;
+    T* pDataIn1 = (T*)pDataIn1X;
+    T* pDataIn2 = (T*)pDataIn2X;
+
+    if (strideOut == sizeof(T)) {
+        // To unroll loops
+        const int64_t NUM_LOOPS_UNROLLED = 1;
+        const int64_t chunkSize = NUM_LOOPS_UNROLLED * (sizeof(U256) / sizeof(T));
+        int64_t perReg = sizeof(U256) / sizeof(T);
+
+        LOGGING("mathopfast datalen %llu  chunkSize %llu  perReg %llu\n", datalen, chunkSize, perReg);
+
+        if (strideIn1 != 0 && strideIn2 != 0) {
+            if (strideIn2 == sizeof(T) && strideIn1 == sizeof(T)) {
+                if (datalen >= chunkSize) {
+                    T* pEnd = &pDataOut[chunkSize * (datalen / chunkSize)];
+                    U256* pEnd_256 = (U256*)pEnd;
+                    U256* pIn1_256 = (U256*)pDataIn1;
+                    U256* pIn2_256 = (U256*)pDataIn2;
+                    U256* pOut_256 = (U256*)pDataOut;
+
+                    do {
+                        // clang requires LOADU on last operand
 #ifdef RT_COMPILER_MSVC
-                    STOREU(pOut_256, MATH_OP256(m1, *pIn1_256));
+                        STOREU(pOut_256, MATH_OP256(LOADU(pIn1_256), *pIn2_256));
 #else
-                    STOREU(pOut_256, MATH_OP256(m1, LOADU(pIn1_256)));
+                        STOREU(pOut_256, MATH_OP256(LOADU(pIn1_256), LOADU(pIn2_256)));
 #endif
-                    pOut_256 += NUM_LOOPS_UNROLLED;
-                    pIn1_256 += NUM_LOOPS_UNROLLED;
+                        pOut_256 += NUM_LOOPS_UNROLLED;
+                        pIn1_256 += NUM_LOOPS_UNROLLED;
+                        pIn2_256 += NUM_LOOPS_UNROLLED;
+                    } while (pOut_256 < pEnd_256);
 
-                } while (pOut_256 < pEnd_256);
+                    // update pointers to last location of wide pointers
+                    pDataIn1 = (T*)pIn1_256;
+                    pDataIn2 = (T*)pIn2_256;
+                    pDataOut = (T*)pOut_256;
+                }
 
-                // update pointers to last location of wide pointers
-                pDataIn1 = (T*)pIn1_256;
-                pDataOut = (T*)pOut_256;
-            }
-            datalen = datalen & (chunkSize - 1);
-            for (int64_t i = 0; i < datalen; i++) {
-                pDataOut[i] = MATH_OP(pDataIn1[i], arg2);
+                datalen = datalen & (chunkSize - 1);
+                for (int64_t i = 0; i < datalen; i++) {
+                    pDataOut[i] = MATH_OP(pDataIn1[i], pDataIn2[i]);
+                }
+
+                return;
             }
         }
-        break;
+        if (strideIn1 == 0)
+        {
+            if (strideIn2 == sizeof(T)) {
+                // NOTE: the unrolled loop is faster
+                T arg1 = *pDataIn1;
+
+                if (datalen >= chunkSize) {
+                    T* pEnd = &pDataOut[chunkSize * (datalen / chunkSize)];
+                    U256* pEnd_256 = (U256*)pEnd;
+                    U256* pIn2_256 = (U256*)pDataIn2;
+                    U256* pOut_256 = (U256*)pDataOut;
+
+                    const U256 m0 = MM_SET((T*)pDataIn1);
+
+                    do {
+#ifdef RT_COMPILER_MSVC
+                        STOREU(pOut_256, MATH_OP256(m0, *pIn2_256));
+#else
+                        STOREU(pOut_256, MATH_OP256(m0, LOADU(pIn2_256)));
+#endif
+
+                        pOut_256 += NUM_LOOPS_UNROLLED;
+                        pIn2_256 += NUM_LOOPS_UNROLLED;
+
+                    } while (pOut_256 < pEnd_256);
+
+                    // update pointers to last location of wide pointers
+                    pDataIn2 = (T*)pIn2_256;
+                    pDataOut = (T*)pOut_256;
+                }
+                datalen = datalen & (chunkSize - 1);
+                for (int64_t i = 0; i < datalen; i++) {
+                    pDataOut[i] = MATH_OP(arg1, pDataIn2[i]);
+                }
+                return;
+            }
+        }
+        if (strideIn2 == 0)
+        {
+            if (strideIn1 == sizeof(T)) {
+                T arg2 = *pDataIn2;
+
+                // Check if the output is the same as the input
+                if (pDataOut == pDataIn1) {
+
+                    // align the load to 32 byte boundary
+                    int64_t babylen = (int64_t)pDataIn1 & 31;
+                    if (babylen != 0) {
+                        // calc how much to align data
+                        babylen = (32 - babylen) / sizeof(T);
+                        if (babylen <= datalen) {
+                            for (int64_t i = 0; i < babylen; i++) {
+                                pDataIn1[i] = MATH_OP(pDataIn1[i], arg2);
+                            }
+                            pDataIn1 += babylen;
+                            datalen -= babylen;
+                        }
+                    }
+
+                    // inplace operation
+                    if (datalen >= chunkSize) {
+                        T* pEnd = &pDataIn1[chunkSize * (datalen / chunkSize)];
+                        U256* pEnd_256 = (U256*)pEnd;
+                        U256* pIn1_256 = (U256*)pDataIn1;
+
+                        const U256 m1 = MM_SET((T*)pDataIn2);
+
+                        // apply 256bit aligned operations
+                        while (pIn1_256 < pEnd_256) {
+                            //pin1_256 is aligned
+                            STOREA(pIn1_256, MATH_OP256(m1, *pIn1_256));
+                            pIn1_256++;
+                        }
+
+                        // update pointers to last location of wide pointers
+                        pDataIn1 = (T*)pIn1_256;
+                    }
+                    datalen = datalen & (chunkSize - 1);
+                    for (int64_t i = 0; i < datalen; i++) {
+                        pDataIn1[i] = MATH_OP(pDataIn1[i], arg2);
+                    }
+
+                }
+                else {
+
+                    if (datalen >= chunkSize) {
+                        T* pEnd = &pDataOut[chunkSize * (datalen / chunkSize)];
+                        U256* pEnd_256 = (U256*)pEnd;
+                        U256* pIn1_256 = (U256*)pDataIn1;
+                        U256* pOut_256 = (U256*)pDataOut;
+
+                        const U256 m1 = MM_SET((T*)pDataIn2);
+
+                        // apply 256bit unaligned operations
+                        do {
+#ifdef RT_COMPILER_MSVC
+                            STOREU(pOut_256, MATH_OP256(m1, *pIn1_256));
+#else
+                            STOREU(pOut_256, MATH_OP256(m1, LOADU(pIn1_256)));
+#endif
+                            pOut_256 += NUM_LOOPS_UNROLLED;
+                            pIn1_256 += NUM_LOOPS_UNROLLED;
+
+                        } while (pOut_256 < pEnd_256);
+
+                        // update pointers to last location of wide pointers
+                        pDataIn1 = (T*)pIn1_256;
+                        pDataOut = (T*)pOut_256;
+                    }
+                    datalen = datalen & (chunkSize - 1);
+                    for (int64_t i = 0; i < datalen; i++) {
+                        pDataOut[i] = MATH_OP(pDataIn1[i], arg2);
+                    }
+                }
+                return;
+            }
+        }
     }
-    default:
-        printf("**error - impossible scalar mode\n");
+
+    // generic rare case
+    for (int64_t i = 0; i < datalen; i++) {
+        *pDataOut = MATH_OP(*pDataIn1, *pDataIn2);
+        pDataIn1 = STRIDE_NEXT(T, pDataIn1, strideIn1);
+        pDataIn2 = STRIDE_NEXT(T, pDataIn2, strideIn2);
+        pDataOut = STRIDE_NEXT(T, pDataOut, strideOut);
     }
+
 }
 
 
@@ -557,31 +584,31 @@ REDUCE_FUNC GetReduceMathOpFast(int func, int atopInType1) {
     switch (func) {
     case MATH_OPERATION::ADD:
         switch (atopInType1) {
-        case ATOP_BOOL:   return ReduceeMathOpFast<int8_t, __m256i, OrOp<int8_t>, OR_OP_256>;
-        case ATOP_FLOAT:  return ReduceeMathOpFast<float, __m256, AddOp<float>, ADD_OP_256f32>;
-        case ATOP_DOUBLE: return ReduceeMathOpFast<double, __m256d, AddOp<double>, ADD_OP_256f64>;
+        case ATOP_BOOL:   return ReduceMathOpFast<int8_t, __m256i, OrOp<int8_t>, OR_OP_256>;
+        case ATOP_FLOAT:  return ReduceMathOpFast<float, __m256, AddOp<float>, ADD_OP_256f32>;
+        case ATOP_DOUBLE: return ReduceMathOpFast<double, __m256d, AddOp<double>, ADD_OP_256f64>;
             // proof of concept for i32 addition loop
-        case ATOP_INT32:  return ReduceeMathOpFast<int32_t, __m256i, AddOp<int32_t>, ADD_OP_256i32>;
-        case ATOP_INT64:  return ReduceeMathOpFast<int64_t, __m256i, AddOp<int64_t>, ADD_OP_256i64>;
-        case ATOP_INT16:  return ReduceeMathOpFast<int16_t, __m256i, AddOp<int16_t>, ADD_OP_256i16>;
-        case ATOP_INT8:   return ReduceeMathOpFast<int8_t, __m256i, AddOp<int8_t>, ADD_OP_256i8>;
+        case ATOP_INT32:  return ReduceMathOpFast<int32_t, __m256i, AddOp<int32_t>, ADD_OP_256i32>;
+        case ATOP_INT64:  return ReduceMathOpFast<int64_t, __m256i, AddOp<int64_t>, ADD_OP_256i64>;
+        case ATOP_INT16:  return ReduceMathOpFast<int16_t, __m256i, AddOp<int16_t>, ADD_OP_256i16>;
+        case ATOP_INT8:   return ReduceMathOpFast<int8_t, __m256i, AddOp<int8_t>, ADD_OP_256i8>;
         }
         return NULL;
 
     case MATH_OPERATION::MUL:
         switch (atopInType1) {
-        case ATOP_BOOL:   return ReduceeMathOpFast<int8_t, __m256i, AndOp<int8_t>, AND_OP_256>;
-        case ATOP_FLOAT:  return ReduceeMathOpFast<float, __m256, MulOp<float>, MUL_OP_256f32>;
-        case ATOP_DOUBLE: return ReduceeMathOpFast<double, __m256d, MulOp<double>, MUL_OP_256f64>;
-        case ATOP_INT32:  return ReduceeMathOpFast<int32_t, __m256i, MulOp<int32_t>, MUL_OP_256i32>;
+        case ATOP_BOOL:   return ReduceMathOpFast<int8_t, __m256i, AndOp<int8_t>, AND_OP_256>;
+        case ATOP_FLOAT:  return ReduceMathOpFast<float, __m256, MulOp<float>, MUL_OP_256f32>;
+        case ATOP_DOUBLE: return ReduceMathOpFast<double, __m256d, MulOp<double>, MUL_OP_256f64>;
+        case ATOP_INT32:  return ReduceMathOpFast<int32_t, __m256i, MulOp<int32_t>, MUL_OP_256i32>;
 
-        case ATOP_INT16:  return ReduceeMathOpFast<int16_t, __m256i, MulOp<int16_t>, MUL_OP_256i16>;
+        case ATOP_INT16:  return ReduceMathOpFast<int16_t, __m256i, MulOp<int16_t>, MUL_OP_256i16>;
 
             // Below the intrinsic to multiply is slower so we disabled it (really wants 32bit -> 64bit)
             //CASE_ATOP_UINT32:  return SimpleMathOpFastMul<UINT32, __m256i>;
             // TODO: 64bit multiply can be done with algo..
             // lo1 * lo2 + (lo1 * hi2) << 32 + (hi1 *lo2) << 32)
-        case ATOP_UINT64: return ReduceeMathOpFast<uint64_t, __m256i, MulOp<uint64_t>, MUL_OP_256u64>;
+        case ATOP_UINT64: return ReduceMathOpFast<uint64_t, __m256i, MulOp<uint64_t>, MUL_OP_256u64>;
         }
         return NULL;
     }
