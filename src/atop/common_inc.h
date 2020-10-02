@@ -234,7 +234,11 @@ typedef struct {
     uint32_t f7c;
 } ATOP_cpuid_t;
 
-
+// Missing types include
+// Half Float
+// A bool that takes up one bit
+// 2 byte unicode
+// pointers to variable length strings of 1,2,4 itemsize
 enum ATOP_TYPES {
     ATOP_BOOL = 0,
     ATOP_INT8, ATOP_UINT8,
@@ -259,12 +263,60 @@ enum COMP_OPERATION {
     CMP_LAST = 6,
 };
 
-enum MATH_OPERATION {
+enum UNARY_OPERATION {
+    // One input, returns same data type
+    ABS = 1,
+    SIGNBIT = 2,
+    FABS = 3,
+    INVERT = 4,
+    FLOOR = 5,
+    CEIL = 6,
+    TRUNC = 7,
+    ROUND = 8,
+    NEGATIVE = 9,
+    POSITIVE = 10,
+    SIGN = 11,
+    RINT = 12,
+    EXP = 13,
+    EXP2 = 14,
+
+    // One input, always return a float one input
+    SQRT = 15,
+    LOG = 16,
+    LOG2 = 17,
+    LOG10 = 18,
+    EXPM1 = 19,
+    LOG1P = 20,
+    SQUARE = 21,
+    CBRT = 22,
+    RECIPROCAL = 23,
+
+    // one input, output bool
+    LOGICAL_NOT = 24,
+    ISINF = 25,
+    ISNAN = 26,
+    ISFINITE = 27,
+    ISNORMAL = 28,
+
+    ISNOTINF = 29,
+    ISNOTNAN = 30,
+    ISNOTFINITE = 31,
+    ISNOTNORMAL = 32,
+    ISNANORZERO = 33,
+
+    // One input, does not allow floats
+    BITWISE_NOT = 34,      // same as invert?
+
+    UNARY_LAST = 35,
+};
+
+enum BINARY_OPERATION {
     // Two ops, returns same type
     ADD = 1,
     SUB = 2,
     MUL = 3,
-    MOD = 4,
+    MOD = 4,   // Warning: there are two mods - C,Java mod  and Python mod
+
     MIN = 5,
     MAX = 6,
     NANMIN = 7,
@@ -279,68 +331,28 @@ enum MATH_OPERATION {
     SUBDATETIMES = 14,  // returns double
     SUBDATES = 15,   // returns int
 
-    // One input, returns same data type
-    ABS = 17,
-    NEG = 18,
-    FABS = 19,
-    INVERT = 20,
-    FLOOR = 21,
-    CEIL = 22,
-    TRUNC = 23,
-    ROUND = 24,
-    NEGATIVE = 25,
-    POSITIVE = 26,
-    SIGN = 27,
-    RINT = 28,
-    EXP = 29,
-    EXP2 = 30,
-
-    // One input, always return a float one input
-    SQRT = 31,
-    LOG = 32,
-    LOG2 = 33,
-    LOG10 = 34,
-    EXPM1 = 35,
-    LOG1P = 36,
-    SQUARE = 37,
-    CBRT = 38,
-    RECIPROCAL = 39,
-
     // Two inputs, Always return a bool
-    LOGICAL_AND = 47,
-    LOGICAL_XOR = 48,
-    LOGICAL_OR = 49,
+    LOGICAL_AND = 16,
+    LOGICAL_XOR = 17,
+    LOGICAL_OR = 18,
 
     // Two inputs, second input must be int based
-    BITWISE_LSHIFT = 51,
-    BITWISE_RSHIFT = 52,
-    BITWISE_AND = 53,
-    BITWISE_XOR = 54,
-    BITWISE_OR = 55,
-    BITWISE_ANDNOT = 56,
-    BITWISE_NOTAND = 57,
-    BITWISE_XOR_SPECIAL = 58,
+    BITWISE_LSHIFT = 19,    //left_shift
+    BITWISE_RSHIFT = 20,
+    BITWISE_AND = 21,
+    BITWISE_XOR = 22,
+    BITWISE_OR = 23,
+    BITWISE_ANDNOT = 24,
+    BITWISE_NOTAND = 25,
+    BITWISE_XOR_SPECIAL = 26,
 
-    // one input, output bool
-    LOGICAL_NOT = 61,
-    ISINF = 62,
-    ISNAN = 63,
-    ISFINITE = 64,
-    ISNORMAL = 65,
-
-    ISNOTINF = 66,
-    ISNOTNAN = 67,
-    ISNOTFINITE = 68,
-    ISNOTNORMAL = 69,
-    ISNANORZERO = 70,
-    SIGNBIT = 71,
-
-    // One input, does not allow floats
-    BITWISE_NOT = 72,
-
-    MATH_LAST = 73,
+    BINARY_LAST = 27,
 };
 
+enum TRIG_OPERATION {
+    // One op, returns same type
+    SIN = 1,
+};
 
 //----------------------------------------------------------------------------------
 // Lookup to go from 1 byte to 8 byte boolean values
@@ -351,20 +363,6 @@ extern int64_t gBooleanLUT64Inverse[256];
 extern int32_t gBooleanLUT32Inverse[16];
 
 
-//-----------------------------------------------------------
-// Build a list of callable vector functions
-enum TYPE_OF_FUNCTION_CALL {
-    ANY_ONE = 1,
-    ANY_TWO = 2,
-    ANY_THREEE = 3,
-    ANY_GROUPBY_FUNC = 4,
-    ANY_GROUPBY_XFUNC32 = 5,
-    ANY_GROUPBY_XFUNC64 = 6,
-    ANY_SCATTER_GATHER = 7,
-    ANY_MERGE_TWO_FUNC = 8,
-    ANY_MERGE_STEP_ONE = 9
-};
-
 enum SCALAR_MODE {
     NO_SCALARS = 0,
     FIRST_ARG_SCALAR = 1,
@@ -372,62 +370,13 @@ enum SCALAR_MODE {
     BOTH_SCALAR = 3   // not used
 };
 
-struct stScatterGatherFunc {
-    // numpy intput ttype
-    int32_t inputType;
 
-    // the core (if any) making this calculation
-    int32_t core;
-
-    // used for nans, how many non nan values
-    int64_t lenOut;
-
-    // !!must be set when used by var and std
-    double meanCalculation;
-
-    double resultOut;
-
-    // Separate output for min/max
-    int64_t  resultOutInt64;
-
-};
-
-typedef double(*ANY_SCATTER_GATHER_FUNC)(void* pDataIn, int64_t len, stScatterGatherFunc* pstScatterGatherFunc);
 typedef void(*UNARY_FUNC)(void* pDataIn, void* pDataOut, int64_t len, int64_t strideIn, int64_t strideOut);
-typedef void(*UNARY_FUNC_STRIDED)(void* pDataIn, void* pDataOut, int64_t len, int64_t strideIn, int64_t strideOut);
 // Pass in two vectors and return one vector
 // Used for operations like C = A + B
 typedef void(*ANY_TWO_FUNC)(void* pDataIn, void* pDataIn2, void* pDataOut, int64_t len, int64_t strideIn1, int64_t strideIn2, int64_t strideOut);
 typedef void(*GROUPBY_FUNC)(void* pstGroupBy, int64_t index);
-typedef void(*REDUCE_FUNC)(void* pDataIn1X, void* pDataOutX, int64_t datalen, int64_t strideIn);
-
-//-----------------------------------------------------------
-// List of function calls
-struct FUNCTION_LIST {
-    int16_t             TypeOfFunctionCall; // See enum
-    int16_t             NumpyType;         // For the array and constants
-    int16_t             NumpyOutputType;
-
-    // The item size for two input arrays assumed to be the same
-    int64_t             InputItemSize;
-    int64_t             OutputItemSize;
-
-    // Strides may be 0 if it is a scalar or length 1
-    int64_t             Input1Strides;
-    int64_t             Input2Strides;
-
-    // TODO: Why not make this void and recast?
-    // Only one of these can be set
-    union {
-        void* FunctionPtr;
-        ANY_SCATTER_GATHER_FUNC     AnyScatterGatherCall;
-        UNARY_FUNC        AnyOneStubCall;
-        ANY_TWO_FUNC      AnyTwoStubCall;
-        GROUPBY_FUNC      GroupByCall;
-    };
-
-    const char* FunctionName;
-};
+typedef void(*REDUCE_FUNC)(void* pDataIn1X, void* pDataOutX, void* pStartVal, int64_t datalen, int64_t strideIn);
 
 
 //======================================================
@@ -440,10 +389,7 @@ struct FUNCTION_LIST {
 //--------------------------------------------------------------------
 // multithreaded struct used for calling unary op codes
 struct UNARY_CALLBACK {
-    union {
-        UNARY_FUNC pUnaryCallback;
-        UNARY_FUNC_STRIDED pUnaryCallbackStrided;
-    };
+    UNARY_FUNC pUnaryCallback;
 
     char* pDataIn;
     char* pDataOut;

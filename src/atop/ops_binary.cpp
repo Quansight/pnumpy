@@ -58,6 +58,8 @@ static const inline void STOREA(__m256i* x, __m256i y) { _mm256_store_si256((__m
 template<typename T> static const inline T AddOp(T x, T y) { return x + y; }
 template<typename T> static const inline T SubOp(T x, T y) { return x - y; }
 template<typename T> static const inline T MulOp(T x, T y) { return x * y; }
+template<typename T> static const inline double DivOp(T x, T y) { return (double)x / (double)y; }
+template<typename T> static const inline float DivOp(float x, T y) { return x / y; }
 
 // bitwise operations
 template<typename T> static const inline T AndOp(T x, T y) { return x & y; }
@@ -85,6 +87,12 @@ static const inline __m256  MUL_OP_256f32(__m256 x, __m256 y) { return _mm256_mu
 static const inline __m256d MUL_OP_256f64(__m256d x, __m256d y) { return _mm256_mul_pd(x, y); }
 static const inline __m256i MUL_OP_256i16(__m256i x, __m256i y) { return _mm256_mullo_epi16(x, y); }
 static const inline __m256i MUL_OP_256i32(__m256i x, __m256i y) { return _mm256_mullo_epi32(x, y); }
+
+static const inline __m256  DIV_OP_256f32(__m256 x, __m256 y) { return _mm256_div_ps(x, y); }
+static const inline __m256d DIV_OP_256f64(__m256d x, __m256d y) { return _mm256_div_pd(x, y); }
+static const inline __m256d CONV_INT32_DOUBLE(__m128i* x) { return _mm256_cvtepi32_pd(*x); }
+
+
 
 // mask off low 32bits
 static const __m256i masklo = _mm256_set1_epi64x(0xFFFFFFFFLL);
@@ -115,7 +123,7 @@ static const inline __m256i ANDNOT_OP_256(__m256i x, __m256i y) { return _mm256_
 //=====================================================================================================
 // symmetric -- arg1 and arg2 can be swapped and the operation will return the same result (like addition or multiplication)
 template<typename T, typename U256, const T MATH_OP(T, T), const U256 MATH_OP256(U256, U256)>
-inline void ReduceMathOpFast(void* pDataIn1X, void* pDataOutX, int64_t datalen, int64_t strideIn) {
+inline void ReduceMathOpFast(void* pDataIn1X, void* pDataOutX, void* pStartVal, int64_t datalen, int64_t strideIn) {
     T* pDataOut = (T*)pDataOutX;
     T* pDataIn1 = (T*)pDataIn1X;
     T* pEnd = (T*)((char*)pDataIn1X + (datalen * strideIn));
@@ -126,7 +134,7 @@ inline void ReduceMathOpFast(void* pDataIn1X, void* pDataOutX, int64_t datalen, 
     int64_t perReg = sizeof(U256) / sizeof(T);
 
     // NOTE: numpy uses the output val to seed the first input
-    T startval = *pDataOut;
+    T startval = *(T*)pStartVal;
         
     if (strideIn == sizeof(T) && datalen >= chunkSize) {
         T* pEnd = &pDataIn1[chunkSize * (datalen / chunkSize)];
@@ -524,13 +532,88 @@ inline void SimpleMathOpFastSymmetric(void* pDataIn1X, void* pDataIn2X, void* pD
 
 }
 
+//=====================================================================================================
+template<typename T, typename U128, typename U256, typename MathFunctionPtr, typename MathFunctionConvert, typename MathFunctionPtr256>
+inline void SimpleMathOpFastDouble(MathFunctionPtr MATH_OP, MathFunctionConvert MATH_CONV, MathFunctionPtr256 MATH_OP256,
+    void* pDataIn1X, void* pDataIn2X, void* pDataOutX, int64_t len, int64_t strideIn1, int64_t strideIn2, int64_t strideOut) {
+    double* pDataOut = (double*)pDataOutX;
+    T* pDataIn1 = (T*)pDataIn1X;
+    T* pDataIn2 = (T*)pDataIn2X;
+
+    LOGGING("mathopfastDouble len %llu  chunkSize %llu  perReg %llu\n", len, chunkSize, perReg);
+
+    if (strideOut == sizeof(double)) {
+        if (sizeof(T) == strideIn1 && strideIn1 == strideIn2) {
+            int64_t chunkSize = (sizeof(U256)) / sizeof(double);
+            int64_t perReg = sizeof(U256) / sizeof(double);
+
+            if (len >= chunkSize) {
+                double* pEnd = &pDataOut[chunkSize * (len / chunkSize)];
+                U256* pEnd_256 = (U256*)pEnd;
+
+                U128* pIn1_256 = (U128*)pDataIn1;
+                U128* pIn2_256 = (U128*)pDataIn2;
+                U256* pOut_256 = (U256*)pDataOut;
+
+                while (pOut_256 < pEnd_256) {
+                    STOREU(pOut_256, MATH_OP256(MATH_CONV(pIn1_256), MATH_CONV(pIn2_256)));
+                    pIn1_256 += 1;
+                    pIn2_256 += 1;
+                    pOut_256 += 1;
+
+                }
+
+                // update pointers to last location of wide pointers
+                pDataIn1 = (T*)pIn1_256;
+                pDataIn2 = (T*)pIn2_256;
+                pDataOut = (double*)pOut_256;
+            }
+
+            len = len & (chunkSize - 1);
+            for (int64_t i = 0; i < len; i++) {
+                pDataOut[i] = MATH_OP(pDataIn1[i], pDataIn2[i]);
+            }
+            return;
+        }
+        if (sizeof(T) == strideIn2 && strideIn1 == 0) {
+            T arg1 = *pDataIn1;
+            for (int64_t i = 0; i < len; i++) {
+                pDataOut[i] = MATH_OP(arg1, pDataIn2[i]);
+            }
+            return;
+        }
+        if (sizeof(T) == strideIn1 && strideIn2 == 0) {
+            T arg2 = *pDataIn2;
+            for (int64_t i = 0; i < len; i++) {
+                pDataOut[i] = MATH_OP(pDataIn1[i], arg2);
+            }
+            return;
+        }
+    }
+    // generic loop
+    for (int64_t i = 0; i < len; i++) {
+        *pDataOut = MATH_OP(*pDataIn1, *pDataIn2);
+        pDataIn1 = STRIDE_NEXT(T, pDataIn1, strideIn1);
+        pDataIn2 = STRIDE_NEXT(T, pDataIn2, strideIn2);
+        pDataOut = STRIDE_NEXT(double, pDataOut, strideOut);
+    }
+
+}
+
+template<typename T, typename U128, typename U256>
+static void SimpleMathOpFastDivDouble(void* pDataIn1X, void* pDataIn2X, void* pDataOutX, int64_t datalen, int64_t strideIn1, int64_t strideIn2, int64_t strideOut) {
+    
+    return SimpleMathOpFastDouble<T, U128, U256, const double(*)(T, T), const U256(*)(U128*), const U256(*)(U256, U256)>(
+        DivOp<T>, CONV_INT32_DOUBLE, DIV_OP_256f64, pDataIn1X, pDataIn2X, pDataOutX, datalen, strideIn1, strideIn2, strideOut);
+}
+
 
 extern "C"
 ANY_TWO_FUNC GetSimpleMathOpFast(int func, int atopInType1, int atopInType2, int* wantedOutType) {
     LOGGING("GetSimpleMathOpFastFunc %d %d\n", atopInType1, func);
 
     switch (func) {
-    case MATH_OPERATION::ADD:
+    case BINARY_OPERATION::ADD:
         *wantedOutType = atopInType1;
         switch (*wantedOutType) {
         case ATOP_BOOL:   return SimpleMathOpFastSymmetric<int8_t, __m256i, OrOp<int8_t>, OR_OP_256>;
@@ -544,7 +627,7 @@ ANY_TWO_FUNC GetSimpleMathOpFast(int func, int atopInType1, int atopInType2, int
         }
         return NULL;
 
-    case MATH_OPERATION::MUL:
+    case BINARY_OPERATION::MUL:
         *wantedOutType = atopInType1;
         switch (*wantedOutType) {
         case ATOP_BOOL:   return SimpleMathOpFastSymmetric<int8_t, __m256i, AndOp<int8_t>, AND_OP_256>;
@@ -563,9 +646,9 @@ ANY_TWO_FUNC GetSimpleMathOpFast(int func, int atopInType1, int atopInType2, int
         }
         return NULL;
 
-    case MATH_OPERATION::SUB:
+    case BINARY_OPERATION::SUB:
         *wantedOutType = atopInType1;
-        switch (*wantedOutType) {
+        switch (atopInType1) {
         case ATOP_FLOAT:  return SimpleMathOpFast<float, __m256, SubOp<float>, SUB_OP_256f32>;
         case ATOP_DOUBLE: return SimpleMathOpFast<double, __m256d, SubOp<double>, SUB_OP_256f64>;
         case ATOP_INT32:  return SimpleMathOpFast<int32_t, __m256i, SubOp<int32_t>, SUB_OP_256i32>;
@@ -574,6 +657,76 @@ ANY_TWO_FUNC GetSimpleMathOpFast(int func, int atopInType1, int atopInType2, int
         case ATOP_INT8:   return SimpleMathOpFast<int8_t, __m256i, SubOp<int8_t>, SUB_OP_256i8>;
         }
         return NULL;
+
+    case BINARY_OPERATION::DIV:
+        *wantedOutType = ATOP_DOUBLE;
+        if (atopInType1 == ATOP_FLOAT) *wantedOutType = ATOP_FLOAT;
+        switch (atopInType1) {
+        case ATOP_FLOAT:  return SimpleMathOpFast<float, __m256, DivOp<float>, DIV_OP_256f32>;
+        case ATOP_DOUBLE: return SimpleMathOpFast<double, __m256d, DivOp<double>, DIV_OP_256f64>;
+        //case ATOP_INT32:  return SimpleMathOpFastDivDouble<int32_t, __m128i, __m256d>;
+        }
+        return NULL;
+
+    case BINARY_OPERATION::LOGICAL_AND:
+        *wantedOutType = atopInType1;
+        switch (atopInType1) {
+        case ATOP_BOOL:   return SimpleMathOpFastSymmetric<INT8, __m256i, AndOp<INT8>, AND_OP_256>;
+        }
+        return NULL;
+
+    case BINARY_OPERATION::BITWISE_AND:
+        *wantedOutType = atopInType1;
+        switch (atopInType1) {
+        case ATOP_INT8:
+        case ATOP_UINT8:
+        case ATOP_BOOL:   return SimpleMathOpFastSymmetric<INT8, __m256i, AndOp<INT8>, AND_OP_256>;
+        case ATOP_UINT16:
+        case ATOP_INT16:  return SimpleMathOpFastSymmetric<INT16, __m256i, AndOp<INT16>, AND_OP_256>;
+        case ATOP_UINT32:
+        case ATOP_INT32:  return SimpleMathOpFastSymmetric<INT32, __m256i, AndOp<INT32>, AND_OP_256>;
+        case ATOP_UINT64:
+        case ATOP_INT64:  return SimpleMathOpFastSymmetric<INT64, __m256i, AndOp<INT64>, AND_OP_256>;
+        }
+        return NULL;
+
+    case BINARY_OPERATION::LOGICAL_OR:
+        *wantedOutType = atopInType1;
+        switch (atopInType1) {
+        case ATOP_BOOL:   return SimpleMathOpFastSymmetric<INT8, __m256i, OrOp<INT8>, OR_OP_256>;
+        }
+        return NULL;
+
+    case BINARY_OPERATION::BITWISE_OR:
+        *wantedOutType = atopInType1;
+        switch (atopInType1) {
+        case ATOP_INT8:
+        case ATOP_UINT8:
+        case ATOP_BOOL:   return SimpleMathOpFastSymmetric<INT8, __m256i, OrOp<INT8>, OR_OP_256>;
+        case ATOP_UINT16:
+        case ATOP_INT16:  return SimpleMathOpFastSymmetric<INT16, __m256i, OrOp<INT16>, OR_OP_256>;
+        case ATOP_UINT32:
+        case ATOP_INT32:  return SimpleMathOpFastSymmetric<INT32, __m256i, OrOp<INT32>, OR_OP_256>;
+        case ATOP_UINT64:
+        case ATOP_INT64:  return SimpleMathOpFastSymmetric<INT64, __m256i, OrOp<INT64>, OR_OP_256>;
+        }
+        return NULL;
+
+    case BINARY_OPERATION::BITWISE_XOR:
+        *wantedOutType = atopInType1;
+        switch (atopInType1) {
+        case ATOP_INT8:
+        case ATOP_UINT8:
+        case ATOP_BOOL:   return SimpleMathOpFastSymmetric<INT8, __m256i, XorOp<INT8>, XOR_OP_256>;
+        case ATOP_UINT16:
+        case ATOP_INT16:  return SimpleMathOpFastSymmetric<INT16, __m256i, XorOp<INT16>, XOR_OP_256>;
+        case ATOP_UINT32:
+        case ATOP_INT32:  return SimpleMathOpFastSymmetric<INT32, __m256i, XorOp<INT32>, XOR_OP_256>;
+        case ATOP_UINT64:
+        case ATOP_INT64:  return SimpleMathOpFastSymmetric<INT64, __m256i, XorOp<INT64>, XOR_OP_256>;
+        }
+        return NULL;
+
     }
     return NULL;
 }
@@ -582,7 +735,7 @@ extern "C"
 REDUCE_FUNC GetReduceMathOpFast(int func, int atopInType1) {
 
     switch (func) {
-    case MATH_OPERATION::ADD:
+    case BINARY_OPERATION::ADD:
         switch (atopInType1) {
         case ATOP_BOOL:   return ReduceMathOpFast<int8_t, __m256i, OrOp<int8_t>, OR_OP_256>;
         case ATOP_FLOAT:  return ReduceMathOpFast<float, __m256, AddOp<float>, ADD_OP_256f32>;
@@ -595,7 +748,7 @@ REDUCE_FUNC GetReduceMathOpFast(int func, int atopInType1) {
         }
         return NULL;
 
-    case MATH_OPERATION::MUL:
+    case BINARY_OPERATION::MUL:
         switch (atopInType1) {
         case ATOP_BOOL:   return ReduceMathOpFast<int8_t, __m256i, AndOp<int8_t>, AND_OP_256>;
         case ATOP_FLOAT:  return ReduceMathOpFast<float, __m256, MulOp<float>, MUL_OP_256f32>;

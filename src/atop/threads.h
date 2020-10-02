@@ -124,7 +124,6 @@ struct stBinCount {
 };
 
 struct OLD_CALLBACK {
-    FUNCTION_LIST* FunctionList;
 
     // Args to call
     union {
