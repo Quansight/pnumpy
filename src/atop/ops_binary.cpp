@@ -23,6 +23,7 @@
 
 #endif
 
+// The following overloaded type routines are used to load scalars into math registers
 static FORCE_INLINE const __m256i MM_SET(bool* pData) { return _mm256_set1_epi8(*(int8_t*)pData); }
 static FORCE_INLINE const __m256i MM_SET(int8_t* pData) { return _mm256_set1_epi8(*(int8_t*)pData); }
 static FORCE_INLINE const __m256i MM_SET(uint8_t* pData) { return _mm256_set1_epi8(*(int8_t*)pData); }
@@ -92,8 +93,6 @@ static const inline __m256  DIV_OP_256f32(__m256 x, __m256 y) { return _mm256_di
 static const inline __m256d DIV_OP_256f64(__m256d x, __m256d y) { return _mm256_div_pd(x, y); }
 static const inline __m256d CONV_INT32_DOUBLE(__m128i* x) { return _mm256_cvtepi32_pd(*x); }
 
-
-
 // mask off low 32bits
 static const __m256i masklo = _mm256_set1_epi64x(0xFFFFFFFFLL);
 static const __m128i shifthigh = _mm_set1_epi64x(32);
@@ -113,12 +112,12 @@ static const inline __m256i MUL_OP_256u64(__m256i x, __m256i y) {
     return _mm256_add_epi64(add1, _mm256_add_epi64(add2, add3));
 }
 
-
 static const inline __m256i AND_OP_256(__m256i x, __m256i y) { return _mm256_and_si256(x, y); }
 static const inline __m256i OR_OP_256(__m256i x, __m256i y) { return _mm256_or_si256(x, y); }
 static const inline __m256i XOR_OP_256(__m256i x, __m256i y) { return _mm256_xor_si256(x, y); }
-static const inline __m256i ANDNOT_OP_256(__m256i x, __m256i y) { return _mm256_andnot_si256(x, y); }
 
+// note: the andnot intrinsic is not symmetric, depending on the order it can also be notand.
+static const inline __m256i ANDNOT_OP_256(__m256i x, __m256i y) { return _mm256_andnot_si256(x, y); }
 
 //=====================================================================================================
 // symmetric -- arg1 and arg2 can be swapped and the operation will return the same result (like addition or multiplication)
@@ -155,7 +154,7 @@ inline void ReduceMathOpFast(void* pDataIn1X, void* pDataOutX, void* pStartVal, 
 
         // perform the operation horizontally in m0
         union {
-            volatile T  horizontal[1];
+            volatile T  horizontal[sizeof(U256) / sizeof(T)];
             U256 mathreg[1];
         };
 
@@ -671,7 +670,7 @@ ANY_TWO_FUNC GetSimpleMathOpFast(int func, int atopInType1, int atopInType2, int
     case BINARY_OPERATION::LOGICAL_AND:
         *wantedOutType = atopInType1;
         switch (atopInType1) {
-        case ATOP_BOOL:   return SimpleMathOpFastSymmetric<INT8, __m256i, AndOp<INT8>, AND_OP_256>;
+        case ATOP_BOOL:   return SimpleMathOpFastSymmetric<int8_t, __m256i, AndOp<int8_t>, AND_OP_256>;
         }
         return NULL;
 
@@ -680,20 +679,20 @@ ANY_TWO_FUNC GetSimpleMathOpFast(int func, int atopInType1, int atopInType2, int
         switch (atopInType1) {
         case ATOP_INT8:
         case ATOP_UINT8:
-        case ATOP_BOOL:   return SimpleMathOpFastSymmetric<INT8, __m256i, AndOp<INT8>, AND_OP_256>;
+        case ATOP_BOOL:   return SimpleMathOpFastSymmetric<int8_t, __m256i, AndOp<int8_t>, AND_OP_256>;
         case ATOP_UINT16:
-        case ATOP_INT16:  return SimpleMathOpFastSymmetric<INT16, __m256i, AndOp<INT16>, AND_OP_256>;
+        case ATOP_INT16:  return SimpleMathOpFastSymmetric<int16_t, __m256i, AndOp<int16_t>, AND_OP_256>;
         case ATOP_UINT32:
-        case ATOP_INT32:  return SimpleMathOpFastSymmetric<INT32, __m256i, AndOp<INT32>, AND_OP_256>;
+        case ATOP_INT32:  return SimpleMathOpFastSymmetric<int32_t, __m256i, AndOp<int32_t>, AND_OP_256>;
         case ATOP_UINT64:
-        case ATOP_INT64:  return SimpleMathOpFastSymmetric<INT64, __m256i, AndOp<INT64>, AND_OP_256>;
+        case ATOP_INT64:  return SimpleMathOpFastSymmetric<int64_t, __m256i, AndOp<int64_t>, AND_OP_256>;
         }
         return NULL;
 
     case BINARY_OPERATION::LOGICAL_OR:
         *wantedOutType = atopInType1;
         switch (atopInType1) {
-        case ATOP_BOOL:   return SimpleMathOpFastSymmetric<INT8, __m256i, OrOp<INT8>, OR_OP_256>;
+        case ATOP_BOOL:   return SimpleMathOpFastSymmetric<int8_t, __m256i, OrOp<int8_t>, OR_OP_256>;
         }
         return NULL;
 
@@ -702,13 +701,13 @@ ANY_TWO_FUNC GetSimpleMathOpFast(int func, int atopInType1, int atopInType2, int
         switch (atopInType1) {
         case ATOP_INT8:
         case ATOP_UINT8:
-        case ATOP_BOOL:   return SimpleMathOpFastSymmetric<INT8, __m256i, OrOp<INT8>, OR_OP_256>;
+        case ATOP_BOOL:   return SimpleMathOpFastSymmetric<int8_t, __m256i, OrOp<int8_t>, OR_OP_256>;
         case ATOP_UINT16:
-        case ATOP_INT16:  return SimpleMathOpFastSymmetric<INT16, __m256i, OrOp<INT16>, OR_OP_256>;
+        case ATOP_INT16:  return SimpleMathOpFastSymmetric<int16_t, __m256i, OrOp<int16_t>, OR_OP_256>;
         case ATOP_UINT32:
-        case ATOP_INT32:  return SimpleMathOpFastSymmetric<INT32, __m256i, OrOp<INT32>, OR_OP_256>;
+        case ATOP_INT32:  return SimpleMathOpFastSymmetric<int32_t, __m256i, OrOp<int32_t>, OR_OP_256>;
         case ATOP_UINT64:
-        case ATOP_INT64:  return SimpleMathOpFastSymmetric<INT64, __m256i, OrOp<INT64>, OR_OP_256>;
+        case ATOP_INT64:  return SimpleMathOpFastSymmetric<int64_t, __m256i, OrOp<int64_t>, OR_OP_256>;
         }
         return NULL;
 
@@ -717,13 +716,13 @@ ANY_TWO_FUNC GetSimpleMathOpFast(int func, int atopInType1, int atopInType2, int
         switch (atopInType1) {
         case ATOP_INT8:
         case ATOP_UINT8:
-        case ATOP_BOOL:   return SimpleMathOpFastSymmetric<INT8, __m256i, XorOp<INT8>, XOR_OP_256>;
+        case ATOP_BOOL:   return SimpleMathOpFastSymmetric<int8_t, __m256i, XorOp<int8_t>, XOR_OP_256>;
         case ATOP_UINT16:
-        case ATOP_INT16:  return SimpleMathOpFastSymmetric<INT16, __m256i, XorOp<INT16>, XOR_OP_256>;
+        case ATOP_INT16:  return SimpleMathOpFastSymmetric<int16_t, __m256i, XorOp<int16_t>, XOR_OP_256>;
         case ATOP_UINT32:
-        case ATOP_INT32:  return SimpleMathOpFastSymmetric<INT32, __m256i, XorOp<INT32>, XOR_OP_256>;
+        case ATOP_INT32:  return SimpleMathOpFastSymmetric<int32_t, __m256i, XorOp<int32_t>, XOR_OP_256>;
         case ATOP_UINT64:
-        case ATOP_INT64:  return SimpleMathOpFastSymmetric<INT64, __m256i, XorOp<INT64>, XOR_OP_256>;
+        case ATOP_INT64:  return SimpleMathOpFastSymmetric<int64_t, __m256i, XorOp<int64_t>, XOR_OP_256>;
         }
         return NULL;
 
