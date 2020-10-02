@@ -602,7 +602,7 @@ PyObject* newinit(PyObject* self, PyObject* args, PyObject* kwargs) {
         PyObject* setbufsize = PyObject_GetAttrString(numpy_module, "setbufsize");
         if (setbufsize && PyCallable_Check(setbufsize)) {
             PyObject* buffersize = PyTuple_New(1);
-            PyTuple_SET_ITEM(buffersize, 0, PyLong_FromLongLong(8192 * 1024));
+            PyTuple_SetItem(buffersize, 0, PyLong_FromLongLong(8192 * 1024));
             PyObject_CallObject(setbufsize, buffersize);
             Py_XDECREF(buffersize);
         }
