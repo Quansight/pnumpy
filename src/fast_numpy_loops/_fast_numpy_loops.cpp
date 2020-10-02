@@ -67,9 +67,19 @@ struct stUFuncToAtop {
 
 // Binary function mapping
 static stUFuncToAtop gBinaryMapping[]={
-    {"add",           MATH_OPERATION::ADD},
-    {"subtract",      MATH_OPERATION::SUB },
-    {"multiply",      MATH_OPERATION::MUL },
+    {"add",           BINARY_OPERATION::ADD},
+    {"subtract",      BINARY_OPERATION::SUB },
+    {"multiply",      BINARY_OPERATION::MUL },
+    {"true_divide",   BINARY_OPERATION::DIV },
+    {"floor_divide",  BINARY_OPERATION::FLOORDIV },
+    {"power",         BINARY_OPERATION::POWER },
+    {"remainder",     BINARY_OPERATION::REMAINDER },
+    {"logical_and",   BINARY_OPERATION::LOGICAL_AND },
+    {"logical_or",    BINARY_OPERATION::LOGICAL_OR },
+    {"bitwise_and",   BINARY_OPERATION::BITWISE_AND },
+    {"bitwise_or",    BINARY_OPERATION::BITWISE_OR },
+    {"bitwise_xor",   BINARY_OPERATION::BITWISE_XOR },
+
 };
 
 // Compare function mapping
@@ -81,17 +91,59 @@ static stUFuncToAtop gCompareMapping[]={
     {"less",          COMP_OPERATION::CMP_LT},
     {"less_equal",    COMP_OPERATION::CMP_LTE } };
 
+// Unary function mapping
+static stUFuncToAtop gUnaryMapping[] = {
+    {"abs",           UNARY_OPERATION::ABS},
+    {"signbit",       UNARY_OPERATION::SIGNBIT},
+    {"fabs",          UNARY_OPERATION::FABS},
+    {"invert",        UNARY_OPERATION::INVERT},
+    {"floor",         UNARY_OPERATION::FLOOR},
+    {"ceil",          UNARY_OPERATION::CEIL},
+    {"trunc",         UNARY_OPERATION::TRUNC},
+    // {"round",         UNARY_OPERATION::ROUND},   NOT A UFUNC
+    {"negative",      UNARY_OPERATION::NEGATIVE},
+    {"positive",      UNARY_OPERATION::POSITIVE},
+    {"sign",          UNARY_OPERATION::SIGN},
+    {"rint",          UNARY_OPERATION::RINT},
+    {"exp",           UNARY_OPERATION::EXP},
+    {"exp2",          UNARY_OPERATION::EXP2},
+    {"sqrt",          UNARY_OPERATION::SQRT},
+    {"log",           UNARY_OPERATION::LOG},
+    {"log2",          UNARY_OPERATION::LOG2},
+    {"log10",         UNARY_OPERATION::LOG10},
+    {"log1p",         UNARY_OPERATION::LOG1P},
+    {"square",        UNARY_OPERATION::SQUARE},
+    {"cbrt",          UNARY_OPERATION::CBRT},
+    {"reciprocal",    UNARY_OPERATION::RECIPROCAL},
+    {"logical_not",   UNARY_OPERATION::LOGICAL_NOT},
+    {"isinf",         UNARY_OPERATION::ISINF},
+    {"isnan",         UNARY_OPERATION::ISNAN},
+    {"isfinite",      UNARY_OPERATION::ISFINITE},
+    //{"isnormal",      UNARY_OPERATION::ISNORMAL},  // not a ufunc
+    // TODO numpy needs to add isnotinf, isnotnan, isnotfinite
+};
+
+// Trigonemtric function mapping
+// To be completed
+static stUFuncToAtop gTrigMapping[] = {
+    {"sin",           TRIG_OPERATION::SIN},
+};
+
 
 //--------------------------------------------------------------------
 // multithreaded struct used for calling unary op codes
 struct BINARY_CALLBACK {
     union {
         ANY_TWO_FUNC        pBinaryFunc;
-        UNARY_FUNC_STRIDED  pUnaryCallbackStrided;
+        UNARY_FUNC          pUnaryCallbackStrided;
         REDUCE_FUNC         pReduceFunc;
     };
 
-    char* pDataIn1;
+    union {
+        char* pDataIn1;
+        char* pStartVal;    // Used for reduce
+    };
+
     char* pDataIn2;
     char* pDataOut;
 
@@ -109,13 +161,15 @@ struct stUFunc {
     PyUFuncGenericFunction  pOldFunc;
     REDUCE_FUNC             pReduceFunc;
 
-    // the maximum threads to eploy
+    // the maximum threads to deploy
     int32_t                 MaxThreads;
-    int32_t                 ChunkSize;
+
+    // the minimum number of elements in the array before threading allowed
+    int32_t                 MinElementsToThread;
 };
 
 // global lookup tables for math opcode enum + dtype enum
-stUFunc  g_UFuncLUT[MATH_OPERATION::MATH_LAST][ATOP_LAST];
+stUFunc  g_UFuncLUT[BINARY_OPERATION::BINARY_LAST][ATOP_LAST];
 stUFunc  g_CompFuncLUT[COMP_OPERATION::CMP_LAST][ATOP_LAST];
 
 // set to 0 to disable
@@ -141,7 +195,7 @@ static BOOL ReduceThreadCallbackStrided(struct stMATH_WORKER_ITEM* pstWorkerItem
         int64_t outputAdj = workBlock * Callback->itemSizeOut;
 
         //printf("[%d] reduce on %lld with len %lld   block: %lld  itemsize: %lld\n", core, workIndex, lenX, workBlock, Callback->itemSizeIn2);
-        Callback->pReduceFunc(pDataIn2 + inputAdj2, pDataOut + outputAdj, lenX, Callback->itemSizeIn2);
+        Callback->pReduceFunc(pDataIn2 + inputAdj2, pDataOut + outputAdj, Callback->pStartVal, lenX, Callback->itemSizeIn2);
 
         // Indicate we completed a block
         didSomeWork = TRUE;
@@ -205,7 +259,7 @@ static void AtopBinaryMathFunction(char** args, const npy_intp* dimensions, cons
                 char* ip2 = (char*)args[1];
                 char* op1 = (char*)args[2];
                 if (!pWorkItem) {
-                    pReduceFunc(ip2, op1, n, steps[1]);
+                    pReduceFunc(ip2, op1, op1, n, steps[1]);
                 }
                 else {
                     const int64_t maxStackAlloc = 1024 * 1024;  // 1 MB
@@ -223,6 +277,11 @@ static void AtopBinaryMathFunction(char** args, const npy_intp* dimensions, cons
                     pWorkItem->WorkCallbackArg = &stCallback;
 
                     stCallback.pReduceFunc = pReduceFunc;
+
+                    // Also pass in original data out since it is used as starting value
+                    stCallback.pStartVal = op1;
+
+                    // Create a data out for each work chunk
                     stCallback.pDataOut = pSumOfSums;
                     stCallback.pDataIn2 = ip2;
                     stCallback.itemSizeIn2 = steps[1];
@@ -231,7 +290,7 @@ static void AtopBinaryMathFunction(char** args, const npy_intp* dimensions, cons
                     // This will notify the worker threads of a new work item
                     // most functions are so fast, we do not need more than 4 worker threads
                     THREADER->WorkMain(pWorkItem, n, maxThreads);
-                    pReduceFunc(pSumOfSums, op1, chunks, itemsize);
+                    pReduceFunc(pSumOfSums, op1, op1, chunks, itemsize);
 
                     // Free if not on the stack
                     if (allocsize > maxStackAlloc) WORKSPACE_FREE(pSumOfSums);
@@ -251,7 +310,6 @@ static void AtopBinaryMathFunction(char** args, const npy_intp* dimensions, cons
                 // For a scalar second is2 == 0
                 npy_intp is1 = steps[0], is2 = steps[1], os1 = steps[2];
                 npy_intp n = dimensions[0];
-                int scalarmode = is1 == 0 ? SCALAR_MODE::FIRST_ARG_SCALAR : is2 == 0 ? SCALAR_MODE::SECOND_ARG_SCALAR : SCALAR_MODE::NO_SCALARS;
 
                 if (!pWorkItem) {
                     pBinaryFunc(ip1, ip2, op1, (int64_t)n, (int64_t)is1, (int64_t)is2, (int64_t)os1);
@@ -283,8 +341,15 @@ static void AtopBinaryMathFunction(char** args, const npy_intp* dimensions, cons
         g_UFuncLUT[funcop][atype].pOldFunc(args, dimensions, steps, innerloop);
         return;
     }
-    // Do it the old way
-    g_UFuncLUT[funcop][atype].pOldFunc(args, dimensions, steps, innerloop);
+    npy_intp n = dimensions[0];
+    stMATH_WORKER_ITEM* pWorkItem = THREADER->GetWorkItem(n);
+    if (!pWorkItem) {
+        // Do it the old way
+        g_UFuncLUT[funcop][atype].pOldFunc(args, dimensions, steps, innerloop);
+    }
+    else {
+
+    }
 };
 
 
@@ -353,142 +418,7 @@ static void AtopUnaryMathFunction(char** args, const npy_intp* dimensions, const
     
 }
 
-
-// Ugly macro exapnsion to handle which ufunc
-// TODO: the ufunc callback needs to use enums
-#define DEF_BINARY_USTUB(_FUNC_, _ATYPE_) void F##_ATYPE_##_FUNC_(char **args, const npy_intp *dimensions, const npy_intp *steps, void*innerloop) { \
-    return AtopBinaryMathFunction(args, dimensions, steps, innerloop, _FUNC_, _ATYPE_);}
-
-#define DEF_BINARY_USTUB_EXPAND(_FUNC_) \
-    DEF_BINARY_USTUB(_FUNC_, ATOP_BOOL); \
-    DEF_BINARY_USTUB(_FUNC_, ATOP_INT8); \
-    DEF_BINARY_USTUB(_FUNC_, ATOP_UINT8); \
-    DEF_BINARY_USTUB(_FUNC_, ATOP_INT16); \
-    DEF_BINARY_USTUB(_FUNC_, ATOP_UINT16); \
-    DEF_BINARY_USTUB(_FUNC_, ATOP_INT32); \
-    DEF_BINARY_USTUB(_FUNC_, ATOP_UINT32); \
-    DEF_BINARY_USTUB(_FUNC_, ATOP_INT64); \
-    DEF_BINARY_USTUB(_FUNC_, ATOP_UINT64); \
-    DEF_BINARY_USTUB(_FUNC_, ATOP_INT128); \
-    DEF_BINARY_USTUB(_FUNC_, ATOP_UINT128); \
-    DEF_BINARY_USTUB(_FUNC_, ATOP_FLOAT); \
-    DEF_BINARY_USTUB(_FUNC_, ATOP_DOUBLE); \
-    DEF_BINARY_USTUB(_FUNC_, ATOP_LONGDOUBLE);
-
-// For however many functions there are
-DEF_BINARY_USTUB_EXPAND(0)
-DEF_BINARY_USTUB_EXPAND(1)
-DEF_BINARY_USTUB_EXPAND(2)
-DEF_BINARY_USTUB_EXPAND(3)
-DEF_BINARY_USTUB_EXPAND(4)
-DEF_BINARY_USTUB_EXPAND(5)
-DEF_BINARY_USTUB_EXPAND(6)
-DEF_BINARY_USTUB_EXPAND(7)
-DEF_BINARY_USTUB_EXPAND(8)
-DEF_BINARY_USTUB_EXPAND(9)
-DEF_BINARY_USTUB_EXPAND(10)
-DEF_BINARY_USTUB_EXPAND(11)
-DEF_BINARY_USTUB_EXPAND(12)
-DEF_BINARY_USTUB_EXPAND(13)
-DEF_BINARY_USTUB_EXPAND(14)
-DEF_BINARY_USTUB_EXPAND(15)
-DEF_BINARY_USTUB_EXPAND(16)
-DEF_BINARY_USTUB_EXPAND(17)
-DEF_BINARY_USTUB_EXPAND(18)
-DEF_BINARY_USTUB_EXPAND(19)
-
-#define DEF_BINARY_USTUB_NAME(_FUNC_) \
-    FATOP_BOOL##_FUNC_, \
-    FATOP_INT8##_FUNC_, \
-    FATOP_UINT8##_FUNC_, \
-    FATOP_INT16##_FUNC_, \
-    FATOP_UINT16##_FUNC_, \
-    FATOP_INT32##_FUNC_, \
-    FATOP_UINT32##_FUNC_, \
-    FATOP_INT64##_FUNC_, \
-    FATOP_UINT64##_FUNC_, \
-    FATOP_INT128##_FUNC_, \
-    FATOP_UINT128##_FUNC_, \
-    FATOP_FLOAT##_FUNC_, \
-    FATOP_DOUBLE##_FUNC_, \
-    FATOP_LONGDOUBLE##_FUNC_ 
-
-PyUFuncGenericFunction g_UFuncGenericLUT[MATH_OPERATION::MATH_LAST][ATOP_LAST] =
-{
-{DEF_BINARY_USTUB_NAME(0)},
-{DEF_BINARY_USTUB_NAME(1)},
-{DEF_BINARY_USTUB_NAME(2)},
-{DEF_BINARY_USTUB_NAME(3)},
-{DEF_BINARY_USTUB_NAME(4)},
-{DEF_BINARY_USTUB_NAME(5)},
-{DEF_BINARY_USTUB_NAME(6)},
-{DEF_BINARY_USTUB_NAME(7)},
-{DEF_BINARY_USTUB_NAME(8)},
-{DEF_BINARY_USTUB_NAME(9)},
-{DEF_BINARY_USTUB_NAME(10)},
-{DEF_BINARY_USTUB_NAME(11)},
-{DEF_BINARY_USTUB_NAME(12)},
-{DEF_BINARY_USTUB_NAME(13)},
-{DEF_BINARY_USTUB_NAME(14)},
-{DEF_BINARY_USTUB_NAME(15)},
-{DEF_BINARY_USTUB_NAME(16)},
-{DEF_BINARY_USTUB_NAME(17)},
-{DEF_BINARY_USTUB_NAME(18)},
-{DEF_BINARY_USTUB_NAME(19)},
-};
-
-
-#define DEF_COMP_USTUB(_FUNC_, _ATYPE_) void COMPF##_ATYPE_##_FUNC_(char **args, const npy_intp *dimensions, const npy_intp *steps, void*innerloop) { \
-    return AtopCompareMathFunction(args, dimensions, steps, innerloop, _FUNC_, _ATYPE_);}
-
-#define DEF_COMP_USTUB_EXPAND(_FUNC_) \
-    DEF_COMP_USTUB(_FUNC_, ATOP_BOOL); \
-    DEF_COMP_USTUB(_FUNC_, ATOP_INT8); \
-    DEF_COMP_USTUB(_FUNC_, ATOP_UINT8); \
-    DEF_COMP_USTUB(_FUNC_, ATOP_INT16); \
-    DEF_COMP_USTUB(_FUNC_, ATOP_UINT16); \
-    DEF_COMP_USTUB(_FUNC_, ATOP_INT32); \
-    DEF_COMP_USTUB(_FUNC_, ATOP_UINT32); \
-    DEF_COMP_USTUB(_FUNC_, ATOP_INT64); \
-    DEF_COMP_USTUB(_FUNC_, ATOP_UINT64); \
-    DEF_COMP_USTUB(_FUNC_, ATOP_INT128); \
-    DEF_COMP_USTUB(_FUNC_, ATOP_UINT128); \
-    DEF_COMP_USTUB(_FUNC_, ATOP_FLOAT); \
-    DEF_COMP_USTUB(_FUNC_, ATOP_DOUBLE); \
-    DEF_COMP_USTUB(_FUNC_, ATOP_LONGDOUBLE);
-
-// For however many functions there are
-DEF_COMP_USTUB_EXPAND(0)
-DEF_COMP_USTUB_EXPAND(1)
-DEF_COMP_USTUB_EXPAND(2)
-DEF_COMP_USTUB_EXPAND(3)
-DEF_COMP_USTUB_EXPAND(4)
-DEF_COMP_USTUB_EXPAND(5)
-
-#define DEF_COMP_USTUB_NAME(_FUNC_) \
-    COMPFATOP_BOOL##_FUNC_, \
-    COMPFATOP_INT8##_FUNC_, \
-    COMPFATOP_UINT8##_FUNC_, \
-    COMPFATOP_INT16##_FUNC_, \
-    COMPFATOP_UINT16##_FUNC_, \
-    COMPFATOP_INT32##_FUNC_, \
-    COMPFATOP_UINT32##_FUNC_, \
-    COMPFATOP_INT64##_FUNC_, \
-    COMPFATOP_UINT64##_FUNC_, \
-    COMPFATOP_INT128##_FUNC_, \
-    COMPFATOP_UINT128##_FUNC_, \
-    COMPFATOP_FLOAT##_FUNC_, \
-    COMPFATOP_DOUBLE##_FUNC_, \
-    COMPFATOP_LONGDOUBLE##_FUNC_ 
-
-PyUFuncGenericFunction g_UFuncCompareLUT[COMP_OPERATION::CMP_LAST][ATOP_LAST] =
-{
-{DEF_COMP_USTUB_NAME(0)},
-{DEF_COMP_USTUB_NAME(1)},
-{DEF_COMP_USTUB_NAME(2)},
-{DEF_COMP_USTUB_NAME(3)},
-{DEF_COMP_USTUB_NAME(4)},
-{DEF_COMP_USTUB_NAME(5)}};
+#include "stubs.h"
 
 
 template <class T>

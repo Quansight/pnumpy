@@ -1139,7 +1139,7 @@ UNARY_FUNC GetUnaryOpSlow(int func, int numpyInType1, int numpyOutType, int* wan
     LOGGING("Looking for func slow %d  type %d  outtype: %d\n", func, numpyInType1, numpyOutType);
 
     switch (func) {
-    case MATH_OPERATION::FABS:
+    case UNARY_OPERATION::FABS:
         //*wantedOutType = ATOP_DOUBLE;
         //switch (numpyInType1) {
         //case ATOP_INT32:  return UnaryOpSlow_FABS<int32_t>;
@@ -1150,7 +1150,7 @@ UNARY_FUNC GetUnaryOpSlow(int func, int numpyInType1, int numpyOutType, int* wan
         //}
         break;
 
-    case MATH_OPERATION::ABS:
+    case UNARY_OPERATION::ABS:
         *wantedOutType = numpyInType1;
         switch (numpyInType1) {
         case ATOP_FLOAT:  return UnaryOpSlow_ABS<float>;
@@ -1164,7 +1164,7 @@ UNARY_FUNC GetUnaryOpSlow(int func, int numpyInType1, int numpyOutType, int* wan
         }
         break;
 
-    case MATH_OPERATION::SIGN:
+    case UNARY_OPERATION::SIGN:
         *wantedOutType = numpyInType1;
         switch (numpyInType1) {
         case ATOP_FLOAT:  return UnaryOpSlow_FLOATSIGN<float>;
@@ -1178,8 +1178,7 @@ UNARY_FUNC GetUnaryOpSlow(int func, int numpyInType1, int numpyOutType, int* wan
         }
         break;
 
-    case MATH_OPERATION::NEG:
-    case MATH_OPERATION::NEGATIVE:
+    case UNARY_OPERATION::NEGATIVE:
         *wantedOutType = numpyInType1;
         switch (numpyInType1) {
         case ATOP_FLOAT:  return UnaryOpSlow_NEG<float>;
@@ -1193,7 +1192,7 @@ UNARY_FUNC GetUnaryOpSlow(int func, int numpyInType1, int numpyOutType, int* wan
         }
         break;
 
-    case MATH_OPERATION::LOGICAL_NOT:
+    case UNARY_OPERATION::LOGICAL_NOT:
         *wantedOutType = ATOP_BOOL;
         // TJD: Not sure why bool works and others do not
         // Can only handle when output type is bool or not defined
@@ -1215,8 +1214,8 @@ UNARY_FUNC GetUnaryOpSlow(int func, int numpyInType1, int numpyOutType, int* wan
         }
         break;
 
-    case MATH_OPERATION::BITWISE_NOT:
-    case MATH_OPERATION::INVERT:
+    case UNARY_OPERATION::BITWISE_NOT:
+    case UNARY_OPERATION::INVERT:
         *wantedOutType = numpyInType1;
         switch (numpyInType1) {
         case ATOP_INT32:   return UnaryOpSlow_INVERT<int32_t>;
@@ -1231,7 +1230,7 @@ UNARY_FUNC GetUnaryOpSlow(int func, int numpyInType1, int numpyOutType, int* wan
         }
         break;
 
-    case MATH_OPERATION::ISFINITE:
+    case UNARY_OPERATION::ISFINITE:
         *wantedOutType = ATOP_BOOL;
         // Can only handle when output type is bool or not defined
         if (numpyOutType == 0 || numpyOutType == -1) {
@@ -1253,7 +1252,7 @@ UNARY_FUNC GetUnaryOpSlow(int func, int numpyInType1, int numpyOutType, int* wan
         }
         break;
 
-    case MATH_OPERATION::ISNOTFINITE:
+    case UNARY_OPERATION::ISNOTFINITE:
         *wantedOutType = ATOP_BOOL;
 
         // Can only handle when output type is bool or not defined
@@ -1276,7 +1275,7 @@ UNARY_FUNC GetUnaryOpSlow(int func, int numpyInType1, int numpyOutType, int* wan
         }
         break;
 
-    case MATH_OPERATION::ISNAN:
+    case UNARY_OPERATION::ISNAN:
         *wantedOutType = ATOP_BOOL;
 
         // Can only handle when output type is bool or not defined
@@ -1300,7 +1299,7 @@ UNARY_FUNC GetUnaryOpSlow(int func, int numpyInType1, int numpyOutType, int* wan
         }
         break;
 
-    case MATH_OPERATION::ISNANORZERO:
+    case UNARY_OPERATION::ISNANORZERO:
         *wantedOutType = ATOP_BOOL;
 
         // Can only handle when output type is bool or not defined
@@ -1324,7 +1323,7 @@ UNARY_FUNC GetUnaryOpSlow(int func, int numpyInType1, int numpyOutType, int* wan
         }
         break;
 
-    case MATH_OPERATION::ISNOTNAN:
+    case UNARY_OPERATION::ISNOTNAN:
         *wantedOutType = ATOP_BOOL;
         // Can only handle when output type is bool or not defined
         if (numpyOutType == 0 || numpyOutType == -1) {
@@ -1345,7 +1344,7 @@ UNARY_FUNC GetUnaryOpSlow(int func, int numpyInType1, int numpyOutType, int* wan
             }
         }
         break;
-    case MATH_OPERATION::ISINF:
+    case UNARY_OPERATION::ISINF:
         *wantedOutType = ATOP_BOOL;
         // Can only handle when output type is bool or not defined
         if (numpyOutType == 0 || numpyOutType == -1) {
@@ -1357,7 +1356,7 @@ UNARY_FUNC GetUnaryOpSlow(int func, int numpyInType1, int numpyOutType, int* wan
             }
         }
         break;
-    case MATH_OPERATION::ISNOTINF:
+    case UNARY_OPERATION::ISNOTINF:
         *wantedOutType = ATOP_BOOL;
         // Can only handle when output type is bool or not defined
         if (numpyOutType == 0 || numpyOutType == -1) {
@@ -1369,7 +1368,7 @@ UNARY_FUNC GetUnaryOpSlow(int func, int numpyInType1, int numpyOutType, int* wan
             }
         }
         break;
-    case MATH_OPERATION::ISNORMAL:
+    case UNARY_OPERATION::ISNORMAL:
         *wantedOutType = ATOP_BOOL;
         // Can only handle when output type is bool or not defined
         if (numpyOutType == 0 || numpyOutType == -1) {
@@ -1381,7 +1380,7 @@ UNARY_FUNC GetUnaryOpSlow(int func, int numpyInType1, int numpyOutType, int* wan
             }
         }
         break;
-    case MATH_OPERATION::ISNOTNORMAL:
+    case UNARY_OPERATION::ISNOTNORMAL:
         *wantedOutType = ATOP_BOOL;
         // Can only handle when output type is bool or not defined
         if (numpyOutType == 0 || numpyOutType == -1) {
@@ -1394,35 +1393,35 @@ UNARY_FUNC GetUnaryOpSlow(int func, int numpyInType1, int numpyOutType, int* wan
         }
         break;
 
-    case MATH_OPERATION::FLOOR:
+    case UNARY_OPERATION::FLOOR:
         *wantedOutType = numpyInType1;
         switch (numpyInType1) {
         case ATOP_DOUBLE: return UnaryOpSlow_FLOOR<double>;
         case ATOP_LONGDOUBLE: return UnaryOpSlow_FLOOR<long double>;
         }
         break;
-    case MATH_OPERATION::CEIL:
+    case UNARY_OPERATION::CEIL:
         *wantedOutType = numpyInType1;
         switch (numpyInType1) {
         case ATOP_DOUBLE: return UnaryOpSlow_CEIL<double>;
         case ATOP_LONGDOUBLE: return UnaryOpSlow_CEIL<long double>;
         }
         break;
-    case MATH_OPERATION::TRUNC:
+    case UNARY_OPERATION::TRUNC:
         *wantedOutType = numpyInType1;
         switch (numpyInType1) {
         case ATOP_DOUBLE: return UnaryOpSlow_TRUNC<double>;
         case ATOP_LONGDOUBLE: return UnaryOpSlow_TRUNC<long double>;
         }
         break;
-    case MATH_OPERATION::ROUND:
+    case UNARY_OPERATION::ROUND:
         *wantedOutType = numpyInType1;
         switch (numpyInType1) {
         case ATOP_DOUBLE: return UnaryOpSlow_ROUND<double>;
         case ATOP_LONGDOUBLE: return UnaryOpSlow_ROUND<long double>;
         }
         break;
-    case MATH_OPERATION::SQRT:
+    case UNARY_OPERATION::SQRT:
         *wantedOutType = ATOP_DOUBLE;
         if (numpyInType1 == ATOP_FLOAT) {
             *wantedOutType = ATOP_FLOAT;
@@ -1439,7 +1438,7 @@ UNARY_FUNC GetUnaryOpSlow(int func, int numpyInType1, int numpyOutType, int* wan
         case ATOP_LONGDOUBLE: return UnaryOpSlow_SQRT<long double>;
         }
         break;
-    case MATH_OPERATION::CBRT:
+    case UNARY_OPERATION::CBRT:
         *wantedOutType = ATOP_DOUBLE;
         if (numpyInType1 == ATOP_FLOAT) {
             *wantedOutType = ATOP_FLOAT;
@@ -1455,7 +1454,7 @@ UNARY_FUNC GetUnaryOpSlow(int func, int numpyInType1, int numpyOutType, int* wan
         }
         break;
 
-    case MATH_OPERATION::LOG:
+    case UNARY_OPERATION::LOG:
         *wantedOutType = ATOP_DOUBLE;
         if (numpyInType1 == ATOP_FLOAT) {
             *wantedOutType = ATOP_FLOAT;
@@ -1474,7 +1473,7 @@ UNARY_FUNC GetUnaryOpSlow(int func, int numpyInType1, int numpyOutType, int* wan
         }
         break;
 
-    case MATH_OPERATION::LOG10:
+    case UNARY_OPERATION::LOG10:
         *wantedOutType = ATOP_DOUBLE;
         if (numpyInType1 == ATOP_FLOAT) {
             *wantedOutType = ATOP_FLOAT;
@@ -1493,7 +1492,7 @@ UNARY_FUNC GetUnaryOpSlow(int func, int numpyInType1, int numpyOutType, int* wan
         }
         break;
 
-    case MATH_OPERATION::EXP:
+    case UNARY_OPERATION::EXP:
         *wantedOutType = ATOP_DOUBLE;
         if (numpyInType1 == ATOP_FLOAT) {
             *wantedOutType = ATOP_FLOAT;
@@ -1512,7 +1511,7 @@ UNARY_FUNC GetUnaryOpSlow(int func, int numpyInType1, int numpyOutType, int* wan
         }
         break;
 
-    case MATH_OPERATION::EXP2:
+    case UNARY_OPERATION::EXP2:
         *wantedOutType = ATOP_DOUBLE;
         if (numpyInType1 == ATOP_FLOAT) {
             *wantedOutType = ATOP_FLOAT;
@@ -1531,7 +1530,7 @@ UNARY_FUNC GetUnaryOpSlow(int func, int numpyInType1, int numpyOutType, int* wan
         }
         break;
 
-    case MATH_OPERATION::SIGNBIT:
+    case UNARY_OPERATION::SIGNBIT:
         *wantedOutType = ATOP_BOOL;
         switch (numpyInType1) {
         case ATOP_FLOAT: return UnaryOpSlow_SIGNBIT<float>;
@@ -1551,10 +1550,10 @@ UNARY_FUNC GetUnaryOpFast(int func, int numpyInType1, int numpyOutType, int* wan
     LOGGING("Looking for func %d  type:%d  outtype:%d\n", func, numpyInType1, numpyOutType);
 
     switch (func) {
-    case MATH_OPERATION::FABS:
+    case UNARY_OPERATION::FABS:
         break;
 
-    case MATH_OPERATION::ABS:
+    case UNARY_OPERATION::ABS:
         *wantedOutType = numpyInType1;
         switch (numpyInType1) {
         case ATOP_FLOAT:  return UnaryOpFast<float, __m256, ABS_OP<float>, ABS_OP_256<__m256>>;
@@ -1564,7 +1563,7 @@ UNARY_FUNC GetUnaryOpFast(int func, int numpyInType1, int numpyOutType, int* wan
         case ATOP_INT8:   return UnaryOpFast<int8_t, __m256i, ABS_OP<int8_t>, ABS_OP_256i8>;
         }
         break;
-    case MATH_OPERATION::ISNAN:
+    case UNARY_OPERATION::ISNAN:
         *wantedOutType = ATOP_BOOL;
         switch (numpyInType1) {
         case ATOP_FLOAT:  return UnaryOpFast_NANF32<float, __m256>;
@@ -1572,7 +1571,7 @@ UNARY_FUNC GetUnaryOpFast(int func, int numpyInType1, int numpyOutType, int* wan
         }
         break;
 
-    case MATH_OPERATION::ISNOTNAN:
+    case UNARY_OPERATION::ISNOTNAN:
         *wantedOutType = ATOP_BOOL;
         switch (numpyInType1) {
         case ATOP_FLOAT:  return UnaryOpFast_NOTNANF32<float, __m256>;
@@ -1580,7 +1579,7 @@ UNARY_FUNC GetUnaryOpFast(int func, int numpyInType1, int numpyOutType, int* wan
         }
         break;
 
-    case MATH_OPERATION::ISFINITE:
+    case UNARY_OPERATION::ISFINITE:
         *wantedOutType = ATOP_BOOL;
         switch (numpyInType1) {
         case ATOP_FLOAT:  return UnaryOpFast_FINITEF32<float, __m256>;
@@ -1588,7 +1587,7 @@ UNARY_FUNC GetUnaryOpFast(int func, int numpyInType1, int numpyOutType, int* wan
         }
         break;
 
-    case MATH_OPERATION::ISNOTFINITE:
+    case UNARY_OPERATION::ISNOTFINITE:
         *wantedOutType = ATOP_BOOL;
         switch (numpyInType1) {
         case ATOP_FLOAT:  return UnaryOpFast_NOTFINITEF32<float, __m256>;
@@ -1596,7 +1595,7 @@ UNARY_FUNC GetUnaryOpFast(int func, int numpyInType1, int numpyOutType, int* wan
         }
         break;
 
-    case MATH_OPERATION::NEG:
+    case UNARY_OPERATION::NEGATIVE:
         *wantedOutType = numpyInType1;
         switch (numpyInType1) {
         case ATOP_FLOAT:  return UnaryOpFast<float, __m256, NEG_OP<float>, NEG_OP_256<__m256>>;
@@ -1607,37 +1606,37 @@ UNARY_FUNC GetUnaryOpFast(int func, int numpyInType1, int numpyOutType, int* wan
         case ATOP_INT8:   return UnaryOpFast<int8_t, __m256i, NEG_OP<int8_t>, NEG_OP_256i8>;
         }
         break;
-    case MATH_OPERATION::INVERT:
+    case UNARY_OPERATION::INVERT:
         break;
-    case MATH_OPERATION::FLOOR:
+    case UNARY_OPERATION::FLOOR:
         *wantedOutType = numpyInType1;
         switch (numpyInType1) {
         case ATOP_FLOAT:  return UnaryOpFast<float, __m256, FLOOR_OP<float>, FLOOR_OP_256<__m256>>;
         case ATOP_DOUBLE: return UnaryOpFast<double, __m256d, FLOOR_OP<double>, FLOOR_OP_256<__m256d>>;
         }
         break;
-    case MATH_OPERATION::CEIL:
+    case UNARY_OPERATION::CEIL:
         *wantedOutType = numpyInType1;
         switch (numpyInType1) {
         case ATOP_FLOAT:  return UnaryOpFast<float, __m256, CEIL_OP<float>, CEIL_OP_256<__m256>>;
         case ATOP_DOUBLE: return UnaryOpFast<double, __m256d, CEIL_OP<double>, CEIL_OP_256<__m256d>>;
         }
         break;
-    case MATH_OPERATION::TRUNC:
+    case UNARY_OPERATION::TRUNC:
         *wantedOutType = numpyInType1;
         switch (numpyInType1) {
         case ATOP_FLOAT:  return UnaryOpFast<float, __m256, TRUNC_OP<float>, TRUNC_OP_256<__m256>>;
         case ATOP_DOUBLE: return UnaryOpFast<double, __m256d, TRUNC_OP<double>, TRUNC_OP_256<__m256d>>;
         }
         break;
-    case MATH_OPERATION::ROUND:
+    case UNARY_OPERATION::ROUND:
         *wantedOutType = numpyInType1;
         switch (numpyInType1) {
         case ATOP_FLOAT:  return UnaryOpFast<float, __m256, ROUND_OP<float>, ROUND_OP_256<__m256>>;
         case ATOP_DOUBLE: return UnaryOpFast<double, __m256d, ROUND_OP<double>, ROUND_OP_256<__m256d>>;
         }
         break;
-    case MATH_OPERATION::SQRT:
+    case UNARY_OPERATION::SQRT:
         *wantedOutType = ATOP_DOUBLE;
         if (numpyInType1 == ATOP_FLOAT) {
             *wantedOutType = ATOP_FLOAT;
@@ -1654,15 +1653,15 @@ UNARY_FUNC GetUnaryOpFast(int func, int numpyInType1, int numpyOutType, int* wan
 
 //--------------------------------------------------------------------
 //
-UNARY_FUNC_STRIDED GetUnaryOpFastStrided(int func, int numpyInType1, int numpyOutType, int* wantedOutType) {
+UNARY_FUNC GetUnaryOpFastStrided(int func, int numpyInType1, int numpyOutType, int* wantedOutType) {
 
     LOGGING("Looking for func %d  type:%d  outtype:%d\n", func, numpyInType1, numpyOutType);
 
     switch (func) {
-    case MATH_OPERATION::FABS:
+    case UNARY_OPERATION::FABS:
         break;
 
-    case MATH_OPERATION::ABS:
+    case UNARY_OPERATION::ABS:
         *wantedOutType = numpyInType1;
         switch (numpyInType1) {
         case ATOP_FLOAT:  return UnaryOpFastStrided<float, __m256, ABS_OP<float>, ABS_OP_256<__m256>>;
@@ -1694,8 +1693,8 @@ static UNARY_FUNC CheckMathOpOneInput(int func, int numpyInType1, int numpyOutTy
 
 //--------------------------------------------------------------------
 // Check to see if we can compute this
-static UNARY_FUNC_STRIDED CheckMathOpOneInputStrided(int func, int numpyInType1, int numpyOutType, int* wantedOutType) {
-    UNARY_FUNC_STRIDED pOneFunc = NULL;
+static UNARY_FUNC CheckMathOpOneInputStrided(int func, int numpyInType1, int numpyOutType, int* wantedOutType) {
+    UNARY_FUNC pOneFunc = NULL;
 
     // Not handling complex, 128bit, voids, objects, or strings here
     if (numpyInType1 <= ATOP_LONGDOUBLE) {
