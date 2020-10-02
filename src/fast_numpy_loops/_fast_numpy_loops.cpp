@@ -135,7 +135,7 @@ static stUFuncToAtop gTrigMapping[] = {
 struct BINARY_CALLBACK {
     union {
         ANY_TWO_FUNC        pBinaryFunc;
-        UNARY_FUNC          pUnaryCallbackStrided;
+        UNARY_FUNC          pUnaryFunc;
         REDUCE_FUNC         pReduceFunc;
     };
 
@@ -171,6 +171,7 @@ struct stUFunc {
 // global lookup tables for math opcode enum + dtype enum
 stUFunc  g_UFuncLUT[BINARY_OPERATION::BINARY_LAST][ATOP_LAST];
 stUFunc  g_CompFuncLUT[COMP_OPERATION::CMP_LAST][ATOP_LAST];
+stUFunc  g_UnaryFuncLUT[UNARY_OPERATION::UNARY_LAST][ATOP_LAST];
 
 // set to 0 to disable
 int32_t  g_AtopEnabled = 1;
@@ -241,6 +242,38 @@ static BOOL BinaryThreadCallbackStrided(struct stMATH_WORKER_ITEM* pstWorkerItem
     return didSomeWork;
 }
 
+
+//------------------------------------------------------------------------------
+//  Concurrent callback from multiple threads
+static BOOL UnaryThreadCallbackStrided(struct stMATH_WORKER_ITEM* pstWorkerItem, int core, int64_t workIndex) {
+    BOOL didSomeWork = FALSE;
+    const BINARY_CALLBACK* Callback = (const BINARY_CALLBACK*)pstWorkerItem->WorkCallbackArg;
+
+    char* pDataIn1 = Callback->pDataIn1;
+    char* pDataOut = Callback->pDataOut;
+    int64_t lenX;
+    int64_t workBlock;
+
+    // As long as there is work to do
+    while ((lenX = pstWorkerItem->GetNextWorkBlock(&workBlock)) > 0) {
+
+        int64_t inputAdj1 = pstWorkerItem->BlockSize * workBlock * Callback->itemSizeIn1;
+        int64_t outputAdj = pstWorkerItem->BlockSize * workBlock * Callback->itemSizeOut;
+
+        // LOGGING("[%d] working on %lld with len %lld   block: %lld\n", core, workIndex, lenX, workBlock);
+        Callback->pUnaryFunc(pDataIn1 + inputAdj1, pDataOut + outputAdj, lenX, Callback->itemSizeIn1, Callback->itemSizeOut);
+
+        // Indicate we completed a block
+        didSomeWork = TRUE;
+
+        // tell others we completed this work block
+        pstWorkerItem->CompleteWorkBlock();
+        //printf("|%d %d", core, (int)workBlock);
+    }
+
+    return didSomeWork;
+}
+
 // For binary math functions like add, sbutract, multiply.
 // 2 inputs and 1 output
 static void AtopBinaryMathFunction(char** args, const npy_intp* dimensions, const npy_intp* steps, void* innerloop, int funcop, int atype) {
@@ -252,7 +285,7 @@ static void AtopBinaryMathFunction(char** args, const npy_intp* dimensions, cons
         if (IS_BINARY_REDUCE) {
             // In a numpy binary reduce, the middle array is the real array
             REDUCE_FUNC pReduceFunc = g_UFuncLUT[funcop][atype].pReduceFunc;
-            int32_t      maxThreads = g_CompFuncLUT[funcop][atype].MaxThreads;
+            int32_t      maxThreads = g_UFuncLUT[funcop][atype].MaxThreads;
 
             //printf("pReduce %p   opcode:%d   dtype:%d   %lld %lld %lld %lld\n", pReduceFunc, funcop, atype, (long long)dimensions[1], (long long)steps[0], (long long)steps[1], (long long)steps[2]);
             if (pReduceFunc) {
@@ -300,7 +333,7 @@ static void AtopBinaryMathFunction(char** args, const npy_intp* dimensions, cons
         }
         else {
             ANY_TWO_FUNC pBinaryFunc = g_UFuncLUT[funcop][atype].pBinaryFunc;
-            int32_t      maxThreads = g_CompFuncLUT[funcop][atype].MaxThreads;
+            int32_t      maxThreads = g_UFuncLUT[funcop][atype].MaxThreads;
 
             if (pBinaryFunc) {
                 char* ip1 = (char*)args[0];
@@ -341,15 +374,16 @@ static void AtopBinaryMathFunction(char** args, const npy_intp* dimensions, cons
         g_UFuncLUT[funcop][atype].pOldFunc(args, dimensions, steps, innerloop);
         return;
     }
-    npy_intp n = dimensions[0];
-    stMATH_WORKER_ITEM* pWorkItem = THREADER->GetWorkItem(n);
-    if (!pWorkItem) {
-        // Do it the old way
-        g_UFuncLUT[funcop][atype].pOldFunc(args, dimensions, steps, innerloop);
-    }
-    else {
-
-    }
+    // TODO try to thread old way
+    //npy_intp n = dimensions[0];
+    //stMATH_WORKER_ITEM* pWorkItem = THREADER->GetWorkItem(n);
+    //if (!pWorkItem) {
+    //    // Do it the old way
+    //    g_UFuncLUT[funcop][atype].pOldFunc(args, dimensions, steps, innerloop);
+    //}
+    //else {
+    //}
+    g_UFuncLUT[funcop][atype].pOldFunc(args, dimensions, steps, innerloop);
 };
 
 
@@ -397,29 +431,66 @@ static void AtopCompareMathFunction(char** args, const npy_intp* dimensions, con
             // most functions are so fast, we do not need more than 4 worker threads
             THREADER->WorkMain(pWorkItem, n, maxThreads);
         }
-
+        return;
     }
-    else {
-        g_CompFuncLUT[funcop][atype].pOldFunc(args, dimensions, steps, innerloop);
+    // old way
+    g_CompFuncLUT[funcop][atype].pOldFunc(args, dimensions, steps, innerloop);
 
-    }
 };
+
 
 
 // For unary math functions like abs, sqrt
 // 1 input and 1 output
 static void AtopUnaryMathFunction(char** args, const npy_intp* dimensions, const npy_intp* steps, void* innerloop, int funcop, int atype) {
-    char* ip1 = (char*)args[0];
-    char* op1 = (char*)args[1];
-    npy_intp is1 = steps[0], os1 = steps[1];
-    npy_intp n = dimensions[0];
-    //g_UFuncLUT[funcop][atype].pBinaryFunc(ip1, ip2, op1, (int64_t)n, is1 == 0 ? SCALAR_MODE::FIRST_ARG_SCALAR : is2 == 0 ? SCALAR_MODE::SECOND_ARG_SCALAR : SCALAR_MODE::NO_SCALARS);
+    //LOGGING("called with %d %d   funcp: %p\n", funcop, atype, g_UFuncLUT[funcop][atype].pOldFunc);
+    if (g_AtopEnabled) {
+        npy_intp n = dimensions[0];
+        stMATH_WORKER_ITEM* pWorkItem = THREADER->GetWorkItem(n);
 
-    
-}
+        UNARY_FUNC pUnaryFunc = g_UnaryFuncLUT[funcop][atype].pUnaryFunc;
+        int32_t    maxThreads = g_UnaryFuncLUT[funcop][atype].MaxThreads;
+
+        if (pUnaryFunc) {
+            char* ip1 = (char*)args[0];
+            char* op1 = (char*)args[1];
+            // For a scalar first is1 ==0
+            // For a scalar second is2 == 0
+            npy_intp is1 = steps[0], os1 = steps[1];
+            npy_intp n = dimensions[0];
+
+            if (!pWorkItem) {
+                pUnaryFunc(ip1, op1, (int64_t)n, (int64_t)is1, (int64_t)os1);
+            }
+            else {
+                BINARY_CALLBACK stCallback;
+
+                // Each thread will call this routine with the callbackArg
+                pWorkItem->DoWorkCallback = UnaryThreadCallbackStrided;
+                pWorkItem->WorkCallbackArg = &stCallback;
+
+                stCallback.pUnaryFunc = pUnaryFunc;
+                stCallback.pDataOut = op1;
+                stCallback.pDataIn1 = ip1;
+                stCallback.itemSizeIn1 = is1;
+                stCallback.itemSizeOut = os1;
+
+                // This will notify the worker threads of a new work item
+                // most functions are so fast, we do not need more than 4 worker threads
+                THREADER->WorkMain(pWorkItem, n, maxThreads);
+
+            }
+            return;
+        }
+        // Thread it the old way
+        g_UnaryFuncLUT[funcop][atype].pOldFunc(args, dimensions, steps, innerloop);
+        return;
+    }
+    // Do it the old way
+    g_UnaryFuncLUT[funcop][atype].pOldFunc(args, dimensions, steps, innerloop);
+};
 
 #include "stubs.h"
-
 
 template <class T>
 void add_T(T **args, npy_intp const *dimensions, npy_intp const *steps,
@@ -526,6 +597,16 @@ PyObject* newinit(PyObject* self, PyObject* args, PyObject* kwargs) {
             return NULL;
         }
 
+        // call np.setbufsize()
+        // note: could be done in __init__
+        PyObject* setbufsize = PyObject_GetAttrString(numpy_module, "setbufsize");
+        if (setbufsize && PyCallable_Check(setbufsize)) {
+            PyObject* buffersize = PyTuple_New(1);
+            PyTuple_SetItem(buffersize, 0, PyLong_FromLongLong(8192 * 1024));
+            PyObject_CallObject(setbufsize, buffersize);
+            Py_XDECREF(buffersize);
+        }
+
         // Loop over all binary ufuncs we want to replace
         int64_t num_ufuncs = sizeof(gBinaryMapping) / sizeof(stUFuncToAtop);
         for (int64_t i = 0; i < num_ufuncs; i++) {
@@ -540,6 +621,8 @@ PyObject* newinit(PyObject* self, PyObject* args, PyObject* kwargs) {
                 Py_XDECREF(ufunc);
                 return PyErr_Format(PyExc_TypeError, "func %s must be the name of a ufunc", ufunc_name);
             }
+
+            //printf("taking over func %s\n", ufunc_name);
 
             // Loop over all dtypes we support for the ufunc
             int64_t num_dtypes = sizeof(dtypes) / sizeof(int);
@@ -613,19 +696,48 @@ PyObject* newinit(PyObject* self, PyObject* args, PyObject* kwargs) {
             }
         }
 
-        //printf("going for abs\n");
-        //PyObject* ufunc = PyObject_GetAttrString(numpy_module, "abs");
-        //if (ufunc) {
-        //    PyUFuncGenericFunction oldFunc;
-        //    int signature[2] = { NPY_FLOAT, NPY_INT32 };
-        //    int ret = PyUFunc_ReplaceLoopBySignature((PyUFuncObject*)ufunc, NULL, signature, &oldFunc);
-        //    printf("got abs %d\n" ,ret);
+        // Loop over all unary ufuncs we want to replace
+        num_ufuncs = sizeof(gUnaryMapping) / sizeof(stUFuncToAtop);
+        for (int64_t i = 0; i < num_ufuncs; i++) {
+            PyObject* result = NULL;
+            PyObject* ufunc = NULL;
+            const char* ufunc_name = gUnaryMapping[i].str_ufunc_name;
+            int atop = gUnaryMapping[i].atop_op;
 
-        //    if (ret < 0) {
-        //        return PyErr_Format(PyExc_TypeError, "Failed with %d. func %s must be the name of a ufunc", ret, "abs");
-        //    }
+            ufunc = PyObject_GetAttrString(numpy_module, ufunc_name);
 
-        //}
+            if (ufunc == NULL) {
+                Py_XDECREF(ufunc);
+                return PyErr_Format(PyExc_TypeError, "func %s must be the name of a ufunc", ufunc_name);
+            }
+
+            // Loop over all dtypes we support for the ufunc
+            int64_t num_dtypes = sizeof(dtypes) / sizeof(int);
+            for (int64_t j = 0; j < num_dtypes; j++) {
+                PyUFuncGenericFunction oldFunc;
+                int dtype = dtypes[j];
+                int signature[3] = { dtype, dtype, dtype };
+
+                int atype = convert_dtype_to_atop[dtype];
+
+                // For unary it only has a signature of 2
+                UNARY_FUNC pUnaryFunc = GetUnaryOpFast(atop, atype, &signature[1]);
+                signature[1] = convert_atop_to_dtype[signature[1]];
+
+                if (pUnaryFunc) {
+                    int ret = PyUFunc_ReplaceLoopBySignature((PyUFuncObject*)ufunc, g_UFuncUnaryLUT[atop][atype], signature, &oldFunc);
+
+                    if (ret < 0) {
+                        return PyErr_Format(PyExc_TypeError, "Unary failed with %d. func %s must be the name of a ufunc.  atop:%d   atype:%d  sigs:%d, %d, %d", ret, ufunc_name, atop, atype, signature[0], signature[1], signature[2]);
+                    }
+
+                    // Store the new function to call and the previous ufunc
+                    g_UnaryFuncLUT[atop][atype].pOldFunc = oldFunc;
+                    g_UnaryFuncLUT[atop][atype].pUnaryFunc = pUnaryFunc;
+                    g_UnaryFuncLUT[atop][atype].MaxThreads = 4;
+                }
+            }
+        }
 
         RETURN_NONE;
     }
