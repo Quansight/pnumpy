@@ -352,6 +352,9 @@ enum BINARY_OPERATION {
 enum TRIG_OPERATION {
     // One op, returns same type
     SIN = 1,
+    COS = 2,
+    TAN = 3,
+
 };
 
 //----------------------------------------------------------------------------------

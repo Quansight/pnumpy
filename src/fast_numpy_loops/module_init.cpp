@@ -15,6 +15,8 @@ extern "C" PyObject* isenabled(PyObject * self, PyObject * args);
 extern "C" PyObject* thread_enable(PyObject * self, PyObject * args);
 extern "C" PyObject* thread_disable(PyObject * self, PyObject * args);
 extern "C" PyObject* thread_isenabled(PyObject * self, PyObject * args);
+extern "C" PyObject* thread_getworkers(PyObject * self, PyObject * args);
+extern "C" PyObject* thread_setworkers(PyObject * self, PyObject * args);
 extern "C" PyObject* cpustring(PyObject * self, PyObject * args);
 
 static char m_doc[] = "Provide methods to override NumPy ufuncs";
@@ -31,6 +33,8 @@ static PyMethodDef module_functions[] = {
     {"thread_enable",    (PyCFunction)thread_enable,  METH_VARARGS, "enable worker threads"},
     {"thread_disable",   (PyCFunction)thread_disable,  METH_VARARGS, "disable worker threads"},
     {"thread_isenabled", (PyCFunction)thread_isenabled,  METH_VARARGS, "returns True if worker threads enabled elseF alse"},
+    {"thread_getworkers",(PyCFunction)thread_getworkers,  METH_VARARGS, "get the number of worker threads"},
+    {"thread_setworkers",(PyCFunction)thread_setworkers,  METH_VARARGS, "set the number of worker threads, return previous value. Must be at least 1."},
     {"cpustring",        (PyCFunction)cpustring,  METH_VARARGS, "cpu brand string plus features"},
     {"oldinit",          (PyCFunction)oldinit, METH_VARARGS | METH_KEYWORDS, oldinit_doc},
     {NULL, NULL, 0,  NULL}

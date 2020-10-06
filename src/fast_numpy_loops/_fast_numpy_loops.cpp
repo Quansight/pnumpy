@@ -8,6 +8,7 @@
 #include "../atop/atop.h"
 #include "../atop/threads.h"
 
+#define LOGGING(...)
 #define RETURN_NONE Py_INCREF(Py_None); return Py_None;
 
 #define IS_BINARY_REDUCE ((args[0] == args[2])\
@@ -127,6 +128,8 @@ static stUFuncToAtop gUnaryMapping[] = {
 // To be completed
 static stUFuncToAtop gTrigMapping[] = {
     {"sin",           TRIG_OPERATION::SIN},
+    {"cos",           TRIG_OPERATION::COS},
+    {"tan",           TRIG_OPERATION::TAN},
 };
 
 
@@ -137,6 +140,7 @@ struct BINARY_CALLBACK {
         ANY_TWO_FUNC        pBinaryFunc;
         UNARY_FUNC          pUnaryFunc;
         REDUCE_FUNC         pReduceFunc;
+        PyUFuncGenericFunction pOldFunc;
     };
 
     union {
@@ -242,6 +246,41 @@ static BOOL BinaryThreadCallbackStrided(struct stMATH_WORKER_ITEM* pstWorkerItem
     return didSomeWork;
 }
 
+
+//------------------------------------------------------------------------------
+//  Concurrent callback from multiple threads
+static BOOL UnaryThreadCallbackOldWay(struct stMATH_WORKER_ITEM* pstWorkerItem, int core, int64_t workIndex) {
+    BOOL didSomeWork = FALSE;
+    const BINARY_CALLBACK* Callback = (const BINARY_CALLBACK*)pstWorkerItem->WorkCallbackArg;
+
+    char* pDataIn1 = Callback->pDataIn1;
+    char* pDataOut = Callback->pDataOut;
+    int64_t lenX;
+    int64_t workBlock;
+
+    // As long as there is work to do
+    while ((lenX = pstWorkerItem->GetNextWorkBlock(&workBlock)) > 0) {
+
+        int64_t inputAdj1 = pstWorkerItem->BlockSize * workBlock * Callback->itemSizeIn1;
+        int64_t outputAdj = pstWorkerItem->BlockSize * workBlock * Callback->itemSizeOut;
+
+        char* args[2] = { pDataIn1 + inputAdj1,  pDataOut + outputAdj };
+        npy_intp dimensions =  (npy_intp)lenX ;
+        const npy_intp steps[2] = { Callback->itemSizeIn1 , Callback->itemSizeOut };
+
+        LOGGING("[%d] working on %lld with len %lld   block: %lld\n", core, workIndex, lenX, workBlock);
+        Callback->pOldFunc(args, &dimensions, steps, NULL);
+
+        // Indicate we completed a block
+        didSomeWork = TRUE;
+
+        // tell others we completed this work block
+        pstWorkerItem->CompleteWorkBlock();
+        //printf("|%d %d", core, (int)workBlock);
+    }
+
+    return didSomeWork;
+}
 
 //------------------------------------------------------------------------------
 //  Concurrent callback from multiple threads
@@ -371,18 +410,9 @@ static void AtopBinaryMathFunction(char** args, const npy_intp* dimensions, cons
             }
         }
         // Thread it the old way
-        g_UFuncLUT[funcop][atype].pOldFunc(args, dimensions, steps, innerloop);
-        return;
+        //g_UFuncLUT[funcop][atype].pOldFunc(args, dimensions, steps, innerloop);
+        //return;
     }
-    // TODO try to thread old way
-    //npy_intp n = dimensions[0];
-    //stMATH_WORKER_ITEM* pWorkItem = THREADER->GetWorkItem(n);
-    //if (!pWorkItem) {
-    //    // Do it the old way
-    //    g_UFuncLUT[funcop][atype].pOldFunc(args, dimensions, steps, innerloop);
-    //}
-    //else {
-    //}
     g_UFuncLUT[funcop][atype].pOldFunc(args, dimensions, steps, innerloop);
 };
 
@@ -394,44 +424,47 @@ static void AtopCompareMathFunction(char** args, const npy_intp* dimensions, con
 
     if (g_AtopEnabled) {
         ANY_TWO_FUNC pBinaryFunc = g_CompFuncLUT[funcop][atype].pBinaryFunc;
-        int32_t      maxThreads = g_CompFuncLUT[funcop][atype].MaxThreads;
 
-        char* ip1 = (char*)args[0];
-        char* ip2 = (char*)args[1];
-        char* op1 = (char*)args[2];
+        if (pBinaryFunc) {
+            int32_t      maxThreads = g_CompFuncLUT[funcop][atype].MaxThreads;
 
-        // For a scalar first is1 ==0
-        // For a scalar second is2 == 0
-        npy_intp is1 = steps[0], is2 = steps[1], os1 = steps[2];
-        int64_t n = (int64_t)dimensions[0];
+            char* ip1 = (char*)args[0];
+            char* ip2 = (char*)args[1];
+            char* op1 = (char*)args[2];
 
-        stMATH_WORKER_ITEM* pWorkItem = THREADER->GetWorkItem(n);
+            // For a scalar first is1 ==0
+            // For a scalar second is2 == 0
+            npy_intp is1 = steps[0], is2 = steps[1], os1 = steps[2];
+            int64_t n = (int64_t)dimensions[0];
 
-        if (pWorkItem == NULL) {
+            stMATH_WORKER_ITEM* pWorkItem = THREADER->GetWorkItem(n);
 
-            // Threading not allowed for this work item, call it directly from main thread
-            pBinaryFunc(ip1, ip2, op1, n, is1, is2, os1);
+            if (pWorkItem == NULL) {
+
+                // Threading not allowed for this work item, call it directly from main thread
+                pBinaryFunc(ip1, ip2, op1, n, is1, is2, os1);
+            }
+            else {
+                BINARY_CALLBACK stCallback;
+
+                // Each thread will call this routine with the callbackArg
+                pWorkItem->DoWorkCallback = BinaryThreadCallbackStrided;
+                pWorkItem->WorkCallbackArg = &stCallback;
+
+                stCallback.pBinaryFunc = pBinaryFunc;
+                stCallback.pDataOut = op1;
+                stCallback.pDataIn1 = ip1;
+                stCallback.pDataIn2 = ip2;
+                stCallback.itemSizeIn1 = is1;
+                stCallback.itemSizeIn2 = is2;
+                stCallback.itemSizeOut = os1;
+
+                // This will notify the worker threads of a new work item
+                // most functions are so fast, we do not need more than 4 worker threads
+                THREADER->WorkMain(pWorkItem, n, maxThreads);
+            }
+            return;
         }
-        else {
-            BINARY_CALLBACK stCallback;
-
-            // Each thread will call this routine with the callbackArg
-            pWorkItem->DoWorkCallback = BinaryThreadCallbackStrided;
-            pWorkItem->WorkCallbackArg = &stCallback;
-
-            stCallback.pBinaryFunc = pBinaryFunc;
-            stCallback.pDataOut = op1;
-            stCallback.pDataIn1 = ip1;
-            stCallback.pDataIn2 = ip2;
-            stCallback.itemSizeIn1 = is1;
-            stCallback.itemSizeIn2 = is2;
-            stCallback.itemSizeOut = os1;
-
-            // This will notify the worker threads of a new work item
-            // most functions are so fast, we do not need more than 4 worker threads
-            THREADER->WorkMain(pWorkItem, n, maxThreads);
-        }
-        return;
     }
     // old way
     g_CompFuncLUT[funcop][atype].pOldFunc(args, dimensions, steps, innerloop);
@@ -444,20 +477,21 @@ static void AtopCompareMathFunction(char** args, const npy_intp* dimensions, con
 // 1 input and 1 output
 static void AtopUnaryMathFunction(char** args, const npy_intp* dimensions, const npy_intp* steps, void* innerloop, int funcop, int atype) {
     //LOGGING("called with %d %d   funcp: %p\n", funcop, atype, g_UFuncLUT[funcop][atype].pOldFunc);
-    if (g_AtopEnabled) {
-        npy_intp n = dimensions[0];
-        stMATH_WORKER_ITEM* pWorkItem = THREADER->GetWorkItem(n);
+    npy_intp n = dimensions[0];
+    stUFunc* pstUFunc = &g_UnaryFuncLUT[funcop][atype];
 
-        UNARY_FUNC pUnaryFunc = g_UnaryFuncLUT[funcop][atype].pUnaryFunc;
-        int32_t    maxThreads = g_UnaryFuncLUT[funcop][atype].MaxThreads;
+    if (g_AtopEnabled) {
+        UNARY_FUNC pUnaryFunc = pstUFunc->pUnaryFunc;
 
         if (pUnaryFunc) {
+            int32_t    maxThreads = pstUFunc->MaxThreads;
+            stMATH_WORKER_ITEM* pWorkItem = THREADER->GetWorkItem(n);
+
             char* ip1 = (char*)args[0];
             char* op1 = (char*)args[1];
             // For a scalar first is1 ==0
             // For a scalar second is2 == 0
             npy_intp is1 = steps[0], os1 = steps[1];
-            npy_intp n = dimensions[0];
 
             if (!pWorkItem) {
                 pUnaryFunc(ip1, op1, (int64_t)n, (int64_t)is1, (int64_t)os1);
@@ -483,11 +517,39 @@ static void AtopUnaryMathFunction(char** args, const npy_intp* dimensions, const
             return;
         }
         // Thread it the old way
-        g_UnaryFuncLUT[funcop][atype].pOldFunc(args, dimensions, steps, innerloop);
-        return;
+        // Drop down to threading existing ufunc routine
     }
-    // Do it the old way
-    g_UnaryFuncLUT[funcop][atype].pOldFunc(args, dimensions, steps, innerloop);
+
+    stMATH_WORKER_ITEM* pWorkItem = THREADER->GetWorkItem(n);
+    if (!pWorkItem) {
+        // Do it the old way, threading not allowed
+        pstUFunc->pOldFunc(args, dimensions, steps, innerloop);
+    }
+    else {
+        // Thread the old way
+        char* ip1 = (char*)args[0];
+        char* op1 = (char*)args[1];
+        // For a scalar first is1 ==0
+        // For a scalar second is2 == 0
+        npy_intp is1 = steps[0], os1 = steps[1];
+
+        BINARY_CALLBACK stCallback;
+
+        // Each thread will call this routine with the callbackArg
+        pWorkItem->DoWorkCallback = UnaryThreadCallbackOldWay;
+        pWorkItem->WorkCallbackArg = &stCallback;
+
+        int32_t      maxThreads = pstUFunc->MaxThreads;
+        stCallback.pOldFunc = pstUFunc->pOldFunc;
+        stCallback.pDataOut = op1;
+        stCallback.pDataIn1 = ip1;
+        stCallback.itemSizeIn1 = is1;
+        stCallback.itemSizeOut = os1;
+
+        // This will notify the worker threads of a new work item
+        // most functions are so fast, we do not need more than 4 worker threads
+        THREADER->WorkMain(pWorkItem, n, maxThreads);
+    }
 };
 
 #include "stubs.h"
@@ -645,11 +707,12 @@ PyObject* newinit(PyObject* self, PyObject* args, PyObject* kwargs) {
                         return PyErr_Format(PyExc_TypeError, "Math failed with %d. func %s must be the name of a ufunc.  atop:%d   atype:%d  sigs:%d, %d, %d", ret, ufunc_name, atop, atype, signature[0], signature[1], signature[2]);
                     }
 
+                    stUFunc* pstUFunc = &g_UFuncLUT[atop][atype];
                     // Store the new function to call and the previous ufunc
-                    g_UFuncLUT[atop][atype].pOldFunc = oldFunc;
-                    g_UFuncLUT[atop][atype].pBinaryFunc = pBinaryFunc;
-                    g_UFuncLUT[atop][atype].pReduceFunc = pReduceFunc;
-                    g_UFuncLUT[atop][atype].MaxThreads = 4;
+                    pstUFunc->pOldFunc = oldFunc;
+                    pstUFunc->pBinaryFunc = pBinaryFunc;
+                    pstUFunc->pReduceFunc = pReduceFunc;
+                    pstUFunc->MaxThreads = 4;
                 }
             }
         }
@@ -688,10 +751,12 @@ PyObject* newinit(PyObject* self, PyObject* args, PyObject* kwargs) {
                         return PyErr_Format(PyExc_TypeError, "Comparison failed with %d. func %s must be the name of a ufunc.  atop:%d   atype:%d  sigs:%d, %d, %d", ret, ufunc_name, atop, atype, signature[0], signature[1], signature[2]);
                     }
 
+                    stUFunc* pstUFunc = &g_CompFuncLUT[atop][atype];
+
                     // Store the new function to call and the previous ufunc
-                    g_CompFuncLUT[atop][atype].pOldFunc = oldFunc;
-                    g_CompFuncLUT[atop][atype].pBinaryFunc = pBinaryFunc;
-                    g_CompFuncLUT[atop][atype].MaxThreads = 4;
+                    pstUFunc->pOldFunc = oldFunc;
+                    pstUFunc->pBinaryFunc = pBinaryFunc;
+                    pstUFunc->MaxThreads = 4;
                 }
             }
         }
@@ -730,11 +795,11 @@ PyObject* newinit(PyObject* self, PyObject* args, PyObject* kwargs) {
                     if (ret < 0) {
                         return PyErr_Format(PyExc_TypeError, "Unary failed with %d. func %s must be the name of a ufunc.  atop:%d   atype:%d  sigs:%d, %d, %d", ret, ufunc_name, atop, atype, signature[0], signature[1], signature[2]);
                     }
-
+                    stUFunc* pstUFunc = &g_UnaryFuncLUT[atop][atype];
                     // Store the new function to call and the previous ufunc
-                    g_UnaryFuncLUT[atop][atype].pOldFunc = oldFunc;
-                    g_UnaryFuncLUT[atop][atype].pUnaryFunc = pUnaryFunc;
-                    g_UnaryFuncLUT[atop][atype].MaxThreads = 4;
+                    pstUFunc->pOldFunc = oldFunc;
+                    pstUFunc->pUnaryFunc = pUnaryFunc;
+                    pstUFunc->MaxThreads = 4;
                 }
             }
         }
@@ -768,25 +833,52 @@ PyObject* isenabled(PyObject* self, PyObject* args) {
 
 extern "C"
 PyObject * thread_enable(PyObject * self, PyObject * args) {
-    THREADER->NoThreading= FALSE;
+    if (THREADER) THREADER->NoThreading= FALSE;
     RETURN_NONE;
 }
 
 extern "C"
 PyObject * thread_disable(PyObject * self, PyObject * args) {
-    THREADER->NoThreading = TRUE;
+    if (THREADER) THREADER->NoThreading = TRUE;
     RETURN_NONE;
 }
 
 extern "C"
 PyObject * thread_isenabled(PyObject * self, PyObject * args) {
-    if (!THREADER->NoThreading) {
-        Py_XINCREF(Py_True);
-        return Py_True;
+    if (THREADER) {
+        if (!THREADER->NoThreading) {
+            Py_XINCREF(Py_True);
+            return Py_True;
+        }
     }
     Py_XINCREF(Py_False);
     return Py_False;
 }
+
+// Returns previous val
+extern "C"
+PyObject * thread_setworkers(PyObject * self, PyObject * args) {
+    if (THREADER) {
+        int workers = 0;
+        if (!PyArg_ParseTuple(args, "i:thread_setworkers", &workers)) {
+            return NULL;
+        }
+        int previousVal = THREADER->SetFutexWakeup(workers);
+        return PyLong_FromLong((long)previousVal);
+    }
+    // error
+    RETURN_NONE;
+}
+
+extern "C"
+PyObject * thread_getworkers(PyObject * self, PyObject * args) {
+    if (THREADER) {
+        int previousVal = THREADER->GetFutexWakeup();
+        return PyLong_FromLong((long)previousVal);
+    }
+    RETURN_NONE;
+}
+
 
 extern "C"
 PyObject * cpustring(PyObject * self, PyObject * args) {
