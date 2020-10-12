@@ -106,13 +106,13 @@ extern WakeAllAddress g_WakeAllAddress;
 extern WaitAddress g_WaitAddress;
 
 // Callback routine from worker thread
-typedef BOOL(*DOWORK_CALLBACK)(struct stMATH_WORKER_ITEM* pstWorkerItem, int core, int64_t workIndex);
+typedef int64_t(*DOWORK_CALLBACK)(struct stMATH_WORKER_ITEM* pstWorkerItem, int core, int64_t workIndex);
 
 // Callback routine from multithreaded worker thread (items just count up from 0,1,2,...)
-typedef BOOL(*MTWORK_CALLBACK)(void* callbackArg, int core, int64_t workIndex);
+typedef int64_t(*MTWORK_CALLBACK)(void* callbackArg, int core, int64_t workIndex);
 
 // Callback routine from multithreaded chunk thread (0, 65536, 130000, etc.)
-typedef BOOL(*MTCHUNK_CALLBACK)(void* callbackArg, int core, int64_t start, int64_t length);
+typedef int64_t(*MTCHUNK_CALLBACK)(void* callbackArg, int core, int64_t start, int64_t length);
 
 // For auto binning we need to divide bins up amongst multiple thread
 struct stBinCount {
@@ -316,7 +316,7 @@ struct stMATH_WORKER_ITEM {
     // Returns TRUE if it did some work
     // Returns FALSE if it did no work 
     // If core is -1, it is the main thread
-    FORCE_INLINE BOOL DoWork(int core, int64_t workIndex) {
+    FORCE_INLINE int64_t DoWork(int core, int64_t workIndex) {
 
         return DoWorkCallback(this, core, workIndex);
     }
@@ -599,10 +599,10 @@ public:
 
     //------------------------------------------------------------------------------
     //  Concurrent callback from multiple threads
-    static BOOL MultiThreadedCounterCallback(struct stMATH_WORKER_ITEM* pstWorkerItem, int core, int64_t workIndex) {
+    static int64_t MultiThreadedCounterCallback(struct stMATH_WORKER_ITEM* pstWorkerItem, int core, int64_t workIndex) {
         // -1 is the first core
         core = core + 1;
-        BOOL didSomeWork = FALSE;
+        int64_t didSomeWork = 0;
 
         int64_t index;
         int64_t workBlock;
@@ -614,7 +614,7 @@ public:
 
             pstWorkerItem->MTWorkCallback(pstWorkerItem->WorkCallbackArg, core, index);
 
-            didSomeWork = TRUE;
+            didSomeWork++;
             // tell others we completed this work block
             pstWorkerItem->CompleteWorkBlock();
 
@@ -659,10 +659,10 @@ public:
     //  Based on chunk size, each workIndex gets (0, 65536, 130000, etc.)
     // callback sig: typedef BOOL(*MTCHUNK_CALLBACK)(void* callbackArg, int core, int64_t start, int64_t length);
 
-    static BOOL MultiThreadedChunkCallback(struct stMATH_WORKER_ITEM* pstWorkerItem, int core, int64_t workIndex) {
+    static int64_t MultiThreadedChunkCallback(struct stMATH_WORKER_ITEM* pstWorkerItem, int core, int64_t workIndex) {
         // -1 is the first core
         core = core + 1;
-        BOOL didSomeWork = FALSE;
+        int64_t didSomeWork = 0;
 
         int64_t lenX;
         int64_t workBlock;
@@ -673,7 +673,7 @@ public:
 
             pstWorkerItem->MTChunkCallback(pstWorkerItem->WorkCallbackArg, core, start, lenX);
 
-            didSomeWork = TRUE;
+            didSomeWork++;
             // tell others we completed this work block
             pstWorkerItem->CompleteWorkBlock();
         }

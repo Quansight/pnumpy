@@ -73,6 +73,8 @@ static stUFuncToAtop gBinaryMapping[]={
     {"multiply",      BINARY_OPERATION::MUL },
     {"true_divide",   BINARY_OPERATION::DIV },
     {"floor_divide",  BINARY_OPERATION::FLOORDIV },
+    {"minimum",       BINARY_OPERATION::MIN },
+    {"maximum",       BINARY_OPERATION::MAX },
     {"power",         BINARY_OPERATION::POWER },
     {"remainder",     BINARY_OPERATION::REMAINDER },
     {"logical_and",   BINARY_OPERATION::LOGICAL_AND },
@@ -179,13 +181,16 @@ stUFunc  g_UnaryFuncLUT[UNARY_OPERATION::UNARY_LAST][ATOP_LAST];
 
 // set to 0 to disable
 int32_t  g_AtopEnabled = 1;
+int32_t  g_AtopLedgerEnabled = 0;
 
+#define LEDGER_START()    int64_t ledgerStartTime; if (g_AtopLedgerEnabled) ledgerStartTime = __rdtsc();
+#define LEDGER_END()      if (!g_AtopLedgerEnabled) return;ledgerStartTime = __rdtsc() - ledgerStartTime;
 
 
 //------------------------------------------------------------------------------
 //  Concurrent callback from multiple threads
-static BOOL ReduceThreadCallbackStrided(struct stMATH_WORKER_ITEM* pstWorkerItem, int core, int64_t workIndex) {
-    BOOL didSomeWork = FALSE;
+static int64_t ReduceThreadCallbackStrided(struct stMATH_WORKER_ITEM* pstWorkerItem, int core, int64_t workIndex) {
+    int64_t didSomeWork = 0;
     BINARY_CALLBACK* Callback = (BINARY_CALLBACK*)pstWorkerItem->WorkCallbackArg;
 
     char* pDataIn2 = Callback->pDataIn2;
@@ -203,7 +208,7 @@ static BOOL ReduceThreadCallbackStrided(struct stMATH_WORKER_ITEM* pstWorkerItem
         Callback->pReduceFunc(pDataIn2 + inputAdj2, pDataOut + outputAdj, Callback->pStartVal, lenX, Callback->itemSizeIn2);
 
         // Indicate we completed a block
-        didSomeWork = TRUE;
+        didSomeWork++;
 
         // tell others we completed this work block
         pstWorkerItem->CompleteWorkBlock();
@@ -212,11 +217,69 @@ static BOOL ReduceThreadCallbackStrided(struct stMATH_WORKER_ITEM* pstWorkerItem
     return didSomeWork;
 }
 
+//------------------------------------------------------------------------------
+//  Concurrent callback from multiple threads
+static int64_t ReduceThreadCallbackNumpy(struct stMATH_WORKER_ITEM* pstWorkerItem, int core, int64_t workIndex) {
+    int64_t didSomeWork = 0;
+    BINARY_CALLBACK* Callback = (BINARY_CALLBACK*)pstWorkerItem->WorkCallbackArg;
+
+    char* pDataIn2 = Callback->pDataIn2;
+    char* pDataOut = Callback->pDataOut;
+    int64_t lenX;
+    int64_t workBlock;
+
+    // As long as there is work to do
+    while ((lenX = pstWorkerItem->GetNextWorkBlock(&workBlock)) > 0) {
+
+        int64_t inputAdj2 = pstWorkerItem->BlockSize * workBlock * Callback->itemSizeIn2;
+        int64_t outputAdj = workBlock * Callback->itemSizeOut;
+
+        char* args[3];
+        npy_intp dimensions[1];
+        npy_intp steps[3];
+
+        args[0] = args[2] = pDataOut + outputAdj;
+        args[1] = pDataIn2 + inputAdj2;
+        dimensions[0] = lenX;
+        steps[0] = 0;
+        steps[2] = 0;
+        steps[1] = Callback->itemSizeIn2;
+
+        // this is also hackish
+        // to set the start value, which is overloaded as first element in output value
+        switch (Callback->itemSizeOut) {
+        case 1:
+            *(int8_t*)args[0] = *(int8_t*)(Callback->pStartVal);
+            break;
+        case 2:
+            *(int16_t*)args[0] = *(int16_t*)(Callback->pStartVal);
+            break;
+        case 4:
+            *(int32_t*)args[0] = *(int32_t*)(Callback->pStartVal);
+            break;
+        case 8:
+            *(int64_t*)args[0] = *(int64_t*)(Callback->pStartVal);
+            break;
+        }
+
+        LOGGING("[%d] numpy reduce on %lld with len %lld   block: %lld  itemsize: %lld\n", core, workIndex, lenX, workBlock, Callback->itemSizeIn2);
+        Callback->pOldFunc(args, dimensions, steps, NULL);
+
+        // Indicate we completed a block
+        didSomeWork++;
+
+        // tell others we completed this work block
+        pstWorkerItem->CompleteWorkBlock();
+    }
+
+    return didSomeWork;
+}
 
 //------------------------------------------------------------------------------
 //  Concurrent callback from multiple threads
-static BOOL BinaryThreadCallbackStrided(struct stMATH_WORKER_ITEM* pstWorkerItem, int core, int64_t workIndex) {
-    BOOL didSomeWork = FALSE;
+//  For new vectorized routines
+static int64_t BinaryThreadCallbackStrided(struct stMATH_WORKER_ITEM* pstWorkerItem, int core, int64_t workIndex) {
+    int64_t didSomeWork = 0;
     const BINARY_CALLBACK* Callback = (const BINARY_CALLBACK*)pstWorkerItem->WorkCallbackArg;
 
     char* pDataIn1 = Callback->pDataIn1;
@@ -236,7 +299,7 @@ static BOOL BinaryThreadCallbackStrided(struct stMATH_WORKER_ITEM* pstWorkerItem
         Callback->pBinaryFunc(pDataIn1 + inputAdj1, pDataIn2 + inputAdj2, pDataOut + outputAdj, lenX, Callback->itemSizeIn1, Callback->itemSizeIn2, Callback->itemSizeOut);
 
         // Indicate we completed a block
-        didSomeWork = TRUE;
+        didSomeWork++;
 
         // tell others we completed this work block
         pstWorkerItem->CompleteWorkBlock();
@@ -249,8 +312,50 @@ static BOOL BinaryThreadCallbackStrided(struct stMATH_WORKER_ITEM* pstWorkerItem
 
 //------------------------------------------------------------------------------
 //  Concurrent callback from multiple threads
-static BOOL UnaryThreadCallbackOldWay(struct stMATH_WORKER_ITEM* pstWorkerItem, int core, int64_t workIndex) {
-    BOOL didSomeWork = FALSE;
+//  For older numpy existing routines
+static int64_t BinaryThreadCallbackNumpy(struct stMATH_WORKER_ITEM* pstWorkerItem, int core, int64_t workIndex) {
+    int64_t didSomeWork = 0;
+    const BINARY_CALLBACK* Callback = (const BINARY_CALLBACK*)pstWorkerItem->WorkCallbackArg;
+
+    char* pDataIn1 = Callback->pDataIn1;
+    char* pDataIn2 = Callback->pDataIn2;
+    char* pDataOut = Callback->pDataOut;
+    int64_t lenX;
+    int64_t workBlock;
+
+    // As long as there is work to do
+    while ((lenX = pstWorkerItem->GetNextWorkBlock(&workBlock)) > 0) {
+
+        int64_t inputAdj1 = pstWorkerItem->BlockSize * workBlock * Callback->itemSizeIn1;
+        int64_t inputAdj2 = pstWorkerItem->BlockSize * workBlock * Callback->itemSizeIn2;
+        int64_t outputAdj = pstWorkerItem->BlockSize * workBlock * Callback->itemSizeOut;
+
+        char* args[3] = { pDataIn1 + inputAdj1, pDataIn2 + inputAdj2, pDataOut + outputAdj };
+        npy_intp dimensions[3] = { lenX, lenX, lenX };
+
+        // TODO: union this so same in struct
+        npy_intp steps[3] = { Callback->itemSizeIn1, Callback->itemSizeIn2, Callback->itemSizeOut };
+
+        LOGGING("[%d] orig numpy working on %lld with len %lld   block: %lld\n", core, workIndex, lenX, workBlock);
+        Callback->pOldFunc(args, dimensions, steps, NULL);
+
+        // Indicate we completed a block
+        didSomeWork++;
+
+        // tell others we completed this work block
+        pstWorkerItem->CompleteWorkBlock();
+        //printf("|%d %d", core, (int)workBlock);
+    }
+
+    return didSomeWork;
+}
+
+
+//------------------------------------------------------------------------------
+// Concurrent callback from multiple threads
+// This routine is the multithreaded callback for existing numpy unary loops like abs, sqrt, etc.
+static int64_t UnaryThreadCallbackOldWay(struct stMATH_WORKER_ITEM* pstWorkerItem, int core, int64_t workIndex) {
+    int64_t didSomeWork = 0;
     const BINARY_CALLBACK* Callback = (const BINARY_CALLBACK*)pstWorkerItem->WorkCallbackArg;
 
     char* pDataIn1 = Callback->pDataIn1;
@@ -272,7 +377,7 @@ static BOOL UnaryThreadCallbackOldWay(struct stMATH_WORKER_ITEM* pstWorkerItem, 
         Callback->pOldFunc(args, &dimensions, steps, NULL);
 
         // Indicate we completed a block
-        didSomeWork = TRUE;
+        didSomeWork++;
 
         // tell others we completed this work block
         pstWorkerItem->CompleteWorkBlock();
@@ -284,8 +389,8 @@ static BOOL UnaryThreadCallbackOldWay(struct stMATH_WORKER_ITEM* pstWorkerItem, 
 
 //------------------------------------------------------------------------------
 //  Concurrent callback from multiple threads
-static BOOL UnaryThreadCallbackStrided(struct stMATH_WORKER_ITEM* pstWorkerItem, int core, int64_t workIndex) {
-    BOOL didSomeWork = FALSE;
+static int64_t UnaryThreadCallbackStrided(struct stMATH_WORKER_ITEM* pstWorkerItem, int core, int64_t workIndex) {
+    int64_t didSomeWork = 0;
     const BINARY_CALLBACK* Callback = (const BINARY_CALLBACK*)pstWorkerItem->WorkCallbackArg;
 
     char* pDataIn1 = Callback->pDataIn1;
@@ -303,7 +408,7 @@ static BOOL UnaryThreadCallbackStrided(struct stMATH_WORKER_ITEM* pstWorkerItem,
         Callback->pUnaryFunc(pDataIn1 + inputAdj1, pDataOut + outputAdj, lenX, Callback->itemSizeIn1, Callback->itemSizeOut);
 
         // Indicate we completed a block
-        didSomeWork = TRUE;
+        didSomeWork++;
 
         // tell others we completed this work block
         pstWorkerItem->CompleteWorkBlock();
@@ -316,104 +421,148 @@ static BOOL UnaryThreadCallbackStrided(struct stMATH_WORKER_ITEM* pstWorkerItem,
 // For binary math functions like add, sbutract, multiply.
 // 2 inputs and 1 output
 static void AtopBinaryMathFunction(char** args, const npy_intp* dimensions, const npy_intp* steps, void* innerloop, int funcop, int atype) {
-    //LOGGING("called with %d %d   funcp: %p\n", funcop, atype, g_UFuncLUT[funcop][atype].pOldFunc);
-    if (g_AtopEnabled) {
-        npy_intp n = dimensions[0];
-        stMATH_WORKER_ITEM* pWorkItem = THREADER->GetWorkItem(n);
+    LOGGING("called with %d %d   funcp: %p\n", funcop, atype, g_UFuncLUT[funcop][atype].pOldFunc);
+    stUFunc* pstUFunc = &g_UFuncLUT[funcop][atype];
+    npy_intp n = dimensions[0];
+    stMATH_WORKER_ITEM* pWorkItem = THREADER->GetWorkItem(n);
 
-        if (IS_BINARY_REDUCE) {
-            // In a numpy binary reduce, the middle array is the real array
-            REDUCE_FUNC pReduceFunc = g_UFuncLUT[funcop][atype].pReduceFunc;
-            int32_t      maxThreads = g_UFuncLUT[funcop][atype].MaxThreads;
+    if (IS_BINARY_REDUCE) {
+        // In a numpy binary reduce, the middle array is the real array
+        REDUCE_FUNC pReduceFunc = pstUFunc->pReduceFunc;
 
-            //printf("pReduce %p   opcode:%d   dtype:%d   %lld %lld %lld %lld\n", pReduceFunc, funcop, atype, (long long)dimensions[1], (long long)steps[0], (long long)steps[1], (long long)steps[2]);
-            if (pReduceFunc) {
-                char* ip2 = (char*)args[1];
-                char* op1 = (char*)args[2];
-                if (!pWorkItem) {
-                    pReduceFunc(ip2, op1, op1, n, steps[1]);
-                }
-                else {
-                    const int64_t maxStackAlloc = 1024 * 1024;  // 1 MB
-                    int64_t itemsize = convert_atop_to_itemsize[atype];
-                    int64_t chunks = 1 + (n -1)  / THREADER->WORK_ITEM_CHUNK;
-                    int64_t allocsize = chunks * itemsize;
-
-                    // try to alloc on stack for speed
-                    char* pSumOfSums = allocsize > maxStackAlloc ? (char*)WORKSPACE_ALLOC(allocsize) : (char*)alloca(allocsize);
-
-                    BINARY_CALLBACK stCallback;
-
-                    // Each thread will call this routine with the callbackArg
-                    pWorkItem->DoWorkCallback = ReduceThreadCallbackStrided;
-                    pWorkItem->WorkCallbackArg = &stCallback;
-
-                    stCallback.pReduceFunc = pReduceFunc;
-
-                    // Also pass in original data out since it is used as starting value
-                    stCallback.pStartVal = op1;
-
-                    // Create a data out for each work chunk
-                    stCallback.pDataOut = pSumOfSums;
-                    stCallback.pDataIn2 = ip2;
-                    stCallback.itemSizeIn2 = steps[1];
-                    stCallback.itemSizeOut = itemsize; // sizeof(T)
-
-                    // This will notify the worker threads of a new work item
-                    // most functions are so fast, we do not need more than 4 worker threads
-                    THREADER->WorkMain(pWorkItem, n, maxThreads);
-                    pReduceFunc(pSumOfSums, op1, op1, chunks, itemsize);
-
-                    // Free if not on the stack
-                    if (allocsize > maxStackAlloc) WORKSPACE_FREE(pSumOfSums);
-                }
-                return;
+        LOGGING("pReduce %p   opcode:%d   dtype:%d   %lld %lld %lld %lld\n", pReduceFunc, funcop, atype, (long long)dimensions[1], (long long)steps[0], (long long)steps[1], (long long)steps[2]);
+        char* ip2 = (char*)args[1];
+        char* op1 = (char*)args[2];
+        if (!pWorkItem) {
+            if (g_AtopEnabled && pReduceFunc) {
+                // Call fast vectorized function without any threading
+                pReduceFunc(ip2, op1, op1, n, steps[1]);
+            }
+            else {
+                // Call the original numpy function without any threading
+                pstUFunc->pOldFunc(args, dimensions, steps, innerloop);
             }
         }
         else {
-            ANY_TWO_FUNC pBinaryFunc = g_UFuncLUT[funcop][atype].pBinaryFunc;
-            int32_t      maxThreads = g_UFuncLUT[funcop][atype].MaxThreads;
+            // Threaded
+            const int64_t maxStackAlloc = 1024 * 1024;  // 1 MB
+            int64_t itemsize = convert_atop_to_itemsize[atype];
+            int64_t chunks = 1 + ((n -1)  / THREADER->WORK_ITEM_CHUNK);
+            int64_t allocsize = chunks * itemsize;
 
-            if (pBinaryFunc) {
-                char* ip1 = (char*)args[0];
-                char* ip2 = (char*)args[1];
-                char* op1 = (char*)args[2];
-                // For a scalar first is1 ==0
-                // For a scalar second is2 == 0
-                npy_intp is1 = steps[0], is2 = steps[1], os1 = steps[2];
-                npy_intp n = dimensions[0];
+            // try to alloc on stack for speed
+            char* pReduceOfReduce = allocsize > maxStackAlloc ? (char*)WORKSPACE_ALLOC(allocsize) : (char*)alloca(allocsize);
 
-                if (!pWorkItem) {
-                    pBinaryFunc(ip1, ip2, op1, (int64_t)n, (int64_t)is1, (int64_t)is2, (int64_t)os1);
-                }
-                else {
-                    BINARY_CALLBACK stCallback;
+            BINARY_CALLBACK stCallback;
 
-                    // Each thread will call this routine with the callbackArg
-                    pWorkItem->DoWorkCallback = BinaryThreadCallbackStrided;
-                    pWorkItem->WorkCallbackArg = &stCallback;
+            // Also pass in original data out since it is used as starting value
+            stCallback.pStartVal = op1;
 
-                    stCallback.pBinaryFunc = pBinaryFunc;
-                    stCallback.pDataOut = op1;
-                    stCallback.pDataIn1 = ip1;
-                    stCallback.pDataIn2 = ip2;
-                    stCallback.itemSizeIn1 = is1;
-                    stCallback.itemSizeIn2 = is2;
-                    stCallback.itemSizeOut = os1;
+            // Create a data out for each work chunk
+            stCallback.pDataOut = pReduceOfReduce;
+            stCallback.pDataIn2 = ip2;
+            stCallback.itemSizeIn2 = steps[1];
+            stCallback.itemSizeOut = itemsize; // sizeof(T)
 
-                    // This will notify the worker threads of a new work item
-                    // most functions are so fast, we do not need more than 4 worker threads
-                    THREADER->WorkMain(pWorkItem, n, maxThreads);
+            pWorkItem->WorkCallbackArg = &stCallback;
 
-                }
-                return;
+            // Each thread will call this routine with the callbackArg
+            if (g_AtopEnabled && pReduceFunc) {
+                stCallback.pReduceFunc = pReduceFunc;
+                pWorkItem->DoWorkCallback = ReduceThreadCallbackStrided;
+
+                // This will notify the worker threads of a new work item
+                // most functions are so fast, we do not need more than 4 worker threads
+                THREADER->WorkMain(pWorkItem, n, pstUFunc->MaxThreads);
+                pReduceFunc(pReduceOfReduce, op1, op1, chunks, itemsize);
+            }
+            else {
+                // A binary reduce for original numpy routine
+                //
+                stCallback.pOldFunc = pstUFunc->pOldFunc;
+                pWorkItem->DoWorkCallback = ReduceThreadCallbackNumpy;
+
+                // This will notify the worker threads of a new work item
+                // most functions are so fast, we do not need more than 4 worker threads
+                THREADER->WorkMain(pWorkItem, n, pstUFunc->MaxThreads);
+
+                // Finish it...
+                // Now perform same function over all the threaded results
+                char* args[3];
+
+                // possible bug -- check how big dimensions is for reduce
+                npy_intp dimensions[1];
+                npy_intp steps[3];
+
+                args[0] = args[2] = op1;
+                args[1] = pReduceOfReduce;
+
+                // toodo, check if only 1 dimension for reduce
+                dimensions[0] = chunks;
+                steps[0] = 0;
+                steps[2] = 0;
+                steps[1] = itemsize;
+
+                pstUFunc->pOldFunc(args, dimensions, steps, innerloop);
+            }
+            // Free if not on the stack
+            if (allocsize > maxStackAlloc) WORKSPACE_FREE(pReduceOfReduce);
+        }
+        return;
+    }
+    else {
+        // NOT a binary reduce
+        ANY_TWO_FUNC pBinaryFunc = pstUFunc->pBinaryFunc;
+
+        char* ip1 = (char*)args[0];
+        char* ip2 = (char*)args[1];
+        char* op1 = (char*)args[2];
+        // For a scalar first is1 ==0
+        // For a scalar second is2 == 0
+        npy_intp is1 = steps[0], is2 = steps[1], os1 = steps[2];
+        npy_intp n = dimensions[0];
+
+        if (!pWorkItem) {
+            if (g_AtopEnabled && pBinaryFunc) {
+                pBinaryFunc(ip1, ip2, op1, (int64_t)n, (int64_t)is1, (int64_t)is2, (int64_t)os1);
+            }
+            else {
+                // Call the original numpy function without any threading
+                pstUFunc->pOldFunc(args, dimensions, steps, innerloop);
             }
         }
-        // Thread it the old way
-        //g_UFuncLUT[funcop][atype].pOldFunc(args, dimensions, steps, innerloop);
-        //return;
+        else {
+            BINARY_CALLBACK stCallback;
+
+            stCallback.pDataOut = op1;
+            stCallback.pDataIn1 = ip1;
+            stCallback.pDataIn2 = ip2;
+            stCallback.itemSizeIn1 = is1;
+            stCallback.itemSizeIn2 = is2;
+            stCallback.itemSizeOut = os1;
+
+            if (g_AtopEnabled && pBinaryFunc) {
+                stCallback.pBinaryFunc = pBinaryFunc;
+
+                // Each thread will call this routine with the callbackArg
+                pWorkItem->DoWorkCallback = BinaryThreadCallbackStrided;
+            }
+            else {
+                stCallback.pOldFunc = pstUFunc->pOldFunc;
+
+                // Each thread will call this routine with the callbackArg
+                pWorkItem->DoWorkCallback = BinaryThreadCallbackNumpy;
+
+            }
+
+            pWorkItem->WorkCallbackArg = &stCallback;
+
+            // This will notify the worker threads of a new work item
+            // most functions are so fast, we do not need more than 4 worker threads
+            THREADER->WorkMain(pWorkItem, n, pstUFunc->MaxThreads);
+        }
+        return;
     }
-    g_UFuncLUT[funcop][atype].pOldFunc(args, dimensions, steps, innerloop);
 };
 
 
@@ -421,13 +570,12 @@ static void AtopBinaryMathFunction(char** args, const npy_intp* dimensions, cons
 // 2 inputs and 1 output
 static void AtopCompareMathFunction(char** args, const npy_intp* dimensions, const npy_intp* steps, void* innerloop, int funcop, int atype) {
     // LOGGING("comparison called with %d %d   funcp: %p  len: %lld\n", funcop, atype, g_CompFuncLUT[funcop][atype].pOldFunc, (long long)dimensions[0]);
+    stUFunc* pstUFunc = &g_CompFuncLUT[funcop][atype];
 
     if (g_AtopEnabled) {
-        ANY_TWO_FUNC pBinaryFunc = g_CompFuncLUT[funcop][atype].pBinaryFunc;
+        ANY_TWO_FUNC pBinaryFunc = pstUFunc->pBinaryFunc;
 
         if (pBinaryFunc) {
-            int32_t      maxThreads = g_CompFuncLUT[funcop][atype].MaxThreads;
-
             char* ip1 = (char*)args[0];
             char* ip2 = (char*)args[1];
             char* op1 = (char*)args[2];
@@ -439,17 +587,13 @@ static void AtopCompareMathFunction(char** args, const npy_intp* dimensions, con
 
             stMATH_WORKER_ITEM* pWorkItem = THREADER->GetWorkItem(n);
 
-            if (pWorkItem == NULL) {
+            if (!pWorkItem) {
 
                 // Threading not allowed for this work item, call it directly from main thread
                 pBinaryFunc(ip1, ip2, op1, n, is1, is2, os1);
             }
             else {
                 BINARY_CALLBACK stCallback;
-
-                // Each thread will call this routine with the callbackArg
-                pWorkItem->DoWorkCallback = BinaryThreadCallbackStrided;
-                pWorkItem->WorkCallbackArg = &stCallback;
 
                 stCallback.pBinaryFunc = pBinaryFunc;
                 stCallback.pDataOut = op1;
@@ -459,15 +603,19 @@ static void AtopCompareMathFunction(char** args, const npy_intp* dimensions, con
                 stCallback.itemSizeIn2 = is2;
                 stCallback.itemSizeOut = os1;
 
+                // Each thread will call this routine with the callbackArg
+                pWorkItem->DoWorkCallback = BinaryThreadCallbackStrided;
+                pWorkItem->WorkCallbackArg = &stCallback;
+
                 // This will notify the worker threads of a new work item
                 // most functions are so fast, we do not need more than 4 worker threads
-                THREADER->WorkMain(pWorkItem, n, maxThreads);
+                THREADER->WorkMain(pWorkItem, n, pstUFunc->MaxThreads);
             }
             return;
         }
     }
     // old way
-    g_CompFuncLUT[funcop][atype].pOldFunc(args, dimensions, steps, innerloop);
+    pstUFunc->pOldFunc(args, dimensions, steps, innerloop);
 
 };
 
@@ -484,7 +632,6 @@ static void AtopUnaryMathFunction(char** args, const npy_intp* dimensions, const
         UNARY_FUNC pUnaryFunc = pstUFunc->pUnaryFunc;
 
         if (pUnaryFunc) {
-            int32_t    maxThreads = pstUFunc->MaxThreads;
             stMATH_WORKER_ITEM* pWorkItem = THREADER->GetWorkItem(n);
 
             char* ip1 = (char*)args[0];
@@ -499,19 +646,19 @@ static void AtopUnaryMathFunction(char** args, const npy_intp* dimensions, const
             else {
                 BINARY_CALLBACK stCallback;
 
-                // Each thread will call this routine with the callbackArg
-                pWorkItem->DoWorkCallback = UnaryThreadCallbackStrided;
-                pWorkItem->WorkCallbackArg = &stCallback;
-
                 stCallback.pUnaryFunc = pUnaryFunc;
                 stCallback.pDataOut = op1;
                 stCallback.pDataIn1 = ip1;
                 stCallback.itemSizeIn1 = is1;
                 stCallback.itemSizeOut = os1;
 
+                // Each thread will call this routine with the callbackArg
+                pWorkItem->DoWorkCallback = UnaryThreadCallbackStrided;
+                pWorkItem->WorkCallbackArg = &stCallback;
+
                 // This will notify the worker threads of a new work item
                 // most functions are so fast, we do not need more than 4 worker threads
-                THREADER->WorkMain(pWorkItem, n, maxThreads);
+                THREADER->WorkMain(pWorkItem, n, pstUFunc->MaxThreads);
 
             }
             return;
@@ -535,23 +682,23 @@ static void AtopUnaryMathFunction(char** args, const npy_intp* dimensions, const
 
         BINARY_CALLBACK stCallback;
 
-        // Each thread will call this routine with the callbackArg
-        pWorkItem->DoWorkCallback = UnaryThreadCallbackOldWay;
-        pWorkItem->WorkCallbackArg = &stCallback;
-
-        int32_t      maxThreads = pstUFunc->MaxThreads;
         stCallback.pOldFunc = pstUFunc->pOldFunc;
         stCallback.pDataOut = op1;
         stCallback.pDataIn1 = ip1;
         stCallback.itemSizeIn1 = is1;
         stCallback.itemSizeOut = os1;
 
+        // Each thread will call this routine with the callbackArg
+        pWorkItem->DoWorkCallback = UnaryThreadCallbackOldWay;
+        pWorkItem->WorkCallbackArg = &stCallback;
+
         // This will notify the worker threads of a new work item
         // most functions are so fast, we do not need more than 4 worker threads
-        THREADER->WorkMain(pWorkItem, n, maxThreads);
+        THREADER->WorkMain(pWorkItem, n, pstUFunc->MaxThreads);
     }
 };
 
+// the inclusion of this file is because there is no callback argument
 #include "stubs.h"
 
 template <class T>
@@ -604,7 +751,7 @@ PyObject* oldinit(PyObject *self, PyObject *args, PyObject *kwargs) {
     PyUFuncGenericFunction oldfunc, newfunc;
     // C++ warns on assigning const char * to char *
 
-    if (!PyArg_ParseTuple(args, "s:initialize", &uname)) {
+    if (!PyArg_ParseTuple(args, "s:oldinit", &uname)) {
         return NULL;
     }
 

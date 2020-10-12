@@ -59,6 +59,8 @@ static const inline void STOREA(__m256i* x, __m256i y) { _mm256_store_si256((__m
 template<typename T> static const inline T AddOp(T x, T y) { return x + y; }
 template<typename T> static const inline T SubOp(T x, T y) { return x - y; }
 template<typename T> static const inline T MulOp(T x, T y) { return x * y; }
+template<typename T> static const inline T MinOp(T x, T y) { return x < y? x : y; }
+template<typename T> static const inline T MaxOp(T x, T y) { return x > y? x : y; }
 template<typename T> static const inline double DivOp(T x, T y) { return (double)x / (double)y; }
 template<typename T> static const inline float DivOp(float x, T y) { return x / y; }
 
@@ -92,6 +94,24 @@ static const inline __m256i MUL_OP_256i32(__m256i x, __m256i y) { return _mm256_
 static const inline __m256  DIV_OP_256f32(__m256 x, __m256 y) { return _mm256_div_ps(x, y); }
 static const inline __m256d DIV_OP_256f64(__m256d x, __m256d y) { return _mm256_div_pd(x, y); }
 static const inline __m256d CONV_INT32_DOUBLE(__m128i* x) { return _mm256_cvtepi32_pd(*x); }
+
+static const inline __m256i MIN_OP_256i8(__m256i x, __m256i y) { return _mm256_min_epi8(x, y); }
+static const inline __m256i MIN_OP_256u8(__m256i x, __m256i y) { return _mm256_min_epu8(x, y); }
+static const inline __m256i MIN_OP_256u16(__m256i x, __m256i y) { return _mm256_min_epu16(x, y); }
+static const inline __m256i MIN_OP_256i16(__m256i x, __m256i y) { return _mm256_min_epi16(x, y); }
+static const inline __m256i MIN_OP_256i32(__m256i x, __m256i y) { return _mm256_min_epi32(x, y); }
+static const inline __m256i MIN_OP_256u32(__m256i x, __m256i y) { return _mm256_min_epu32(x, y); }
+static const inline __m256  MIN_OP_256f32(__m256 x, __m256 y) { return _mm256_min_ps(x, y); }
+static const inline __m256d MIN_OP_256f64(__m256d x, __m256d y) { return _mm256_min_pd(x, y); }
+
+static const inline __m256i MAX_OP_256i8(__m256i x, __m256i y) { return _mm256_max_epi8(x, y); }
+static const inline __m256i MAX_OP_256u8(__m256i x, __m256i y) { return _mm256_max_epu8(x, y); }
+static const inline __m256i MAX_OP_256u16(__m256i x, __m256i y) { return _mm256_max_epu16(x, y); }
+static const inline __m256i MAX_OP_256i16(__m256i x, __m256i y) { return _mm256_max_epi16(x, y); }
+static const inline __m256i MAX_OP_256i32(__m256i x, __m256i y) { return _mm256_max_epi32(x, y); }
+static const inline __m256i MAX_OP_256u32(__m256i x, __m256i y) { return _mm256_max_epu32(x, y); }
+static const inline __m256  MAX_OP_256f32(__m256 x, __m256 y) { return _mm256_max_ps(x, y); }
+static const inline __m256d MAX_OP_256f64(__m256d x, __m256d y) { return _mm256_max_pd(x, y); }
 
 // mask off low 32bits
 static const __m256i masklo = _mm256_set1_epi64x(0xFFFFFFFFLL);
@@ -173,6 +193,8 @@ inline void ReduceMathOpFast(void* pDataIn1X, void* pDataOutX, void* pStartVal, 
     }
     *pDataOut = startval;
 }
+
+
 
 
 //=====================================================================================================
@@ -667,6 +689,28 @@ ANY_TWO_FUNC GetSimpleMathOpFast(int func, int atopInType1, int atopInType2, int
         }
         return NULL;
 
+    case BINARY_OPERATION::MIN:
+        *wantedOutType = atopInType1;
+        switch (atopInType1) {
+        case ATOP_INT8:  return SimpleMathOpFast<int8_t, __m256i, MinOp<int8_t>, MIN_OP_256i8>;
+        case ATOP_INT16:  return SimpleMathOpFast<int16_t, __m256i, MinOp<int16_t>, MIN_OP_256i16>;
+        case ATOP_INT32:  return SimpleMathOpFast<int32_t, __m256i, MinOp<int32_t>, MIN_OP_256i32>;
+        case ATOP_FLOAT:  return SimpleMathOpFast<float, __m256, MinOp<float>, MIN_OP_256f32>;
+        case ATOP_DOUBLE: return SimpleMathOpFast<double, __m256d, MinOp<double>, MIN_OP_256f64>;
+        }
+        return NULL;
+
+    case BINARY_OPERATION::MAX:
+        *wantedOutType = atopInType1;
+        switch (atopInType1) {
+        case ATOP_INT8:  return SimpleMathOpFast<int8_t, __m256i, MaxOp<int8_t>, MAX_OP_256i8>;
+        case ATOP_INT16:  return SimpleMathOpFast<int16_t, __m256i, MaxOp<int16_t>, MAX_OP_256i16>;
+        case ATOP_INT32:  return SimpleMathOpFast<int32_t, __m256i, MaxOp<int32_t>, MAX_OP_256i32>;
+        case ATOP_FLOAT:  return SimpleMathOpFast<float, __m256, MaxOp<float>, MAX_OP_256f32>;
+        case ATOP_DOUBLE: return SimpleMathOpFast<double, __m256d, MaxOp<double>, MAX_OP_256f64>;
+        }
+        return NULL;
+
     case BINARY_OPERATION::LOGICAL_AND:
         *wantedOutType = atopInType1;
         switch (atopInType1) {
@@ -734,12 +778,12 @@ extern "C"
 REDUCE_FUNC GetReduceMathOpFast(int func, int atopInType1) {
 
     switch (func) {
+    // The reduce for ADD is SUM
     case BINARY_OPERATION::ADD:
         switch (atopInType1) {
         case ATOP_BOOL:   return ReduceMathOpFast<int8_t, __m256i, OrOp<int8_t>, OR_OP_256>;
         case ATOP_FLOAT:  return ReduceMathOpFast<float, __m256, AddOp<float>, ADD_OP_256f32>;
         case ATOP_DOUBLE: return ReduceMathOpFast<double, __m256d, AddOp<double>, ADD_OP_256f64>;
-            // proof of concept for i32 addition loop
         case ATOP_INT32:  return ReduceMathOpFast<int32_t, __m256i, AddOp<int32_t>, ADD_OP_256i32>;
         case ATOP_INT64:  return ReduceMathOpFast<int64_t, __m256i, AddOp<int64_t>, ADD_OP_256i64>;
         case ATOP_INT16:  return ReduceMathOpFast<int16_t, __m256i, AddOp<int16_t>, ADD_OP_256i16>;
@@ -747,22 +791,48 @@ REDUCE_FUNC GetReduceMathOpFast(int func, int atopInType1) {
         }
         return NULL;
 
+    // The reduce for MUL is PROD
     case BINARY_OPERATION::MUL:
         switch (atopInType1) {
         case ATOP_BOOL:   return ReduceMathOpFast<int8_t, __m256i, AndOp<int8_t>, AND_OP_256>;
         case ATOP_FLOAT:  return ReduceMathOpFast<float, __m256, MulOp<float>, MUL_OP_256f32>;
         case ATOP_DOUBLE: return ReduceMathOpFast<double, __m256d, MulOp<double>, MUL_OP_256f64>;
         case ATOP_INT32:  return ReduceMathOpFast<int32_t, __m256i, MulOp<int32_t>, MUL_OP_256i32>;
-
         case ATOP_INT16:  return ReduceMathOpFast<int16_t, __m256i, MulOp<int16_t>, MUL_OP_256i16>;
-
-            // Below the intrinsic to multiply is slower so we disabled it (really wants 32bit -> 64bit)
-            //CASE_ATOP_UINT32:  return SimpleMathOpFastMul<UINT32, __m256i>;
-            // TODO: 64bit multiply can be done with algo..
-            // lo1 * lo2 + (lo1 * hi2) << 32 + (hi1 *lo2) << 32)
         case ATOP_UINT64: return ReduceMathOpFast<uint64_t, __m256i, MulOp<uint64_t>, MUL_OP_256u64>;
         }
         return NULL;
+
+    case BINARY_OPERATION::MIN:
+        switch (atopInType1) {
+        case ATOP_BOOL:   return ReduceMathOpFast<int8_t, __m256i, MinOp<int8_t>, MIN_OP_256i8>;
+        case ATOP_FLOAT:  return ReduceMathOpFast<float, __m256, MinOp<float>, MIN_OP_256f32>;
+        case ATOP_DOUBLE: return ReduceMathOpFast<double, __m256d, MinOp<double>, MIN_OP_256f64>;
+        case ATOP_INT8:  return ReduceMathOpFast<int8_t, __m256i, MinOp<int8_t>, MIN_OP_256i8>;
+        case ATOP_INT16:  return ReduceMathOpFast<int16_t, __m256i, MinOp<int16_t>, MIN_OP_256i16>;
+        case ATOP_INT32:  return ReduceMathOpFast<int32_t, __m256i, MinOp<int32_t>, MIN_OP_256i32>;
+        case ATOP_UINT8:  return ReduceMathOpFast<uint8_t, __m256i, MinOp<uint8_t>, MIN_OP_256u8>;
+        case ATOP_UINT16:  return ReduceMathOpFast<uint16_t, __m256i, MinOp<uint16_t>, MIN_OP_256u16>;
+        case ATOP_UINT32:  return ReduceMathOpFast<uint32_t, __m256i, MinOp<uint32_t>, MIN_OP_256u32>;
+            // NOTE for i64 have to use cmp_gt then use boolmask
+        }
+        return NULL;
+
+    case BINARY_OPERATION::MAX:
+        switch (atopInType1) {
+        case ATOP_BOOL:   return ReduceMathOpFast<int8_t, __m256i, MaxOp<int8_t>, MAX_OP_256i8>;
+        case ATOP_FLOAT:  return ReduceMathOpFast<float, __m256, MaxOp<float>, MAX_OP_256f32>;
+        case ATOP_DOUBLE: return ReduceMathOpFast<double, __m256d, MaxOp<double>, MAX_OP_256f64>;
+        case ATOP_INT8:  return ReduceMathOpFast<int8_t, __m256i, MaxOp<int8_t>, MAX_OP_256i8>;
+        case ATOP_INT16:  return ReduceMathOpFast<int16_t, __m256i, MaxOp<int16_t>, MAX_OP_256i16>;
+        case ATOP_INT32:  return ReduceMathOpFast<int32_t, __m256i, MaxOp<int32_t>, MAX_OP_256i32>;
+        case ATOP_UINT8:  return ReduceMathOpFast<uint8_t, __m256i, MaxOp<uint8_t>, MAX_OP_256u8>;
+        case ATOP_UINT16:  return ReduceMathOpFast<uint16_t, __m256i, MaxOp<uint16_t>, MAX_OP_256u16>;
+        case ATOP_UINT32:  return ReduceMathOpFast<uint32_t, __m256i, MaxOp<uint32_t>, MAX_OP_256u32>;
+            // NOTE for i64 have to use cmp_gt then use boolmask
+        }
+        return NULL;
+
     }
     return NULL;
 }

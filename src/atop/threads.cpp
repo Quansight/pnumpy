@@ -105,7 +105,7 @@ WorkerThreadFunction(void* lpParam)
         workIndex = pWorkerRing->WorkIndex;
         workIndexCompleted = pWorkerRing->WorkIndexCompleted;
 
-        BOOL didSomeWork = FALSE;
+        int64_t didSomeWork = 0;
 
         // See if work to do
         if (workIndex > workIndexCompleted) {
@@ -123,10 +123,16 @@ WorkerThreadFunction(void* lpParam)
             }
 #else
             didSomeWork = pWorkItem->DoWork(core, workIndex);
-
 #endif
         }
 
+        // didSomeWork contains how many work items the thread completed
+        // TODO: Use core as an index to keep stats track of how many
+        // work items each thread is completing for future thread tuning
+        //
+        // NOTE: if we did some work, we loop back to top while to check for more work
+        // before waiting again on the worker Q
+        //
         if (!didSomeWork) {
             workIndexCompleted = workIndex;
 
