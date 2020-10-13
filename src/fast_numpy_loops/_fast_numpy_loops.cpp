@@ -339,7 +339,7 @@ static int64_t BinaryThreadCallbackNumpy(struct stMATH_WORKER_ITEM* pstWorkerIte
         npy_intp dimensions[3] = { lenX, lenX, lenX };
 
         LOGGING("[%d] orig numpy working on %lld with len %lld   block: %lld\n", core, workIndex, lenX, workBlock);
-        Callback->pOldFunc(args, dimensions, Callback->steps, NULL);
+        Callback->pOldFunc(args, dimensions, (npy_intp*)(Callback->steps), NULL);
 
         // Indicate we completed a block
         didSomeWork++;
@@ -934,19 +934,19 @@ PyObject* newinit(PyObject* self, PyObject* args, PyObject* kwargs) {
 }
 
 extern "C"
-PyObject * enable(PyObject * self, PyObject * args) {
+PyObject * atop_enable(PyObject * self, PyObject * args) {
     g_AtopEnabled = TRUE;
     RETURN_NONE;
 }
 
 extern "C"
-PyObject * disable(PyObject * self, PyObject * args) {
+PyObject * atop_disable(PyObject * self, PyObject * args) {
     g_AtopEnabled = FALSE;
     RETURN_NONE;
 }
 
 extern "C"
-PyObject* isenabled(PyObject* self, PyObject* args) {
+PyObject* atop_isenabled(PyObject* self, PyObject* args) {
     if (g_AtopEnabled) {
         Py_XINCREF(Py_True);
         return Py_True;

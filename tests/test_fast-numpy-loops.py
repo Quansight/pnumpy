@@ -3,18 +3,18 @@ import fast_numpy_loops as fn
 
 def test_enable():
     # enable/disable return the previous value
-    old = fn.isenabled()
-    fn.enable()
-    assert fn.isenabled() == True
-    fn.disable()
-    assert fn.isenabled() == False
+    old = fn.atop_isenabled()
+    fn.atop_enable()
+    assert fn.atop_isenabled() == True
+    fn.atop_disable()
+    assert fn.atop_isenabled() == False
 
     # restore prior state
     if old:
-        fn.enable()
+        fn.atop_enable()
     else:
-        fn.disable()
-    assert fn.isenabled() == old
+        fn.atop_disable()
+    assert fn.atop_isenabled() == old
 
 def test_result(rng):
     print('numpy version', np.__version__)
