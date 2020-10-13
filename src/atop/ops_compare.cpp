@@ -179,6 +179,15 @@ template<typename T> FORCE_INLINE const __m256i COMP8i_LT(T x, T y, T mask1) { r
 template<typename T> FORCE_INLINE const __m256i COMP8i_GE(T x, T y, T mask1) { return _mm256_xor_si256(_mm256_and_si256(_mm256_cmpgt_epi8(y, x), mask1), mask1); }
 template<typename T> FORCE_INLINE const __m256i COMP8i_LE(T x, T y, T mask1) { return _mm256_xor_si256(_mm256_and_si256(_mm256_cmpgt_epi8(x, y), mask1), mask1); }
 
+// For bools we have to clamp values to 1 or 0 using min_epu8
+template<typename T> FORCE_INLINE const __m256i COMPBool_EQ(T x, T y, T mask1) { return _mm256_and_si256(_mm256_cmpeq_epi8(_mm256_min_epu8(x, mask1), _mm256_min_epu8(y, mask1)), mask1); }
+template<typename T> FORCE_INLINE const __m256i COMPBool_NE(T x, T y, T mask1) { return _mm256_xor_si256(_mm256_and_si256(_mm256_cmpeq_epi8(_mm256_min_epu8(x, mask1), _mm256_min_epu8(y, mask1)), mask1), mask1); }
+template<typename T> FORCE_INLINE const __m256i COMPBool_GT(T x, T y, T mask1) { return _mm256_and_si256(_mm256_cmpgt_epi8(_mm256_min_epu8(x, mask1), _mm256_min_epu8(y, mask1)), mask1); }
+template<typename T> FORCE_INLINE const __m256i COMPBool_LT(T x, T y, T mask1) { return _mm256_and_si256(_mm256_cmpgt_epi8(_mm256_min_epu8(y, mask1), _mm256_min_epu8(x, mask1)), mask1); }
+template<typename T> FORCE_INLINE const __m256i COMPBool_GE(T x, T y, T mask1) { return _mm256_xor_si256(_mm256_and_si256(_mm256_cmpgt_epi8(_mm256_min_epu8(y, mask1), _mm256_min_epu8(x, mask1)), mask1), mask1); }
+template<typename T> FORCE_INLINE const __m256i COMPBool_LE(T x, T y, T mask1) { return _mm256_xor_si256(_mm256_and_si256(_mm256_cmpgt_epi8(_mm256_min_epu8(x, mask1), _mm256_min_epu8(y, mask1)), mask1), mask1); }
+
+
 // This will compute 16 x int16 comparison at a time
 template<typename T> FORCE_INLINE const __m128i COMP16i_EQ(T x1, T y1, T mask1) {
     __m256i m0 = _mm256_and_si256(_mm256_cmpeq_epi16(x1, y1), mask1);
@@ -225,6 +234,13 @@ template<typename T> FORCE_INLINE const bool COMP_GE(T X, T Y) { return (X >= Y)
 template<typename T> FORCE_INLINE const bool COMP_LT(T X, T Y) { return (X < Y); }
 template<typename T> FORCE_INLINE const bool COMP_LE(T X, T Y) { return (X <= Y); }
 template<typename T> FORCE_INLINE const bool COMP_NE(T X, T Y) { return (X != Y); }
+
+template<typename T> FORCE_INLINE const bool COMPB_EQ(T X, T Y) { return ((X && Y) || (!X && !Y)) ? 1: 0; }
+template<typename T> FORCE_INLINE const bool COMPB_GT(T X, T Y) { return (X && !Y) ? 1 : 0; }
+template<typename T> FORCE_INLINE const bool COMPB_GE(T X, T Y) { return (Y && !X) ? 0: 1; }
+template<typename T> FORCE_INLINE const bool COMPB_LT(T X, T Y) { return (Y && !X) ? 1: 0; }
+template<typename T> FORCE_INLINE const bool COMPB_LE(T X, T Y) { return (X && !Y) ? 0: 1; }
+template<typename T> FORCE_INLINE const bool COMPB_NE(T X, T Y) { return ((X && Y) || (!X && !Y)) ? 0: 1; }
 
 // Comparing int64_t to uint64_t
 template<typename T> FORCE_INLINE const bool COMP_GT_INT64(T X, T Y) { if ((X | Y) & 0x8000000000000000) return FALSE; return (X > Y); }
@@ -1063,8 +1079,16 @@ ANY_TWO_FUNC GetComparisonOpFast(int func, int atopInType1, int atopInType2, int
         }
         break;
     case ATOP_BOOL:
-        // TJD: TODO - special compare
-        break;
+        // TJD: special compares for booleans
+        switch (func) {
+        case COMP_OPERATION::CMP_EQ:      return CompareInt8<COMPBool_EQ<__m256i>, COMPB_EQ>;
+        case COMP_OPERATION::CMP_NE:      return CompareInt8<COMPBool_NE<__m256i>, COMPB_NE>;
+        case COMP_OPERATION::CMP_GT:      return CompareInt8<COMPBool_GT<__m256i>, COMPB_GT>;
+        case COMP_OPERATION::CMP_GTE:     return CompareInt8<COMPBool_GE<__m256i>, COMPB_GE>;
+        case COMP_OPERATION::CMP_LT:      return CompareInt8<COMPBool_LT<__m256i>, COMPB_LT>;
+        case COMP_OPERATION::CMP_LTE:     return CompareInt8<COMPBool_LE<__m256i>, COMPB_LE>;
+        }
+        //break;
     case ATOP_INT8:
         switch (func) {
         case COMP_OPERATION::CMP_EQ:      return CompareInt8<COMP8i_EQ<__m256i>, COMP_EQ>;
