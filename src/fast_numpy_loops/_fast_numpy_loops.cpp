@@ -73,8 +73,8 @@ static stUFuncToAtop gBinaryMapping[]={
     {"multiply",      BINARY_OPERATION::MUL },
     {"true_divide",   BINARY_OPERATION::DIV },
     {"floor_divide",  BINARY_OPERATION::FLOORDIV },
-    {"minimum",       BINARY_OPERATION::MIN },
-    {"maximum",       BINARY_OPERATION::MAX },
+    //{"minimum",       BINARY_OPERATION::MIN },
+    //{"maximum",       BINARY_OPERATION::MAX },
     {"power",         BINARY_OPERATION::POWER },
     {"remainder",     BINARY_OPERATION::REMAINDER },
     {"logical_and",   BINARY_OPERATION::LOGICAL_AND },
@@ -104,24 +104,24 @@ static stUFuncToAtop gUnaryMapping[] = {
     {"ceil",          UNARY_OPERATION::CEIL},
     {"trunc",         UNARY_OPERATION::TRUNC},
     // {"round",         UNARY_OPERATION::ROUND},   NOT A UFUNC
-    {"negative",      UNARY_OPERATION::NEGATIVE},
-    {"positive",      UNARY_OPERATION::POSITIVE},
-    {"sign",          UNARY_OPERATION::SIGN},
-    {"rint",          UNARY_OPERATION::RINT},
-    {"exp",           UNARY_OPERATION::EXP},
-    {"exp2",          UNARY_OPERATION::EXP2},
-    {"sqrt",          UNARY_OPERATION::SQRT},
-    {"log",           UNARY_OPERATION::LOG},
-    {"log2",          UNARY_OPERATION::LOG2},
-    {"log10",         UNARY_OPERATION::LOG10},
-    {"log1p",         UNARY_OPERATION::LOG1P},
-    {"square",        UNARY_OPERATION::SQUARE},
-    {"cbrt",          UNARY_OPERATION::CBRT},
-    {"reciprocal",    UNARY_OPERATION::RECIPROCAL},
-    {"logical_not",   UNARY_OPERATION::LOGICAL_NOT},
-    {"isinf",         UNARY_OPERATION::ISINF},
-    {"isnan",         UNARY_OPERATION::ISNAN},
-    {"isfinite",      UNARY_OPERATION::ISFINITE},
+    //{"negative",      UNARY_OPERATION::NEGATIVE},
+    //{"positive",      UNARY_OPERATION::POSITIVE},
+    //{"sign",          UNARY_OPERATION::SIGN},
+    //{"rint",          UNARY_OPERATION::RINT},
+    //{"exp",           UNARY_OPERATION::EXP},
+    //{"exp2",          UNARY_OPERATION::EXP2},
+    //{"sqrt",          UNARY_OPERATION::SQRT},
+    //{"log",           UNARY_OPERATION::LOG},
+    //{"log2",          UNARY_OPERATION::LOG2},
+    //{"log10",         UNARY_OPERATION::LOG10},
+    //{"log1p",         UNARY_OPERATION::LOG1P},
+    //{"square",        UNARY_OPERATION::SQUARE},
+    //{"cbrt",          UNARY_OPERATION::CBRT},
+    //{"reciprocal",    UNARY_OPERATION::RECIPROCAL},
+    //{"logical_not",   UNARY_OPERATION::LOGICAL_NOT},
+    //{"isinf",         UNARY_OPERATION::ISINF},
+    //{"isnan",         UNARY_OPERATION::ISNAN},
+    //{"isfinite",      UNARY_OPERATION::ISFINITE},
     //{"isnormal",      UNARY_OPERATION::ISNORMAL},  // not a ufunc
     // TODO numpy needs to add isnotinf, isnotnan, isnotfinite
 };
@@ -424,18 +424,18 @@ static int64_t UnaryThreadCallbackStrided(struct stMATH_WORKER_ITEM* pstWorkerIt
 // For binary math functions like add, sbutract, multiply.
 // 2 inputs and 1 output
 static void AtopBinaryMathFunction(char** args, const npy_intp* dimensions, const npy_intp* steps, void* innerloop, int funcop, int atype) {
-    LOGGING("called with %d %d   funcp: %p\n", funcop, atype, g_UFuncLUT[funcop][atype].pOldFunc);
     stUFunc* pstUFunc = &g_UFuncLUT[funcop][atype];
     npy_intp n = dimensions[0];
     stMATH_WORKER_ITEM* pWorkItem = THREADER->GetWorkItem(n);
+    LOGGING("called with %d %d   funcp: %p  len:%lld   inputs: %p %p %p  steps: %lld %lld %lld\n", funcop, atype, g_UFuncLUT[funcop][atype].pOldFunc, (long long)n, args[0], args[1], args[2], (long long)steps[0], (long long)steps[1], (long long)steps[2]);
 
     if (IS_BINARY_REDUCE) {
         // In a numpy binary reduce, the middle array is the real array
         REDUCE_FUNC pReduceFunc = pstUFunc->pReduceFunc;
 
-        LOGGING("pReduce %p   opcode:%d   dtype:%d   %lld %lld %lld %lld\n", pReduceFunc, funcop, atype, (long long)dimensions[1], (long long)steps[0], (long long)steps[1], (long long)steps[2]);
+        LOGGING("pReduce %p   opcode:%d   dtype:%d   %lld %lld %lld %lld\n", pReduceFunc, funcop, atype, (long long)dimensions[0], (long long)steps[0], (long long)steps[1], (long long)steps[2]);
         char* ip2 = args[1];
-        char* op1 = args[2];
+        char* op1 = args[0];
         if (!pWorkItem) {
             // Not threaded
             if (g_AtopEnabled && pReduceFunc) {
@@ -517,6 +517,19 @@ static void AtopBinaryMathFunction(char** args, const npy_intp* dimensions, cons
     else {
         // NOT a binary reduce
         ANY_TWO_FUNC pBinaryFunc = pstUFunc->pBinaryFunc;
+
+        char* pInput1 = args[0];
+        char* pInput2 = args[1];
+        char* pOutput = args[2];
+
+        // This code needs review: this is only an issue if array is contiguous and output is within
+        // a cacheline of the input (that is, 32 or 64 bytes)
+        // Check for address overlap where the output memory lies inside input1 or input2
+        char* pInput1End = pInput1 + (n * steps[0]);
+        char* pInput2End = pInput2 + (n * steps[1]);
+        if ((pOutput > pInput1 && pOutput < pInput1End) || (pOutput > pInput2 && pOutput < pInput2End)) {
+            pBinaryFunc = NULL;
+        }
 
         // Check if threading allowed
         if (!pWorkItem) {
@@ -628,17 +641,22 @@ static void AtopCompareMathFunction(char** args, const npy_intp* dimensions, con
 // For unary math functions like abs, sqrt
 // 1 input and 1 output
 static void AtopUnaryMathFunction(char** args, const npy_intp* dimensions, const npy_intp* steps, void* innerloop, int funcop, int atype) {
-    //LOGGING("called with %d %d   funcp: %p\n", funcop, atype, g_UFuncLUT[funcop][atype].pOldFunc);
     npy_intp n = dimensions[0];
     stUFunc* pstUFunc = &g_UnaryFuncLUT[funcop][atype];
     UNARY_FUNC pUnaryFunc = pstUFunc->pUnaryFunc;
+    LOGGING("unary called with %d %d   funcp: %p  len: %lld  inputs: %p %p  steps: %lld %lld\n", funcop, atype, g_UFuncLUT[funcop][atype].pOldFunc, n, args[0], args[1], (int64_t)steps[0], (int64_t)steps[1]);
 
     stMATH_WORKER_ITEM* pWorkItem = THREADER->GetWorkItem(n);
-
+    int64_t strideOut = steps[1];
+    if (strideOut == 0) {
+        pUnaryFunc = NULL;
+        //        strideOut = convert_atop_to_itemsize[atype];
+        //        if (n != 1) printf("!!!! error unary with no strides but len != 1  %lld\n", n);
+    }
     if (!pWorkItem) {
         // Threading not allowed
         if (g_AtopEnabled && pUnaryFunc) {
-            pUnaryFunc(args[0], args[1], (int64_t)n, (int64_t)steps[0], (int64_t)steps[1]);
+            pUnaryFunc(args[0], args[1], (int64_t)n, (int64_t)steps[0], strideOut);
         }
         else {
             // Do it the old way, threading not allowed
@@ -652,7 +670,7 @@ static void AtopUnaryMathFunction(char** args, const npy_intp* dimensions, const
         stCallback.pDataIn1 = args[0];
         stCallback.pDataOut = args[1];
         stCallback.itemSizeIn1 = steps[0];
-        stCallback.itemSizeOut = steps[1];
+        stCallback.itemSizeOut = strideOut;
 
         // Each thread will call this routine with the callbackArg
         pWorkItem->WorkCallbackArg = &stCallback;

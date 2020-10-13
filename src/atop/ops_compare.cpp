@@ -1063,6 +1063,8 @@ ANY_TWO_FUNC GetComparisonOpFast(int func, int atopInType1, int atopInType2, int
         }
         break;
     case ATOP_BOOL:
+        // TJD: TODO - special compare
+        break;
     case ATOP_INT8:
         switch (func) {
         case COMP_OPERATION::CMP_EQ:      return CompareInt8<COMP8i_EQ<__m256i>, COMP_EQ>;
