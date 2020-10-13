@@ -104,24 +104,24 @@ static stUFuncToAtop gUnaryMapping[] = {
     {"ceil",          UNARY_OPERATION::CEIL},
     {"trunc",         UNARY_OPERATION::TRUNC},
     // {"round",         UNARY_OPERATION::ROUND},   NOT A UFUNC
-    //{"negative",      UNARY_OPERATION::NEGATIVE},
-    //{"positive",      UNARY_OPERATION::POSITIVE},
-    //{"sign",          UNARY_OPERATION::SIGN},
-    //{"rint",          UNARY_OPERATION::RINT},
-    //{"exp",           UNARY_OPERATION::EXP},
-    //{"exp2",          UNARY_OPERATION::EXP2},
-    //{"sqrt",          UNARY_OPERATION::SQRT},
-    //{"log",           UNARY_OPERATION::LOG},
-    //{"log2",          UNARY_OPERATION::LOG2},
-    //{"log10",         UNARY_OPERATION::LOG10},
-    //{"log1p",         UNARY_OPERATION::LOG1P},
-    //{"square",        UNARY_OPERATION::SQUARE},
-    //{"cbrt",          UNARY_OPERATION::CBRT},
-    //{"reciprocal",    UNARY_OPERATION::RECIPROCAL},
-    //{"logical_not",   UNARY_OPERATION::LOGICAL_NOT},
-    //{"isinf",         UNARY_OPERATION::ISINF},
-    //{"isnan",         UNARY_OPERATION::ISNAN},
-    //{"isfinite",      UNARY_OPERATION::ISFINITE},
+    {"negative",      UNARY_OPERATION::NEGATIVE},
+    {"positive",      UNARY_OPERATION::POSITIVE},
+    {"sign",          UNARY_OPERATION::SIGN},
+    {"rint",          UNARY_OPERATION::RINT},
+    {"exp",           UNARY_OPERATION::EXP},
+    {"exp2",          UNARY_OPERATION::EXP2},
+    {"sqrt",          UNARY_OPERATION::SQRT},
+    {"log",           UNARY_OPERATION::LOG},
+    {"log2",          UNARY_OPERATION::LOG2},
+    {"log10",         UNARY_OPERATION::LOG10},
+    {"log1p",         UNARY_OPERATION::LOG1P},
+    {"square",        UNARY_OPERATION::SQUARE},
+    {"cbrt",          UNARY_OPERATION::CBRT},
+    {"reciprocal",    UNARY_OPERATION::RECIPROCAL},
+    {"logical_not",   UNARY_OPERATION::LOGICAL_NOT},
+    {"isinf",         UNARY_OPERATION::ISINF},
+    {"isnan",         UNARY_OPERATION::ISNAN},
+    {"isfinite",      UNARY_OPERATION::ISFINITE},
     //{"isnormal",      UNARY_OPERATION::ISNORMAL},  // not a ufunc
     // TODO numpy needs to add isnotinf, isnotnan, isnotfinite
 };
@@ -523,11 +523,9 @@ static void AtopBinaryMathFunction(char** args, const npy_intp* dimensions, cons
         char* pOutput = args[2];
 
         // This code needs review: this is only an issue if array is contiguous and output is within
-        // a cacheline of the input (that is, 32 or 64 bytes)
+        // a cacheline of the input (that is, 32 or 64 bytes) because vector intrinsics process in chunks
         // Check for address overlap where the output memory lies inside input1 or input2
-        char* pInput1End = pInput1 + (n * steps[0]);
-        char* pInput2End = pInput2 + (n * steps[1]);
-        if ((pOutput > pInput1 && pOutput < pInput1End) || (pOutput > pInput2 && pOutput < pInput2End)) {
+        if ((pOutput > pInput1 && pOutput < (pInput1 + 64)) || (pOutput > pInput2 && pOutput < (pInput2 + 64))) {
             pBinaryFunc = NULL;
         }
 
