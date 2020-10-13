@@ -145,53 +145,66 @@ template<typename T, typename U256, const T MATH_OP(T, T), const U256 MATH_OP256
 inline void ReduceMathOpFast(void* pDataIn1X, void* pDataOutX, void* pStartVal, int64_t datalen, int64_t strideIn) {
     T* pDataOut = (T*)pDataOutX;
     T* pDataIn1 = (T*)pDataIn1X;
-    T* pEnd = (T*)((char*)pDataIn1X + (datalen * strideIn));
 
-    // TJD: testing indicates unrolling size of 2 is 3% faster
-    const int64_t NUM_LOOPS_UNROLLED = 2;
-    const int64_t chunkSize = NUM_LOOPS_UNROLLED * (sizeof(U256) / sizeof(T));
-    int64_t perReg = sizeof(U256) / sizeof(T);
+    if (strideIn != 0) {
+        T* pEnd = (T*)((char*)pDataIn1X + (datalen * strideIn));
 
-    // NOTE: numpy uses the output val to seed the first input
-    T startval = *(T*)pStartVal;
-        
-    if (strideIn == sizeof(T) && datalen >= chunkSize) {
-        T* pEnd = &pDataIn1[chunkSize * (datalen / chunkSize)];
-        U256* pEnd_256 = (U256*)pEnd;
-        U256* pDataIn256 = (U256*)pDataIn1;
+        // TJD: testing indicates unrolling size of 2 is 3% faster
+        const int64_t NUM_LOOPS_UNROLLED = 2;
+        const int64_t chunkSize = NUM_LOOPS_UNROLLED * (sizeof(U256) / sizeof(T));
+        int64_t perReg = sizeof(U256) / sizeof(T);
 
-        U256 m0 = LOADU(pDataIn256);
-        U256 m1 = LOADU(pDataIn256 + 1);
-        pDataIn256 += NUM_LOOPS_UNROLLED;
+        // NOTE: numpy uses the output val to seed the first input
+        T startval = *(T*)pStartVal;
 
-        while (pDataIn256 < pEnd_256) {
-            m0 = MATH_OP256(m0, pDataIn256[0]);
-            m1 = MATH_OP256(m1, pDataIn256[1]);
+        if (strideIn == sizeof(T) && datalen >= chunkSize) {
+            T* pEnd = &pDataIn1[chunkSize * (datalen / chunkSize)];
+            U256* pEnd_256 = (U256*)pEnd;
+            U256* pDataIn256 = (U256*)pDataIn1;
+
+            U256 m0 = LOADU(pDataIn256);
+            U256 m1 = LOADU(pDataIn256 + 1);
             pDataIn256 += NUM_LOOPS_UNROLLED;
+
+            while (pDataIn256 < pEnd_256) {
+                m0 = MATH_OP256(m0, pDataIn256[0]);
+                m1 = MATH_OP256(m1, pDataIn256[1]);
+                pDataIn256 += NUM_LOOPS_UNROLLED;
+            }
+
+            m0 = MATH_OP256(m0, m1);
+
+            // perform the operation horizontally in m0
+            union {
+                volatile T  horizontal[sizeof(U256) / sizeof(T)];
+                U256 mathreg[1];
+            };
+
+            // NOTE: there is a horizontal add, there is a better way to do this
+            mathreg[0] = m0;
+            for (int i = 0; i < perReg; i++) {
+                //printf("startval %lld %lld\n", (long long)startval, (long long)horizontal[i]);
+                startval = MATH_OP(horizontal[i], startval);
+            }
+            pDataIn1 = (T*)pDataIn256;
         }
 
-        m0 = MATH_OP256(m0, m1);
-
-        // perform the operation horizontally in m0
-        union {
-            volatile T  horizontal[sizeof(U256) / sizeof(T)];
-            U256 mathreg[1];
-        };
-
-        // NOTE: there is a horizontal add, there is a better way to do this
-        mathreg[0] = m0;
-        for (int i = 0; i < perReg; i++) {
-            //printf("startval %lld %lld\n", (long long)startval, (long long)horizontal[i]);
-            startval = MATH_OP(horizontal[i], startval);
+        //printf("startval %lf stride:%lld\n", (double)startval, strideIn);
+        while (pDataIn1 != pEnd) {
+            startval = MATH_OP(*pDataIn1, startval);
+            pDataIn1 = STRIDE_NEXT(T, pDataIn1, strideIn);
         }
-        pDataIn1 = (T*)pDataIn256;
+        *pDataOut = startval;
     }
-
-    while (pDataIn1 != pEnd) {
-        startval = MATH_OP(*pDataIn1, startval);
-        pDataIn1 = STRIDE_NEXT(T, pDataIn1, strideIn);
+    else {
+        // sometimes the stridein is 0
+        // notice this when  a = np.pad(a, (25, 20), 'median', stat_length=(3, 5))
+        T startval = *(T*)pStartVal;
+        for (int64_t i = 0; i < datalen; i++) {
+            startval = MATH_OP(*pDataIn1, startval);
+        }
+        *pDataOut = startval;
     }
-    *pDataOut = startval;
 }
 
 
@@ -239,9 +252,9 @@ inline void SimpleMathOpFast(void* pDataIn1X, void* pDataIn2X, void* pDataOutX, 
                     pDataIn1 = (T*)pIn1_256;
                     pDataIn2 = (T*)pIn2_256;
                     pDataOut = (T*)pOut_256;
+                    datalen = datalen & (chunkSize - 1);
                 }
 
-                datalen = datalen & (chunkSize - 1);
                 for (int64_t i = 0; i < datalen; i++) {
                     pDataOut[i] = MATH_OP(pDataIn1[i], pDataIn2[i]);
                 }
@@ -278,8 +291,9 @@ inline void SimpleMathOpFast(void* pDataIn1X, void* pDataIn2X, void* pDataOutX, 
                     // update pointers to last location of wide pointers
                     pDataIn2 = (T*)pIn2_256;
                     pDataOut = (T*)pOut_256;
+                    datalen = datalen & (chunkSize - 1);
                 }
-                datalen = datalen & (chunkSize - 1);
+
                 for (int64_t i = 0; i < datalen; i++) {
                     pDataOut[i] = MATH_OP(arg1, pDataIn2[i]);
                 }
@@ -323,8 +337,9 @@ inline void SimpleMathOpFast(void* pDataIn1X, void* pDataIn2X, void* pDataOutX, 
 
                         // update pointers to last location of wide pointers
                         pDataIn1 = (T*)pIn1_256;
+                        datalen = datalen & (chunkSize - 1);
                     }
-                    datalen = datalen & (chunkSize - 1);
+
                     for (int64_t i = 0; i < datalen; i++) {
                         pDataIn1[i] = MATH_OP(pDataIn1[i], arg2);
                     }
@@ -352,8 +367,8 @@ inline void SimpleMathOpFast(void* pDataIn1X, void* pDataIn2X, void* pDataOutX, 
                         // update pointers to last location of wide pointers
                         pDataIn1 = (T*)pIn1_256;
                         pDataOut = (T*)pOut_256;
+                        datalen = datalen & (chunkSize - 1);
                     }
-                    datalen = datalen & (chunkSize - 1);
                     for (int64_t i = 0; i < datalen; i++) {
                         pDataOut[i] = MATH_OP(pDataIn1[i], arg2);
                     }
@@ -389,40 +404,38 @@ inline void SimpleMathOpFastSymmetric(void* pDataIn1X, void* pDataIn2X, void* pD
 
         LOGGING("mathopfast datalen %llu  chunkSize %llu  perReg %llu\n", datalen, chunkSize, perReg);
 
-        if (strideIn1 != 0 && strideIn2 != 0) {
-            if (strideIn2 == sizeof(T) && strideIn1 == sizeof(T)) {
-                if (datalen >= chunkSize) {
-                    T* pEnd = &pDataOut[chunkSize * (datalen / chunkSize)];
-                    U256* pEnd_256 = (U256*)pEnd;
-                    U256* pIn1_256 = (U256*)pDataIn1;
-                    U256* pIn2_256 = (U256*)pDataIn2;
-                    U256* pOut_256 = (U256*)pDataOut;
+        if (strideIn2 == sizeof(T) && strideIn1 == sizeof(T)) {
+            if (datalen >= chunkSize) {
+                T* pEnd = &pDataOut[chunkSize * (datalen / chunkSize)];
+                U256* pEnd_256 = (U256*)pEnd;
+                U256* pIn1_256 = (U256*)pDataIn1;
+                U256* pIn2_256 = (U256*)pDataIn2;
+                U256* pOut_256 = (U256*)pDataOut;
 
-                    do {
-                        // clang requires LOADU on last operand
+                do {
+                    // clang requires LOADU on last operand
 #ifdef RT_COMPILER_MSVC
-                        STOREU(pOut_256, MATH_OP256(LOADU(pIn1_256), *pIn2_256));
+                    STOREU(pOut_256, MATH_OP256(LOADU(pIn1_256), *pIn2_256));
 #else
-                        STOREU(pOut_256, MATH_OP256(LOADU(pIn1_256), LOADU(pIn2_256)));
+                    STOREU(pOut_256, MATH_OP256(LOADU(pIn1_256), LOADU(pIn2_256)));
 #endif
-                        pOut_256 += NUM_LOOPS_UNROLLED;
-                        pIn1_256 += NUM_LOOPS_UNROLLED;
-                        pIn2_256 += NUM_LOOPS_UNROLLED;
-                    } while (pOut_256 < pEnd_256);
+                    pOut_256 += NUM_LOOPS_UNROLLED;
+                    pIn1_256 += NUM_LOOPS_UNROLLED;
+                    pIn2_256 += NUM_LOOPS_UNROLLED;
+                } while (pOut_256 < pEnd_256);
 
-                    // update pointers to last location of wide pointers
-                    pDataIn1 = (T*)pIn1_256;
-                    pDataIn2 = (T*)pIn2_256;
-                    pDataOut = (T*)pOut_256;
-                }
-
+                // update pointers to last location of wide pointers
+                pDataIn1 = (T*)pIn1_256;
+                pDataIn2 = (T*)pIn2_256;
+                pDataOut = (T*)pOut_256;
                 datalen = datalen & (chunkSize - 1);
-                for (int64_t i = 0; i < datalen; i++) {
-                    pDataOut[i] = MATH_OP(pDataIn1[i], pDataIn2[i]);
-                }
-
-                return;
             }
+
+            for (int64_t i = 0; i < datalen; i++) {
+                pDataOut[i] = MATH_OP(pDataIn1[i], pDataIn2[i]);
+            }
+
+            return;
         }
         if (strideIn1 == 0)
         {
@@ -453,8 +466,8 @@ inline void SimpleMathOpFastSymmetric(void* pDataIn1X, void* pDataIn2X, void* pD
                     // update pointers to last location of wide pointers
                     pDataIn2 = (T*)pIn2_256;
                     pDataOut = (T*)pOut_256;
+                    datalen = datalen & (chunkSize - 1);
                 }
-                datalen = datalen & (chunkSize - 1);
                 for (int64_t i = 0; i < datalen; i++) {
                     pDataOut[i] = MATH_OP(arg1, pDataIn2[i]);
                 }
@@ -500,8 +513,8 @@ inline void SimpleMathOpFastSymmetric(void* pDataIn1X, void* pDataIn2X, void* pD
 
                         // update pointers to last location of wide pointers
                         pDataIn1 = (T*)pIn1_256;
+                        datalen = datalen & (chunkSize - 1);
                     }
-                    datalen = datalen & (chunkSize - 1);
                     for (int64_t i = 0; i < datalen; i++) {
                         pDataIn1[i] = MATH_OP(pDataIn1[i], arg2);
                     }
@@ -532,8 +545,8 @@ inline void SimpleMathOpFastSymmetric(void* pDataIn1X, void* pDataIn2X, void* pD
                         // update pointers to last location of wide pointers
                         pDataIn1 = (T*)pIn1_256;
                         pDataOut = (T*)pOut_256;
+                        datalen = datalen & (chunkSize - 1);
                     }
-                    datalen = datalen & (chunkSize - 1);
                     for (int64_t i = 0; i < datalen; i++) {
                         pDataOut[i] = MATH_OP(pDataIn1[i], arg2);
                     }
@@ -588,9 +601,9 @@ inline void SimpleMathOpFastDouble(MathFunctionPtr MATH_OP, MathFunctionConvert 
                 pDataIn1 = (T*)pIn1_256;
                 pDataIn2 = (T*)pIn2_256;
                 pDataOut = (double*)pOut_256;
+                len = len & (chunkSize - 1);
             }
 
-            len = len & (chunkSize - 1);
             for (int64_t i = 0; i < len; i++) {
                 pDataOut[i] = MATH_OP(pDataIn1[i], pDataIn2[i]);
             }
