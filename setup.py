@@ -23,7 +23,7 @@ import numpy as np
 # deps have been safely installed).
 if 'TOX_ENV_NAME' in os.environ and os.environ.get('SETUP_PY_EXT_COVERAGE') == 'yes' and platform.system() == 'Linux':
     CFLAGS = os.environ['CFLAGS'] = '-fprofile-arcs -ftest-coverage -DNPY_NO_DEPRECATED_API=NPY_1_7_API_VERSION'
-    LFLAGS = os.environ['LFLAGS'] = '-lgcov -lm'
+    LFLAGS = os.environ['LFLAGS'] = '-lgcov'
 else:
     CFLAGS = '-DNPY_NO_DEPRECATED_API=NPY_1_7_API_VERSION -DPy_LIMITED_API'
     LFLAGS = ''
@@ -32,6 +32,9 @@ if platform.system() == 'Windows':
     CFLAGS += ' /Ox /Ob2 /Oi /Ot /d2FH4-'
 else:
     CFLAGS += ' -mavx2 -fpermissive -Wno-unused-variable -Wno-unused-function -std=c++11 -pthread -falign-functions=32'
+
+if platform.system() == 'Linux':
+    LFLAGS += ' -lm'
 
 def read(*names, **kwargs):
     with io.open(

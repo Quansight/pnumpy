@@ -94,19 +94,21 @@ template<typename T> static const inline __m256d TAN_OP_256(__m256d x) { return 
 #if defined(__GNUC__)
 // May require -lm for linker
 
-__m256d _ZGVdN4v_cos(__m256d x);
-__m256d _ZGVdN4v_exp(__m256d x);
-__m256d _ZGVdN4v_log(__m256d x);
-__m256d _ZGVdN4v_sin(__m256d x);
-__m256d _ZGVdN4vv_pow(__m256d x, __m256d y);
-void    _ZGVdN4vvv_sincos(__m256d x, __m256i ptrs, __m256i ptrc);
+extern "C" {
+    __m256d _ZGVdN4v_cos(__m256d x);
+    __m256d _ZGVdN4v_exp(__m256d x);
+    __m256d _ZGVdN4v_log(__m256d x);
+    __m256d _ZGVdN4v_sin(__m256d x);
+    __m256d _ZGVdN4vv_pow(__m256d x, __m256d y);
+    void    _ZGVdN4vvv_sincos(__m256d x, __m256i ptrs, __m256i ptrc);
 
-__m256  _ZGVdN8v_cosf(__m256 x);
-__m256  _ZGVdN8v_expf(__m256 x);
-__m256  _ZGVdN8v_logf(__m256 x);
-__m256  _ZGVdN8v_sinf(__m256 x);
-__m256  _ZGVdN8vv_powf(__m256 x, __m256 y);
-void    _ZGVdN8vvv_sincosf(__m256 x, __m256i ptrs_lo, __m256i ptrs_hi, __m256i ptrc_lo, __m256i ptrc_hi);
+    __m256  _ZGVdN8v_cosf(__m256 x);
+    __m256  _ZGVdN8v_expf(__m256 x);
+    __m256  _ZGVdN8v_logf(__m256 x);
+    __m256  _ZGVdN8v_sinf(__m256 x);
+    __m256  _ZGVdN8vv_powf(__m256 x, __m256 y);
+    void    _ZGVdN8vvv_sincosf(__m256 x, __m256i ptrs_lo, __m256i ptrs_hi, __m256i ptrc_lo, __m256i ptrc_hi);
+}
 
 template<typename T> static const inline __m256  SIN_OP_256(__m256 x) { return _ZGVdN8v_sinf(x); }
 template<typename T> static const inline __m256d SIN_OP_256(__m256d x) { return _ZGVdN4v_sin(x); }
