@@ -1031,18 +1031,17 @@ PyObject* newinit(PyObject* self, PyObject* args, PyObject* kwargs) {
                 UNARY_FUNC pUnaryFunc = GetTrigOpFast(atop, atype, &signature[1]);
                 signature[1] = convert_atop_to_dtype[signature[1]];
 
-                if (pUnaryFunc) {
-                    int ret = PyUFunc_ReplaceLoopBySignature((PyUFuncObject*)ufunc, g_UFuncTrigLUT[atop][atype], signature, &oldFunc);
+                // Even if pUnaryFunc is NULL, still hook it since we can thread it
+                int ret = PyUFunc_ReplaceLoopBySignature((PyUFuncObject*)ufunc, g_UFuncTrigLUT[atop][atype], signature, &oldFunc);
 
-                    if (ret < 0) {
-                        return PyErr_Format(PyExc_TypeError, "Trig failed with %d. func %s must be the name of a ufunc.  atop:%d   atype:%d  sigs:%d, %d, %d", ret, ufunc_name, atop, atype, signature[0], signature[1], signature[2]);
-                    }
-                    stUFunc* pstUFunc = &g_TrigFuncLUT[atop][atype];
-                    // Store the new function to call and the previous ufunc
-                    pstUFunc->pOldFunc = oldFunc;
-                    pstUFunc->pUnaryFunc = pUnaryFunc;
-                    pstUFunc->MaxThreads = 8;
+                if (ret < 0) {
+                    return PyErr_Format(PyExc_TypeError, "Trig failed with %d. func %s must be the name of a ufunc.  atop:%d   atype:%d  sigs:%d, %d, %d", ret, ufunc_name, atop, atype, signature[0], signature[1], signature[2]);
                 }
+                stUFunc* pstUFunc = &g_TrigFuncLUT[atop][atype];
+                // Store the new function to call and the previous ufunc
+                pstUFunc->pOldFunc = oldFunc;
+                pstUFunc->pUnaryFunc = pUnaryFunc;
+                pstUFunc->MaxThreads = 5;
             }
         }
 
