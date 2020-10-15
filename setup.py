@@ -23,7 +23,7 @@ import numpy as np
 # deps have been safely installed).
 if 'TOX_ENV_NAME' in os.environ and os.environ.get('SETUP_PY_EXT_COVERAGE') == 'yes' and platform.system() == 'Linux':
     CFLAGS = os.environ['CFLAGS'] = '-fprofile-arcs -ftest-coverage -DNPY_NO_DEPRECATED_API=NPY_1_7_API_VERSION'
-    LFLAGS = os.environ['LFLAGS'] = '-lgcov'
+    LFLAGS = os.environ['LFLAGS'] = '-lgcov -lm'
 else:
     CFLAGS = '-DNPY_NO_DEPRECATED_API=NPY_1_7_API_VERSION -DPy_LIMITED_API'
     LFLAGS = ''
