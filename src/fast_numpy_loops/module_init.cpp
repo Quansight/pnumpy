@@ -17,6 +17,8 @@ extern "C" PyObject* thread_disable(PyObject * self, PyObject * args);
 extern "C" PyObject* thread_isenabled(PyObject * self, PyObject * args);
 extern "C" PyObject* thread_getworkers(PyObject * self, PyObject * args);
 extern "C" PyObject* thread_setworkers(PyObject * self, PyObject * args);
+extern "C" PyObject* timer_gettsc(PyObject * self, PyObject * args);
+extern "C" PyObject* timer_getutc(PyObject * self, PyObject * args);
 extern "C" PyObject* cpustring(PyObject * self, PyObject * args);
 
 static char m_doc[] = "Provide methods to override NumPy ufuncs";
@@ -35,6 +37,8 @@ static PyMethodDef module_functions[] = {
     {"thread_isenabled", (PyCFunction)thread_isenabled,  METH_VARARGS, "returns True if worker threads enabled else False"},
     {"thread_getworkers",(PyCFunction)thread_getworkers,  METH_VARARGS, "get the number of worker threads"},
     {"thread_setworkers",(PyCFunction)thread_setworkers,  METH_VARARGS, "set the number of worker threads, return previous value. Must be at least 1."},
+    {"timer_gettsc",     (PyCFunction)timer_gettsc,  METH_VARARGS, "get the time stamp counter"},
+    {"timer_getutc",     (PyCFunction)timer_getutc,  METH_VARARGS, "get the time in utc nanos since unix epoch"},
     {"cpustring",        (PyCFunction)cpustring,  METH_VARARGS, "cpu brand string plus features"},
     {"oldinit",          (PyCFunction)oldinit, METH_VARARGS | METH_KEYWORDS, oldinit_doc},
     {NULL, NULL, 0,  NULL}
