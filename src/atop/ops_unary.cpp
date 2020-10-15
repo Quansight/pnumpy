@@ -47,6 +47,23 @@ static const inline void STOREA(__m256i* x, __m256i y) { _mm256_store_si256((__m
 #define _mm_truncme_ps(val)       _mm256_round_ps((val), _MM_FROUND_TRUNC)
 #define _mm_truncme_pd(val)       _mm256_round_pd((val), _MM_FROUND_TRUNC)
 
+// This shuffle is for int32/float32.  It will move byte positions 0, 4, 8, and 12 together into one 32 bit dword
+static const __m256i g_shuffle1 = _mm256_set_epi8((char)0x80, (char)0x80, (char)0x80, (char)0x80, (char)0x80, (char)0x80, (char)0x80, (char)0x80, (char)0x80, (char)0x80, (char)0x80, (char)0x80, 12, 8, 4, 0,
+(char)0x80, (char)0x80, (char)0x80, (char)0x80, (char)0x80, (char)0x80, (char)0x80, (char)0x80, (char)0x80, (char)0x80, (char)0x80, (char)0x80, 12, 8, 4, 0);
+
+// This is the second shuffle for int32/float32.  It will move byte positions 0, 4, 8, and 12 together into one 32 bit dword
+static const __m256i g_shuffle2 = _mm256_set_epi8((char)0x80, (char)0x80, (char)0x80, (char)0x80, (char)0x80, (char)0x80, (char)0x80, (char)0x80, 12, 8, 4, 0, (char)0x80, (char)0x80, (char)0x80, (char)0x80,
+(char)0x80, (char)0x80, (char)0x80, (char)0x80, (char)0x80, (char)0x80, (char)0x80, (char)0x80, 12, 8, 4, 0, (char)0x80, (char)0x80, (char)0x80, (char)0x80);
+
+static const __m256i g_shuffle3 = _mm256_set_epi8((char)0x80, (char)0x80, (char)0x80, (char)0x80, 12, 8, 4, 0, (char)0x80, (char)0x80, (char)0x80, (char)0x80, (char)0x80, (char)0x80, (char)0x80, (char)0x80,
+(char)0x80, (char)0x80, (char)0x80, (char)0x80, 12, 8, 4, 0, (char)0x80, (char)0x80, (char)0x80, (char)0x80, (char)0x80, (char)0x80, (char)0x80, (char)0x80);
+
+static const __m256i g_shuffle4 = _mm256_set_epi8(12, 8, 4, 0, (char)0x80, (char)0x80, (char)0x80, (char)0x80, (char)0x80, (char)0x80, (char)0x80, (char)0x80, (char)0x80, (char)0x80, (char)0x80, (char)0x80,
+    12, 8, 4, 0, (char)0x80, (char)0x80, (char)0x80, (char)0x80, (char)0x80, (char)0x80, (char)0x80, (char)0x80, (char)0x80, (char)0x80, (char)0x80, (char)0x80);
+
+// interleave hi lo across 128 bit lanes
+static const __m256i g_permute = _mm256_set_epi32(7, 3, 6, 2, 5, 1, 4, 0);
+static const __m256i g_ones = _mm256_set1_epi8(1);
 
 //// Examples of how to store a constant in vector math
 //MEM_ALIGN(64)
@@ -344,6 +361,7 @@ static inline void UnaryOpFast(void* pDataIn, void* pDataOut, int64_t len, int64
         // update thin pointers to last location of wide pointers
         pIn = (T*)pIn1_256;
         pOut = (T*)pOut_256;
+
     }
 
     // Slow loop, handle 1 at a time
@@ -418,30 +436,59 @@ static inline void UnaryNanFastFloat(MathFunctionPtr MATH_OP, void* pDataIn, voi
     bool* pOut = (bool*)pDataOut;
     bool* pLastOut = (bool*)((char*)pOut + (strideOut * len));
 
-    int64_t chunkSize = sizeof(U256) / sizeof(T);
+    // Loops unrolled 4 times, 4 * 8 = 32
+    int64_t chunkSize = 32; // sizeof(U256) / sizeof(T);
 
-    if (sizeof(bool) == strideOut && sizeof(T) == strideIn && len >= chunkSize) {
-        bool* pEnd = &pOut[chunkSize * (len / chunkSize)];
-        int64_t* pEnd_i64 = (int64_t*)pEnd;
-
+    if (sizeof(bool) == strideOut && sizeof(T) == strideIn) {
+        int8_t* pEnd = (int8_t*)pDataOut + len;
+        __m256i* pDestFast = (__m256i*)pDataOut;
+        __m256i* pDestFastEnd = &pDestFast[len / 32];
         U256* pIn1_256 = (U256*)pDataIn;
-        int64_t* pOut_i64 = (int64_t*)pDataOut;
 
-        while (pOut_i64 < pEnd_i64) {
-            //// Use 256 bit registers which hold 8 floats or 4 doubles
+        if (pDestFast != pDestFastEnd) {
+            const __m256i shuffle1 = g_shuffle1;
+            const __m256i shuffle2 = g_shuffle2;
+            const __m256i shuffle3 = g_shuffle3;
+            const __m256i shuffle4 = g_shuffle4;
+            const __m256i permute = g_permute;
+            const __m256i ones = _mm256_set1_epi8(1);
 
-            U256 m0 = LOADU(pIn1_256);
-            pIn1_256++;
+            do  {
+                //// Use 256 bit registers which hold 8 floats or 4 doubles
+                // Older code below disabled for faster code
+                //U256 m0 = LOADU(pIn1_256);
+                //pIn1_256++;
+                //// nans will NOT equal eachother
+                //// NOTE: on my intel chip CMP_NEQ_OQ does not work for nans 
+                //// +/-inf will equal eachother
+                //*pOut_i64++ = gBooleanLUT64Inverse[_mm256_movemask_ps(_mm256_cmp_ps(m0, m0, _CMP_EQ_OQ)) & 255];
 
-            // nans will NOT equal eachother
-            // NOTE: on my intel chip CMP_NEQ_OQ does not work for nans 
-            // +/-inf will equal eachother
-            *pOut_i64++ = gBooleanLUT64Inverse[_mm256_movemask_ps(_mm256_cmp_ps(m0, m0, _CMP_EQ_OQ)) & 255];
+                // Load 8 float32 4 times in a row to produce 32 booleans
+                U256 f0 = LOADU(pIn1_256);
+                __m256i m0 = _mm256_shuffle_epi8(_mm256_castps_si256(_mm256_cmp_ps(f0, f0, _CMP_EQ_OQ)), shuffle1);
+                U256 f1 = LOADU(pIn1_256 + 1);
+                __m256i m1 = _mm256_shuffle_epi8(_mm256_castps_si256(_mm256_cmp_ps(f1, f1, _CMP_EQ_OQ)), shuffle2);
+                U256 f2 = LOADU(pIn1_256 + 2);
+                __m256i m2 = _mm256_shuffle_epi8(_mm256_castps_si256(_mm256_cmp_ps(f2, f2, _CMP_EQ_OQ)), shuffle3);
+                U256 f3 = LOADU(pIn1_256 + 3);
+                __m256i m3 = _mm256_shuffle_epi8(_mm256_castps_si256(_mm256_cmp_ps(f3, f3, _CMP_EQ_OQ)), shuffle4);
+                m0 = _mm256_or_si256(_mm256_or_si256(m0, m1), _mm256_or_si256(m2, m3));
+
+                // write 32 booleans at a time
+                STOREU(pDestFast, _mm256_add_epi8(_mm256_permutevar8x32_epi32(m0, permute), ones));
+
+                pIn1_256 += 4;
+                pDestFast++;
+            } while (pDestFast != pDestFastEnd);
         }
 
-        // update thin pointers to last location of wide pointers
-        pIn = (T*)pIn1_256;
-        pOut = (bool*)pOut_i64;
+        float* pDataInX = (float*)pIn1_256;
+        int8_t* pDataOutX = (int8_t*)pDestFast;
+        while (pDataOutX < pEnd) {
+            *pDataOutX++ = MATH_OP(*pDataInX);
+            pDataInX++;
+        }
+        return;
     }
 
     // Slow loop, handle 1 at a time
@@ -1675,69 +1722,6 @@ UNARY_FUNC GetUnaryOpFastStrided(int func, int atopInType1, int* wantedOutType) 
     }
     return NULL;
 }
-
-////--------------------------------------------------------------------
-//// Check to see if we can compute this
-//static UNARY_FUNC CheckMathOpOneInput(int func, int numpyInType1, int numpyOutType, int* wantedOutType) {
-//    UNARY_FUNC pOneFunc = NULL;
-//
-//    // Not handling complex, 128bit, voids, objects, or strings here
-//    if (numpyInType1 <= ATOP_LONGDOUBLE) {
-//        pOneFunc = GetUnaryOpFast(func, numpyInType1, numpyOutType, wantedOutType);
-//        if (pOneFunc == NULL) {
-//            LOGGING("Unary fast func not found for func %d  type %d\n", func, numpyInType1);
-//            pOneFunc = GetUnaryOpSlow(func, numpyInType1, numpyOutType, wantedOutType);
-//        }
-//    }
-//    return pOneFunc;
-//}
-//
-////--------------------------------------------------------------------
-//// Check to see if we can compute this
-//static UNARY_FUNC CheckMathOpOneInputStrided(int func, int numpyInType1, int numpyOutType, int* wantedOutType) {
-//    UNARY_FUNC pOneFunc = NULL;
-//
-//    // Not handling complex, 128bit, voids, objects, or strings here
-//    if (numpyInType1 <= ATOP_LONGDOUBLE) {
-//        pOneFunc = GetUnaryOpFastStrided(func, numpyInType1, numpyOutType, wantedOutType);
-//        //if (pOneFunc == NULL) {
-//        //   LOGGING("Unary fast func not found for func %d  type %d\n", func, numpyInType1);
-//        //   pOneFunc = GetUnaryOpSlow(func, numpyInType1, numpyOutType, wantedOutType);
-//        //}
-//    }
-//    return pOneFunc;
-//}
-
-////------------------------------------------------------------------------------
-////  Concurrent callback from multiple threads
-//static BOOL UnaryThreadCallbackStrided(struct stMATH_WORKER_ITEM* pstWorkerItem, int core, int64_t workIndex) {
-//    BOOL didSomeWork = FALSE;
-//    UNARY_CALLBACK* Callback = (UNARY_CALLBACK*)pstWorkerItem->WorkCallbackArg;
-//
-//    char* pDataIn = (char*)Callback->pDataIn;
-//    char* pDataOut = (char*)Callback->pDataOut;
-//    int64_t lenX;
-//    int64_t workBlock;
-//
-//    // As long as there is work to do
-//    while ((lenX = pstWorkerItem->GetNextWorkBlock(&workBlock)) > 0) {
-//
-//        int64_t inputAdj = pstWorkerItem->BlockSize * workBlock * Callback->itemSizeIn;
-//        int64_t outputAdj = pstWorkerItem->BlockSize * workBlock * Callback->itemSizeOut;
-//
-//        LOGGING("[%d] working on %lld with len %lld   block: %lld\n", core, workIndex, lenX, workBlock);
-//        Callback->pUnaryCallbackStrided(pDataIn + inputAdj, pDataOut + outputAdj, lenX, Callback->itemSizeIn, Callback->itemSizeOut);
-//
-//        // Indicate we completed a block
-//        didSomeWork = TRUE;
-//
-//        // tell others we completed this work block
-//        pstWorkerItem->CompleteWorkBlock();
-//        //printf("|%d %d", core, (int)workBlock);
-//    }
-//
-//    return didSomeWork;
-//}
 
 #if defined(__clang__)
 #pragma clang attribute pop

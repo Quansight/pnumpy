@@ -183,6 +183,7 @@ struct stUFunc {
 stUFunc  g_UFuncLUT[BINARY_OPERATION::BINARY_LAST][ATOP_LAST];
 stUFunc  g_CompFuncLUT[COMP_OPERATION::CMP_LAST][ATOP_LAST];
 stUFunc  g_UnaryFuncLUT[UNARY_OPERATION::UNARY_LAST][ATOP_LAST];
+stUFunc  g_TrigFuncLUT[TRIG_OPERATION::TRIG_LAST][ATOP_LAST];
 
 // set to 0 to disable
 int32_t  g_AtopEnabled = 1;
@@ -692,6 +693,62 @@ static void AtopUnaryMathFunction(char** args, const npy_intp* dimensions, const
 
 };
 
+
+
+static void AtopTrigMathFunction(char** args, const npy_intp* dimensions, const npy_intp* steps, void* innerloop, int funcop, int atype) {
+    npy_intp n = dimensions[0];
+    stUFunc* pstUFunc = &g_TrigFuncLUT[funcop][atype];
+    UNARY_FUNC pUnaryFunc = pstUFunc->pUnaryFunc;
+    LOGGING("trig called with %d %d   funcp: %p  len: %lld  inputs: %p %p  steps: %lld %lld\n", funcop, atype, pstUFunc->pOldFunc, n, args[0], args[1], (int64_t)steps[0], (int64_t)steps[1]);
+
+    stMATH_WORKER_ITEM* pWorkItem = THREADER->GetWorkItem(n);
+    int64_t strideOut = steps[1];
+    if (strideOut == 0) {
+        pUnaryFunc = NULL;
+        //        strideOut = convert_atop_to_itemsize[atype];
+        //        if (n != 1) printf("!!!! error unary with no strides but len != 1  %lld\n", n);
+    }
+    if (!pWorkItem) {
+        // Threading not allowed
+        if (g_AtopEnabled && pUnaryFunc) {
+            pUnaryFunc(args[0], args[1], (int64_t)n, (int64_t)steps[0], strideOut);
+        }
+        else {
+            // Do it the old way, threading not allowed
+            pstUFunc->pOldFunc(args, dimensions, steps, innerloop);
+        }
+    }
+    else {
+        // Threading allowed
+        UFUNC_CALLBACK stCallback;
+
+        stCallback.pDataIn1 = args[0];
+        stCallback.pDataOut = args[1];
+        stCallback.itemSizeIn1 = steps[0];
+        stCallback.itemSizeOut = strideOut;
+
+        // Each thread will call this routine with the callbackArg
+        pWorkItem->WorkCallbackArg = &stCallback;
+
+        if (g_AtopEnabled && pUnaryFunc) {
+            // Call the new replacement routine
+            stCallback.pUnaryFunc = pUnaryFunc;
+            pWorkItem->DoWorkCallback = UnaryThreadCallbackStrided;
+        }
+        else {
+            // Call the original numpy routine
+            stCallback.pOldFunc = pstUFunc->pOldFunc;
+            pWorkItem->DoWorkCallback = UnaryThreadCallbackNumpy;
+        }
+        // This will notify the worker threads of a new work item
+        // most functions are so fast, we do not need more than 4 worker threads
+        THREADER->WorkMain(pWorkItem, n, pstUFunc->MaxThreads);
+    }
+
+    // Ledger
+
+};
+
 // the inclusion of this file is because there is no callback argument
 #include "stubs.h"
 
@@ -941,6 +998,50 @@ PyObject* newinit(PyObject* self, PyObject* args, PyObject* kwargs) {
                     pstUFunc->pUnaryFunc = pUnaryFunc;
                     pstUFunc->MaxThreads = 4;
                 }
+            }
+        }
+
+
+        // Loop over all trig ufuncs we want to replace
+        int trig_dtypes[] = { NPY_FLOAT32, NPY_FLOAT64 };
+        num_ufuncs = sizeof(gTrigMapping) / sizeof(stUFuncToAtop);
+        for (int64_t i = 0; i < num_ufuncs; i++) {
+            PyObject* result = NULL;
+            PyObject* ufunc = NULL;
+            const char* ufunc_name = gTrigMapping[i].str_ufunc_name;
+            int atop = gTrigMapping[i].atop_op;
+
+            ufunc = PyObject_GetAttrString(numpy_module, ufunc_name);
+
+            if (ufunc == NULL) {
+                Py_XDECREF(ufunc);
+                return PyErr_Format(PyExc_TypeError, "func %s must be the name of a ufunc", ufunc_name);
+            }
+
+            // Loop over all dtypes we support for the ufunc
+            int64_t num_dtypes = sizeof(trig_dtypes) / sizeof(int);
+            for (int64_t j = 0; j < num_dtypes; j++) {
+                PyUFuncGenericFunction oldFunc;
+                int dtype = trig_dtypes[j];
+                int signature[3] = { dtype, dtype, dtype };
+
+                int atype = convert_dtype_to_atop[dtype];
+
+                // For unary it only has a signature of 2
+                UNARY_FUNC pUnaryFunc = GetTrigOpFast(atop, atype, &signature[1]);
+                signature[1] = convert_atop_to_dtype[signature[1]];
+
+                // Even if pUnaryFunc is NULL, still hook it since we can thread it
+                int ret = PyUFunc_ReplaceLoopBySignature((PyUFuncObject*)ufunc, g_UFuncTrigLUT[atop][atype], signature, &oldFunc);
+
+                if (ret < 0) {
+                    return PyErr_Format(PyExc_TypeError, "Trig failed with %d. func %s must be the name of a ufunc.  atop:%d   atype:%d  sigs:%d, %d, %d", ret, ufunc_name, atop, atype, signature[0], signature[1], signature[2]);
+                }
+                stUFunc* pstUFunc = &g_TrigFuncLUT[atop][atype];
+                // Store the new function to call and the previous ufunc
+                pstUFunc->pOldFunc = oldFunc;
+                pstUFunc->pUnaryFunc = pUnaryFunc;
+                pstUFunc->MaxThreads = 5;
             }
         }
 

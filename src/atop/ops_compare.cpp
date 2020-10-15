@@ -388,20 +388,45 @@ static void CompareFloat(void* pDataIn, void* pDataIn2, void* pDataOut, int64_t 
             if (strideIn1 == sizeof(float) && strideIn2 == sizeof(float)) {
                 const __m256* pSrc1Fast = (const __m256*)pDataIn;
                 const __m256* pSrc2Fast = (const __m256*)pDataIn2;
-                int64_t* pDestFast = (int64_t*)pDataOut;
-                int64_t fastCount = len / 8;
-                for (int64_t i = 0; i < fastCount; i++) {
-                    // Alternate way
-                    int32_t bitmask = _mm256_movemask_ps(_mm256_cmp_ps(LOADU(pSrc1Fast + i), LOADU(pSrc2Fast + i), COMP_OPCODE));
-                    pDestFast[i] = gBooleanLUT64[bitmask & 255];
+                __m256i* pDestFast = (__m256i*)pDataOut;
+                int8_t* pEnd = (int8_t*)pDataOut + len;
+
+                __m256i* pDestFastEnd = &pDestFast[len / 32];
+                //int64_t* pDestFast = (int64_t*)pDataOut;
+                //int64_t fastCount = len / 8;
+                //for (int64_t i = 0; i < fastCount; i++) {
+                //    // Alternate way
+                //    int32_t bitmask = _mm256_movemask_ps(_mm256_cmp_ps(LOADU(pSrc1Fast + i), LOADU(pSrc2Fast + i), COMP_OPCODE));
+                //    pDestFast[i] = gBooleanLUT64[bitmask & 255];
+                //}
+                //len = len - (fastCount * 8);
+                //const float* pDataInX = &((float*)pDataIn)[fastCount * 8];
+                //const float* pDataIn2X = &((float*)pDataIn2)[fastCount * 8];
+                //int8_t* pDataOutX = &((int8_t*)pDataOut)[fastCount * 8];
+                //for (int64_t i = 0; i < len; i++) {
+                //    pDataOutX[i] = COMPARE(pDataInX[i], pDataIn2X[i]);
+                //}
+                while (pDestFast != pDestFastEnd) {
+                    // the shuffle will move all 8 comparisons together
+                    __m256i m0 = _mm256_shuffle_epi8(_mm256_castps_si256(_mm256_cmp_ps(LOADU(pSrc1Fast + 0), LOADU(pSrc2Fast + 0), COMP_OPCODE)), g_shuffle1);
+                    __m256i m1 = _mm256_shuffle_epi8(_mm256_castps_si256(_mm256_cmp_ps(LOADU(pSrc1Fast + 1), LOADU(pSrc2Fast + 1), COMP_OPCODE)), g_shuffle2);
+                    __m256i m2 = _mm256_shuffle_epi8(_mm256_castps_si256(_mm256_cmp_ps(LOADU(pSrc1Fast + 2), LOADU(pSrc2Fast + 2), COMP_OPCODE)), g_shuffle3);
+                    __m256i m3 = _mm256_shuffle_epi8(_mm256_castps_si256(_mm256_cmp_ps(LOADU(pSrc1Fast + 3), LOADU(pSrc2Fast + 3), COMP_OPCODE)), g_shuffle4);
+                    m0 = _mm256_or_si256(_mm256_or_si256(m0, m1), _mm256_or_si256(m2, m3));
+
+                    STOREU(pDestFast, _mm256_and_si256(_mm256_permutevar8x32_epi32(m0, g_permute), g_ones));
+                    pSrc1Fast += 4;
+                    pSrc2Fast += 4;
+                    pDestFast++;
                 }
-                len = len - (fastCount * 8);
-                const float* pDataInX = &((float*)pDataIn)[fastCount * 8];
-                const float* pDataIn2X = &((float*)pDataIn2)[fastCount * 8];
-                int8_t* pDataOutX = &((int8_t*)pDataOut)[fastCount * 8];
-                for (int64_t i = 0; i < len; i++) {
-                    pDataOutX[i] = COMPARE(pDataInX[i], pDataIn2X[i]);
+
+                float* pDataInX = (float*)pSrc1Fast;
+                float* pData2InX = (float*)pSrc2Fast;
+                int8_t* pDataOutX = (int8_t*)pDestFast;
+                while (pDataOutX < pEnd) {
+                    *pDataOutX++ = COMPARE(*pDataInX++, *pData2InX++);
                 }
+
                 return;
             }
         }
