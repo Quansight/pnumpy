@@ -132,6 +132,15 @@ static stUFuncToAtop gTrigMapping[] = {
     {"sin",           TRIG_OPERATION::SIN},
     {"cos",           TRIG_OPERATION::COS},
     {"tan",           TRIG_OPERATION::TAN},
+    {"arcsin",        TRIG_OPERATION::ASIN},
+    {"arccos",        TRIG_OPERATION::ACOS},
+    {"arctan",        TRIG_OPERATION::ATAN},
+    {"sinh",          TRIG_OPERATION::SINH},
+    {"cosh",          TRIG_OPERATION::COSH},
+    {"tanh",          TRIG_OPERATION::TANH},
+    {"arcsinh",       TRIG_OPERATION::ASINH},
+    {"arccosh",       TRIG_OPERATION::ACOSH},
+    {"arctanh",       TRIG_OPERATION::ATANH},
 };
 
 
@@ -161,6 +170,9 @@ struct UFUNC_CALLBACK {
 
     int64_t itemSizeIn2;
     int64_t itemSizeOut;
+
+    // mysterious innerloop used by numpy for tan
+    void* innerloop;
 };
 
 struct stUFunc {
@@ -269,7 +281,7 @@ static int64_t ReduceThreadCallbackNumpy(struct stMATH_WORKER_ITEM* pstWorkerIte
         }
 
         LOGGING("[%d] numpy reduce on %lld with len %lld   block: %lld  itemsize: %lld\n", core, workIndex, lenX, workBlock, Callback->itemSizeIn2);
-        Callback->pOldFunc(args, dimensions, steps, NULL);
+        Callback->pOldFunc(args, dimensions, steps, Callback->innerloop);
 
         // Indicate we completed a block
         didSomeWork++;
@@ -340,7 +352,7 @@ static int64_t BinaryThreadCallbackNumpy(struct stMATH_WORKER_ITEM* pstWorkerIte
         npy_intp dimensions[3] = { lenX, lenX, lenX };
 
         LOGGING("[%d] orig numpy working on %lld with len %lld   block: %lld\n", core, workIndex, lenX, workBlock);
-        Callback->pOldFunc(args, dimensions, (npy_intp*)(Callback->steps), NULL);
+        Callback->pOldFunc(args, dimensions, (npy_intp*)(Callback->steps), Callback->innerloop);
 
         // Indicate we completed a block
         didSomeWork++;
@@ -377,7 +389,7 @@ static int64_t UnaryThreadCallbackNumpy(struct stMATH_WORKER_ITEM* pstWorkerItem
         const npy_intp steps[2] = { Callback->itemSizeIn1 , Callback->itemSizeOut };
 
         LOGGING("[%d] working on %lld with len %lld   block: %lld\n", core, workIndex, lenX, workBlock);
-        Callback->pOldFunc(args, &dimensions, steps, NULL);
+        Callback->pOldFunc(args, &dimensions, steps, Callback->innerloop);
 
         // Indicate we completed a block
         didSomeWork++;
@@ -485,6 +497,7 @@ static void AtopBinaryMathFunction(char** args, const npy_intp* dimensions, cons
                 // A binary reduce for original numpy routine
                 //
                 stCallback.pOldFunc = pstUFunc->pOldFunc;
+                stCallback.innerloop = innerloop;
                 pWorkItem->DoWorkCallback = ReduceThreadCallbackNumpy;
 
                 // This will notify the worker threads of a new work item
@@ -562,6 +575,7 @@ static void AtopBinaryMathFunction(char** args, const npy_intp* dimensions, cons
             }
             else {
                 stCallback.pOldFunc = pstUFunc->pOldFunc;
+                stCallback.innerloop = innerloop;
 
                 // Each thread will call this routine with the callbackArg
                 pWorkItem->DoWorkCallback = BinaryThreadCallbackNumpy;
@@ -619,6 +633,7 @@ static void AtopCompareMathFunction(char** args, const npy_intp* dimensions, con
         }
         else {
             stCallback.pOldFunc = pstUFunc->pOldFunc;
+            stCallback.innerloop = innerloop;
 
             // Each thread will call this routine with the callbackArg
             // Use the original numpy ufunc loop
@@ -682,6 +697,7 @@ static void AtopUnaryMathFunction(char** args, const npy_intp* dimensions, const
         else {
             // Call the original numpy routine
             stCallback.pOldFunc = pstUFunc->pOldFunc;
+            stCallback.innerloop = innerloop;
             pWorkItem->DoWorkCallback = UnaryThreadCallbackNumpy;
         }
         // This will notify the worker threads of a new work item
@@ -699,7 +715,7 @@ static void AtopTrigMathFunction(char** args, const npy_intp* dimensions, const 
     npy_intp n = dimensions[0];
     stUFunc* pstUFunc = &g_TrigFuncLUT[funcop][atype];
     UNARY_FUNC pUnaryFunc = pstUFunc->pUnaryFunc;
-    LOGGING("trig called with %d %d   funcp: %p  len: %lld  inputs: %p %p  steps: %lld %lld\n", funcop, atype, pstUFunc->pOldFunc, n, args[0], args[1], (int64_t)steps[0], (int64_t)steps[1]);
+    //printf("trig called with %d %d   funcp: %p  len: %lld  inputs: %p %p  steps: %lld %lld\n", funcop, atype, pstUFunc->pOldFunc, n, args[0], args[1], (int64_t)steps[0], (int64_t)steps[1]);
 
     stMATH_WORKER_ITEM* pWorkItem = THREADER->GetWorkItem(n);
     int64_t strideOut = steps[1];
@@ -738,6 +754,7 @@ static void AtopTrigMathFunction(char** args, const npy_intp* dimensions, const 
         else {
             // Call the original numpy routine
             stCallback.pOldFunc = pstUFunc->pOldFunc;
+            stCallback.innerloop = innerloop;
             pWorkItem->DoWorkCallback = UnaryThreadCallbackNumpy;
         }
         // This will notify the worker threads of a new work item

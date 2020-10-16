@@ -346,7 +346,10 @@ enum BINARY_OPERATION {
     BITWISE_NOTAND = 25,
     BITWISE_XOR_SPECIAL = 26,
 
-    BINARY_LAST = 27,
+    ATAN2 = 27,
+    HYPOT = 28,
+
+    BINARY_LAST = 29,
 };
 
 enum TRIG_OPERATION {
@@ -354,7 +357,16 @@ enum TRIG_OPERATION {
     SIN = 1,
     COS = 2,
     TAN = 3,
-    TRIG_LAST = 4
+    ASIN = 4,
+    ACOS = 5,
+    ATAN = 6,
+    SINH = 7,
+    COSH = 8,
+    TANH = 9,
+    ASINH = 10,
+    ACOSH = 11,
+    ATANH = 12,
+    TRIG_LAST = 15
 };
 
 //----------------------------------------------------------------------------------

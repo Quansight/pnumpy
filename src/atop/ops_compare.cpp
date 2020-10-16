@@ -351,10 +351,10 @@ static void CompareFloat(void* pDataIn, void* pDataIn2, void* pDataOut, int64_t 
                 __m256i* pDestFastEnd = &pDestFast[len / 32];
                 while (pDestFast != pDestFastEnd) {
                     // the shuffle will move all 8 comparisons together
-                    __m256i m0 = _mm256_shuffle_epi8(_mm256_castps_si256(_mm256_cmp_ps(pSrc1Fast[0], m5, COMP_OPCODE)), g_shuffle1);
-                    __m256i m1 = _mm256_shuffle_epi8(_mm256_castps_si256(_mm256_cmp_ps(pSrc1Fast[1], m5, COMP_OPCODE)), g_shuffle2);
-                    __m256i m2 = _mm256_shuffle_epi8(_mm256_castps_si256(_mm256_cmp_ps(pSrc1Fast[2], m5, COMP_OPCODE)), g_shuffle3);
-                    __m256i m3 = _mm256_shuffle_epi8(_mm256_castps_si256(_mm256_cmp_ps(pSrc1Fast[3], m5, COMP_OPCODE)), g_shuffle4);
+                    __m256i m0 = _mm256_shuffle_epi8(_mm256_castps_si256(_mm256_cmp_ps(LOADU(pSrc1Fast+0), m5, COMP_OPCODE)), g_shuffle1);
+                    __m256i m1 = _mm256_shuffle_epi8(_mm256_castps_si256(_mm256_cmp_ps(LOADU(pSrc1Fast+1), m5, COMP_OPCODE)), g_shuffle2);
+                    __m256i m2 = _mm256_shuffle_epi8(_mm256_castps_si256(_mm256_cmp_ps(LOADU(pSrc1Fast+2), m5, COMP_OPCODE)), g_shuffle3);
+                    __m256i m3 = _mm256_shuffle_epi8(_mm256_castps_si256(_mm256_cmp_ps(LOADU(pSrc1Fast+3), m5, COMP_OPCODE)), g_shuffle4);
                     m0 = _mm256_or_si256(_mm256_or_si256(m0, m1), _mm256_or_si256(m2, m3));
 
                     STOREU(pDestFast, _mm256_and_si256(_mm256_permutevar8x32_epi32(m0, g_permute), g_ones));

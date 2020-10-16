@@ -72,6 +72,24 @@ template<typename T> static const inline T OrOp(T x, T y) { return x | y; }
 template<typename T> static const inline T AndNotOp(T x, T y) { return ~x & y; }
 
 //=========================================================================================
+
+template<typename T> static const inline double ATAN2_OP(double x, double y) { return atan2(x, y); }
+template<typename T> static const inline float ATAN2_OP(float x, float y) { return atan2f(x, y); }
+
+template<typename T> static const inline double HYPOT_OP(double x, double y) { return hypotl(x, y); }
+template<typename T> static const inline float HYPOT_OP(float x, float y) { return hypotf(x, y); }
+
+#if defined(RT_COMPILER_MSVC)
+
+template<typename T> static const inline __m256  ATAN2_OP_256(__m256 x, __m256 y) { return _mm256_atan2_ps(x, y); }
+template<typename T> static const inline __m256d ATAN2_OP_256(__m256d x, __m256d y) { return _mm256_atan2_pd(x, y); }
+
+template<typename T> static const inline __m256  HYPOT_OP_256(__m256 x, __m256 y) { return _mm256_hypot_ps(x, y); }
+template<typename T> static const inline __m256d HYPOT_OP_256(__m256d x, __m256d y) { return _mm256_hypot_pd(x, y); }
+
+#endif
+
+//=========================================================================================
 static const inline __m256  ADD_OP_256f32(__m256 x, __m256 y) { return _mm256_add_ps(x, y); }
 static const inline __m256d ADD_OP_256f64(__m256d x, __m256d y) { return _mm256_add_pd(x, y); }
 static const inline __m256i ADD_OP_256i8(__m256i x, __m256i y) { return _mm256_add_epi8(x, y); }
