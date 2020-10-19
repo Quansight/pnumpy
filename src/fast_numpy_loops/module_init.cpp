@@ -17,6 +17,15 @@ extern "C" PyObject* thread_disable(PyObject * self, PyObject * args);
 extern "C" PyObject* thread_isenabled(PyObject * self, PyObject * args);
 extern "C" PyObject* thread_getworkers(PyObject * self, PyObject * args);
 extern "C" PyObject* thread_setworkers(PyObject * self, PyObject * args);
+extern "C" PyObject* ledger_enable(PyObject * self, PyObject * args);
+extern "C" PyObject* ledger_disable(PyObject * self, PyObject * args);
+extern "C" PyObject* ledger_isenabled(PyObject * self, PyObject * args);
+extern "C" PyObject* ledger_info(PyObject * self, PyObject * args);
+extern "C" PyObject* recycler_enable(PyObject * self, PyObject * args);
+extern "C" PyObject* recycler_disable(PyObject * self, PyObject * args);
+extern "C" PyObject* recycler_isenabled(PyObject * self, PyObject * args);
+extern "C" PyObject* recycler_info(PyObject * self, PyObject * args);
+
 extern "C" PyObject* timer_gettsc(PyObject * self, PyObject * args);
 extern "C" PyObject* timer_getutc(PyObject * self, PyObject * args);
 extern "C" PyObject* cpustring(PyObject * self, PyObject * args);
@@ -41,6 +50,14 @@ static PyMethodDef module_functions[] = {
     {"timer_getutc",     (PyCFunction)timer_getutc,  METH_VARARGS, "get the time in utc nanos since unix epoch"},
     {"cpustring",        (PyCFunction)cpustring,  METH_VARARGS, "cpu brand string plus features"},
     {"oldinit",          (PyCFunction)oldinit, METH_VARARGS | METH_KEYWORDS, oldinit_doc},
+    {"ledger_enable",    (PyCFunction)ledger_enable,  METH_VARARGS, "enable ledger debuggging"},
+    {"ledger_disable",   (PyCFunction)ledger_disable,  METH_VARARGS, "disable ledger"},
+    {"ledger_isenabled", (PyCFunction)ledger_isenabled,  METH_VARARGS, "returns True if ledger enabled else False"},
+    {"ledger_info",      (PyCFunction)ledger_info,  METH_VARARGS, "return ledger information"},
+    {"recycler_enable",    (PyCFunction)recycler_enable,  METH_VARARGS, "enable recycler debuggging"},
+    {"recycler_disable",   (PyCFunction)recycler_disable,  METH_VARARGS, "disable recycler"},
+    {"recycler_isenabled", (PyCFunction)recycler_isenabled,  METH_VARARGS, "returns True if recycler enabled else False"},
+    {"recycler_info",      (PyCFunction)recycler_info,  METH_VARARGS, "return recycler information"},
     {NULL, NULL, 0,  NULL}
 };
 
