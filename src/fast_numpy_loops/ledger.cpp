@@ -129,3 +129,41 @@ uint64_t GetUTCNanos() {
    return GetTimeStamp();
 #endif
 }
+
+
+struct stLEDGER_ITEM {
+    const char* StrName;
+    int64_t     StartTime;
+    int64_t     TotalTime;
+
+    int64_t     ArraySize;
+
+    int32_t     ArrayOp;
+    int32_t     Type;
+
+};
+
+//-----------------------------------------------------------
+// allocated on 64 byte alignment
+struct stLedgerRing {
+    static const int64_t   RING_BUFFER_SIZE = 8096;
+    static const int64_t   RING_BUFFER_MASK = 8095;
+
+    volatile int64_t       Index;
+
+    stLEDGER_ITEM          LedgerQueue[RING_BUFFER_SIZE];
+
+    void Init() {
+        Index = 0;
+
+        for (int i = 0; i < RING_BUFFER_SIZE; i++) {
+            LedgerQueue[i].StrName = 0;
+            LedgerQueue[i].StartTime = 0;
+            LedgerQueue[i].TotalTime = 0;
+            LedgerQueue[i].ArraySize = 0;
+        }
+    }
+};
+
+stLedgerRing    g_LedgerRing;
+
