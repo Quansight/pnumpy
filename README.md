@@ -15,9 +15,13 @@ via third-party functions.
 pip install fast_numpy_loops
 ```
 
-You can also install the in-development version 0.0.1 with::
+You can also install the in-development version 0.0.1 with:
 ```
 pip install https://github.com/Quansight/numpy-threading-extensions/archive/v0.0.1.zip
+```
+or latest with
+```
+pip install https://github.com/Quansight/numpy-threading-extensions/archive/main.zip
 ```
 
 ## Documentation
