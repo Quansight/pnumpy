@@ -277,35 +277,27 @@ enum UNARY_OPERATION {
     POSITIVE = 10,
     SIGN = 11,
     RINT = 12,
-    EXP = 13,
-    EXP2 = 14,
 
     // One input, always return a float one input
     SQRT = 15,
-    LOG = 16,
-    LOG2 = 17,
-    LOG10 = 18,
-    EXPM1 = 19,
-    LOG1P = 20,
-    SQUARE = 21,
-    CBRT = 22,
-    RECIPROCAL = 23,
+    SQUARE = 16,
+    RECIPROCAL = 17,
 
     // one input, output bool
-    LOGICAL_NOT = 24,
-    ISINF = 25,
-    ISNAN = 26,
-    ISFINITE = 27,
-    ISNORMAL = 28,
+    LOGICAL_NOT = 18,
+    ISINF = 19,
+    ISNAN = 20,
+    ISFINITE = 21,
+    ISNORMAL = 22,
 
-    ISNOTINF = 29,
-    ISNOTNAN = 30,
-    ISNOTFINITE = 31,
-    ISNOTNORMAL = 32,
-    ISNANORZERO = 33,
+    ISNOTINF = 23,
+    ISNOTNAN = 24,
+    ISNOTFINITE = 25,
+    ISNOTNORMAL = 26,
+    ISNANORZERO = 27,
 
     // One input, does not allow floats
-    BITWISE_NOT = 34,      // same as invert?
+    BITWISE_NOT = 28,      // same as invert?
 
     UNARY_LAST = 35,
 };
@@ -366,7 +358,17 @@ enum TRIG_OPERATION {
     ASINH = 10,
     ACOSH = 11,
     ATANH = 12,
-    TRIG_LAST = 15
+
+    LOG = 13,
+    LOG2 = 14,
+    LOG10 = 15,
+    EXP = 16,
+    EXP2 = 17,
+    EXPM1 = 18,
+    LOG1P = 19,
+    CBRT = 20,
+
+    TRIG_LAST = 21
 };
 
 //----------------------------------------------------------------------------------

@@ -199,6 +199,10 @@ inline void ReduceMathOpFast(void* pDataIn1X, void* pDataOutX, void* pStartVal, 
             };
 
             // NOTE: there is a horizontal add, there is a better way to do this
+            //m0 = _mm_add_ps(_mm256_extractf128_ps(m0, 0), _mm256_extractf128_ps(m0, 1));
+            //m0 = _mm_hadd_ps(m0, m0);
+            //m0 = _mm_hadd_ps(m0, m0);
+
             mathreg[0] = m0;
             for (int i = 0; i < perReg; i++) {
                 //printf("startval %lld %lld\n", (long long)startval, (long long)horizontal[i]);
