@@ -110,15 +110,8 @@ static stUFuncToAtop gUnaryMapping[] = {
     {"positive",      UNARY_OPERATION::POSITIVE},
     {"sign",          UNARY_OPERATION::SIGN},
     {"rint",          UNARY_OPERATION::RINT},
-    {"exp",           UNARY_OPERATION::EXP},
-    {"exp2",          UNARY_OPERATION::EXP2},
     {"sqrt",          UNARY_OPERATION::SQRT},
-    {"log",           UNARY_OPERATION::LOG},
-    {"log2",          UNARY_OPERATION::LOG2},
-    {"log10",         UNARY_OPERATION::LOG10},
-    {"log1p",         UNARY_OPERATION::LOG1P},
     {"square",        UNARY_OPERATION::SQUARE},
-    {"cbrt",          UNARY_OPERATION::CBRT},
     {"reciprocal",    UNARY_OPERATION::RECIPROCAL},
     {"logical_not",   UNARY_OPERATION::LOGICAL_NOT},
     {"isinf",         UNARY_OPERATION::ISINF},
@@ -143,6 +136,14 @@ static stUFuncToAtop gTrigMapping[] = {
     {"arcsinh",       TRIG_OPERATION::ASINH},
     {"arccosh",       TRIG_OPERATION::ACOSH},
     {"arctanh",       TRIG_OPERATION::ATANH},
+    {"cbrt",          TRIG_OPERATION::CBRT},
+    {"exp",           TRIG_OPERATION::EXP},
+    {"exp2",          TRIG_OPERATION::EXP2},
+    {"expm1",         TRIG_OPERATION::EXPM1},
+    {"log",           TRIG_OPERATION::LOG},
+    {"log2",          TRIG_OPERATION::LOG2},
+    {"log10",         TRIG_OPERATION::LOG10},
+    {"log1p",         TRIG_OPERATION::LOG1P},
 };
 
 
@@ -1077,6 +1078,9 @@ PyObject* newinit(PyObject* self, PyObject* args, PyObject* kwargs) {
 
                 // For unary it only has a signature of 2
                 UNARY_FUNC pUnaryFunc = GetTrigOpFast(atop, atype, &signature[1]);
+                if (!pUnaryFunc) {
+                    GetTrigOpSlow(atop, atype, &signature[1]);
+                }
                 signature[1] = convert_atop_to_dtype[signature[1]];
 
                 // Even if pUnaryFunc is NULL, still hook it since we can thread it
@@ -1088,6 +1092,8 @@ PyObject* newinit(PyObject* self, PyObject* args, PyObject* kwargs) {
                 stUFunc* pstUFunc = &g_TrigFuncLUT[atop][atype];
                 // Store the new function to call and the previous ufunc
                 pstUFunc->pOldFunc = oldFunc;
+
+                // NULL allowed here, it will use the default
                 pstUFunc->pUnaryFunc = pUnaryFunc;
                 pstUFunc->MaxThreads = 5;
             }

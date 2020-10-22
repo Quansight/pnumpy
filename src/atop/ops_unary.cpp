@@ -1077,72 +1077,11 @@ template<typename T>
 static void UnaryOpSlow_SQRT(void* pDataIn1, void* pDataOut, int64_t len, int64_t strideIn, int64_t strideOut) {
     return UnaryOpSlow<T, const T(*)(T)>(SQRT_OP<T>, pDataIn1, pDataOut, len, strideIn, strideOut);
 }
-//-------------------------------------------------------------------
-template<typename T>
-static void UnaryOpSlow_CBRT(void* pDataIn1, void* pDataOut, int64_t len, int64_t strideIn, int64_t strideOut) {
-    return UnaryOpSlow<T, const T(*)(T)>(CBRT_OP<T>, pDataIn1, pDataOut, len, strideIn, strideOut);
-}
-//-------------------------------------------------------------------
-template<typename T>
-static void UnaryOpSlow_LOG(void* pDataIn1, void* pDataOut, int64_t len, int64_t strideIn, int64_t strideOut) {
-    return UnaryOpSlow<T, const T(*)(T)>(LOG_OP<T>, pDataIn1, pDataOut, len, strideIn, strideOut);
-}
-//-------------------------------------------------------------------
-template<typename T>
-static void UnaryOpSlow_LOG2(void* pDataIn1, void* pDataOut, int64_t len, int64_t strideIn, int64_t strideOut) {
-    return UnaryOpSlow<T, const T(*)(T)>(LOG2_OP<T>, pDataIn1, pDataOut, len, strideIn, strideOut);
-}
-//-------------------------------------------------------------------
-template<typename T>
-static void UnaryOpSlow_LOG10(void* pDataIn1, void* pDataOut, int64_t len, int64_t strideIn, int64_t strideOut) {
-    return UnaryOpSlow<T, const T(*)(T)>(LOG10_OP<T>, pDataIn1, pDataOut, len, strideIn, strideOut);
-}
-//-------------------------------------------------------------------
-template<typename T>
-static void UnaryOpSlow_EXP(void* pDataIn1, void* pDataOut, int64_t len, int64_t strideIn, int64_t strideOut) {
-    return UnaryOpSlow<T, const T(*)(T)>(EXP_OP<T>, pDataIn1, pDataOut, len, strideIn, strideOut);
-}
-//-------------------------------------------------------------------
-template<typename T>
-static void UnaryOpSlow_EXP2(void* pDataIn1, void* pDataOut, int64_t len, int64_t strideIn, int64_t strideOut) {
-    return UnaryOpSlow<T, const T(*)(T)>(EXP2_OP<T>, pDataIn1, pDataOut, len, strideIn, strideOut);
-}
-
 
 //-------------------------------------------------------------------
 template<typename T>
 static void UnaryOpSlowDouble_SQRT(void* pDataIn1, void* pDataOut, int64_t len, int64_t strideIn, int64_t strideOut) {
     return UnaryOpSlowDouble<T, const double(*)(double)>(SQRT_OP<double>, pDataIn1, pDataOut, len, strideIn, strideOut);
-}
-//-------------------------------------------------------------------
-template<typename T>
-static void UnaryOpSlowDouble_CBRT(void* pDataIn1, void* pDataOut, int64_t len, int64_t strideIn, int64_t strideOut) {
-    return UnaryOpSlowDouble<T, const double(*)(double)>(CBRT_OP<double>, pDataIn1, pDataOut, len, strideIn, strideOut);
-}
-//-------------------------------------------------------------------
-template<typename T>
-static void UnaryOpSlowDouble_LOG(void* pDataIn1, void* pDataOut, int64_t len, int64_t strideIn, int64_t strideOut) {
-    return UnaryOpSlowDouble<T, const double(*)(double)>(LOG_OP<double>, pDataIn1, pDataOut, len, strideIn, strideOut);
-}
-//-------------------------------------------------------------------
-template<typename T>
-static void UnaryOpSlowDouble_LOG2(void* pDataIn1, void* pDataOut, int64_t len, int64_t strideIn, int64_t strideOut) {
-    return UnaryOpSlowDouble<T, const double(*)(double)>(LOG2_OP<double>, pDataIn1, pDataOut, len, strideIn, strideOut);
-}
-//-------------------------------------------------------------------
-template<typename T>
-static void UnaryOpSlowDouble_LOG10(void* pDataIn1, void* pDataOut, int64_t len, int64_t strideIn, int64_t strideOut) {
-    return UnaryOpSlowDouble<T, const double(*)(double)>(LOG10_OP<double>, pDataIn1, pDataOut, len, strideIn, strideOut);
-}
-//-------------------------------------------------------------------
-template<typename T>
-static void UnaryOpSlowDouble_EXP(void* pDataIn1, void* pDataOut, int64_t len, int64_t strideIn, int64_t strideOut) {
-    return UnaryOpSlowDouble<T, const double(*)(double)>(EXP_OP<double>, pDataIn1, pDataOut, len, strideIn, strideOut);
-}
-//-------------------------------------------------------------------
-template<typename T>
-static void UnaryOpSlowDouble_EXP2(void* pDataIn1, void* pDataOut, int64_t len, int64_t strideIn, int64_t strideOut) {
-    return UnaryOpSlowDouble<T, const double(*)(double)>(EXP2_OP<double>, pDataIn1, pDataOut, len, strideIn, strideOut);
 }
 
 
@@ -1483,97 +1422,6 @@ UNARY_FUNC GetUnaryOpSlow(int func, int numpyInType1, int numpyOutType, int* wan
         case ATOP_UINT64:  return UnaryOpSlowDouble_SQRT<int64_t>;
         case ATOP_DOUBLE:  return UnaryOpSlow_SQRT<double>;
         case ATOP_LONGDOUBLE: return UnaryOpSlow_SQRT<long double>;
-        }
-        break;
-    case UNARY_OPERATION::CBRT:
-        *wantedOutType = ATOP_DOUBLE;
-        if (numpyInType1 == ATOP_FLOAT) {
-            *wantedOutType = ATOP_FLOAT;
-        }
-        if (numpyInType1 == ATOP_LONGDOUBLE) {
-            *wantedOutType = ATOP_LONGDOUBLE;
-        }
-        switch (numpyInType1) {
-        case ATOP_INT32:   return UnaryOpSlowDouble_CBRT<int32_t>;
-        case ATOP_UINT32:  return UnaryOpSlowDouble_CBRT<uint32_t>;
-        case ATOP_INT64:   return UnaryOpSlowDouble_CBRT<int64_t>;
-        case ATOP_UINT64:  return UnaryOpSlowDouble_CBRT<int64_t>;
-        }
-        break;
-
-    case UNARY_OPERATION::LOG:
-        *wantedOutType = ATOP_DOUBLE;
-        if (numpyInType1 == ATOP_FLOAT) {
-            *wantedOutType = ATOP_FLOAT;
-        }
-        if (numpyInType1 == ATOP_LONGDOUBLE) {
-            *wantedOutType = ATOP_LONGDOUBLE;
-        }
-        switch (numpyInType1) {
-        case ATOP_FLOAT: return UnaryOpSlow_LOG<float>;
-        case ATOP_DOUBLE: return UnaryOpSlow_LOG<double>;
-        case ATOP_LONGDOUBLE: return UnaryOpSlow_LOG<long double>;
-        case ATOP_INT32:   return UnaryOpSlowDouble_LOG<int32_t>;
-        case ATOP_UINT32:  return UnaryOpSlowDouble_LOG<uint32_t>;
-        case ATOP_INT64:   return UnaryOpSlowDouble_LOG<int64_t>;
-        case ATOP_UINT64:  return UnaryOpSlowDouble_LOG<int64_t>;
-        }
-        break;
-
-    case UNARY_OPERATION::LOG10:
-        *wantedOutType = ATOP_DOUBLE;
-        if (numpyInType1 == ATOP_FLOAT) {
-            *wantedOutType = ATOP_FLOAT;
-        }
-        if (numpyInType1 == ATOP_LONGDOUBLE) {
-            *wantedOutType = ATOP_LONGDOUBLE;
-        }
-        switch (numpyInType1) {
-        case ATOP_FLOAT: return UnaryOpSlow_LOG10<float>;
-        case ATOP_DOUBLE: return UnaryOpSlow_LOG10<double>;
-        case ATOP_LONGDOUBLE: return UnaryOpSlow_LOG10<long double>;
-        case ATOP_INT32:  return UnaryOpSlowDouble_LOG10<int32_t>;
-        case ATOP_UINT32:  return UnaryOpSlowDouble_LOG10<uint32_t>;
-        case ATOP_INT64:  return UnaryOpSlowDouble_LOG10<int64_t>;
-        case ATOP_UINT64:  return UnaryOpSlowDouble_LOG10<int64_t>;
-        }
-        break;
-
-    case UNARY_OPERATION::EXP:
-        *wantedOutType = ATOP_DOUBLE;
-        if (numpyInType1 == ATOP_FLOAT) {
-            *wantedOutType = ATOP_FLOAT;
-        }
-        if (numpyInType1 == ATOP_LONGDOUBLE) {
-            *wantedOutType = ATOP_LONGDOUBLE;
-        }
-        switch (numpyInType1) {
-        case ATOP_FLOAT: return UnaryOpSlow_EXP<float>;
-        case ATOP_DOUBLE: return UnaryOpSlow_EXP<double>;
-        case ATOP_LONGDOUBLE: return UnaryOpSlow_EXP<long double>;
-        case ATOP_INT32:  return UnaryOpSlowDouble_EXP<int32_t>;
-        case ATOP_UINT32:  return UnaryOpSlowDouble_EXP<uint32_t>;
-        case ATOP_INT64:  return UnaryOpSlowDouble_EXP<int64_t>;
-        case ATOP_UINT64:  return UnaryOpSlowDouble_EXP<int64_t>;
-        }
-        break;
-
-    case UNARY_OPERATION::EXP2:
-        *wantedOutType = ATOP_DOUBLE;
-        if (numpyInType1 == ATOP_FLOAT) {
-            *wantedOutType = ATOP_FLOAT;
-        }
-        if (numpyInType1 == ATOP_LONGDOUBLE) {
-            *wantedOutType = ATOP_LONGDOUBLE;
-        }
-        switch (numpyInType1) {
-        case ATOP_FLOAT: return UnaryOpSlow_EXP2<float>;
-        case ATOP_DOUBLE: return UnaryOpSlow_EXP2<double>;
-        case ATOP_LONGDOUBLE: return UnaryOpSlow_EXP2<long double>;
-        case ATOP_INT32:  return UnaryOpSlowDouble_EXP2<int32_t>;
-        case ATOP_UINT32:  return UnaryOpSlowDouble_EXP2<uint32_t>;
-        case ATOP_INT64:  return UnaryOpSlowDouble_EXP2<int64_t>;
-        case ATOP_UINT64:  return UnaryOpSlowDouble_EXP2<int64_t>;
         }
         break;
 
