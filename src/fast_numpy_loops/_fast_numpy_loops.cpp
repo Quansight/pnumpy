@@ -1,4 +1,3 @@
-
 #include "Python.h"
 #define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
 #include "numpy/ndarrayobject.h"
@@ -839,57 +838,8 @@ void add_T(T **args, npy_intp const *dimensions, npy_intp const *steps,
     }
 }
 
-
 extern "C"
-PyObject* oldinit(PyObject *self, PyObject *args, PyObject *kwargs) {
-    PyObject* result = NULL;
-    PyObject *ufunc = NULL;
-    const char * uname = NULL;
-    int ret = 0;
-    int signature[3] = {NPY_INT32, NPY_INT32, NPY_INT32};
-    PyUFuncGenericFunction oldfunc, newfunc;
-    // C++ warns on assigning const char * to char *
-
-    if (!PyArg_ParseTuple(args, "s:oldinit", &uname)) {
-        return NULL;
-    }
-
-    // Initialize numpy's C-API.
-    import_array();
-    import_umath();
-
-    PyObject *numpy_module = PyImport_ImportModule("numpy");
-    if (numpy_module == NULL) {
-        PyErr_SetString(PyExc_TypeError, "cannot import numpy");
-        return NULL;
-    }
-    ufunc = PyObject_GetAttrString(numpy_module, uname);
-    Py_DECREF(numpy_module);
-    if (ufunc == NULL || (!PyObject_TypeCheck(ufunc, &PyUFunc_Type))) {
-        if (ufunc) Py_XDECREF(ufunc);
-        return PyErr_Format(PyExc_TypeError, "func %s must be the name of a ufunc", uname);
-    }
-
-    // TODO: parse requested dtype into the templating type
-    newfunc = (PyUFuncGenericFunction)add_T<int32_t>;
-    ret = PyUFunc_ReplaceLoopBySignature((PyUFuncObject*)ufunc,
-                                             newfunc, signature, &oldfunc);
-
-    if (ret < 0) {
-        PyErr_SetString(PyExc_ValueError, "signature int,int->int not found");
-    }
-    if (oldfunc == newfunc) {
-        result = PyUnicode_FromString("int32,int32->int32 (repeated initialize)");
-    }
-    else {
-        result = PyUnicode_FromString("int32,int32->int32");
-    }
-    return result;
-}
-
-
-extern "C"
-PyObject* newinit(PyObject* self, PyObject* args, PyObject* kwargs) {
+PyObject* init(PyObject* self, PyObject* args, PyObject* kwargs) {
     int dtypes[] = { NPY_BOOL, NPY_INT8, NPY_UINT8,  NPY_INT16, NPY_UINT16,  NPY_INT32, NPY_UINT32,  NPY_INT64, NPY_UINT64, NPY_FLOAT32, NPY_FLOAT64 };
     //int dtypes[] = {  NPY_INT32,  NPY_INT64};
 
@@ -1079,7 +1029,7 @@ PyObject* newinit(PyObject* self, PyObject* args, PyObject* kwargs) {
                 // For unary it only has a signature of 2
                 UNARY_FUNC pUnaryFunc = GetTrigOpFast(atop, atype, &signature[1]);
                 if (!pUnaryFunc) {
-                    GetTrigOpSlow(atop, atype, &signature[1]);
+                   GetTrigOpSlow(atop, atype, &signature[1]);
                 }
                 signature[1] = convert_atop_to_dtype[signature[1]];
 

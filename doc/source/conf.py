@@ -18,11 +18,11 @@
 # -- Project information -----------------------------------------------------
 
 project = 'fast_numpy_loops'
-copyright = '2020, tdimitri, mattip'
-author = 'tdimitri, mattip'
+copyright = '2020'
+author = 'The Authors'
 
 # The full version, including alpha/beta/rc tags
-release = 'v0.0.0'
+release = 'v0.1.0'
 
 
 # -- General configuration ---------------------------------------------------
