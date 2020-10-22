@@ -104,6 +104,7 @@ setup(
                      'src/fast_numpy_loops/module_init.cpp',
                      'src/fast_numpy_loops/ledger.cpp',
                      'src/fast_numpy_loops/getitem.cpp',
+                     'src/fast_numpy_loops/recycler.cpp',
                      'src/atop/atop.cpp',
                      'src/atop/threads.cpp',
                      'src/atop/ops_binary.cpp',

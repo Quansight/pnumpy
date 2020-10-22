@@ -47,7 +47,7 @@ PyArrayObject* AllocateNumpyArray(int ndim, npy_intp* dims, int32_t numpyType, i
     const int array_flags = fortran_array ? NPY_ARRAY_F_CONTIGUOUS : 0;
 
     // Make one dimension size on stack
-    volatile INT64 dimensions[1] = { len };
+    volatile int64_t dimensions[1] = { len };
 
     // This is the safest way...
     if (!dims) {

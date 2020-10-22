@@ -362,7 +362,195 @@ static void UnaryOpSlowDouble_EXP2(void* pDataIn1, void* pDataOut, int64_t len, 
     return UnaryOpSlowDouble<T, const double(*)(double)>(EXP2_OP<double>, pDataIn1, pDataOut, len, strideIn, strideOut);
 }
 
+/*
+ * Constants used in vector implementation of exp(x)
+ */
+#define NPY_RINT_CVT_MAGICf 0x1.800000p+23f
+#define NPY_CODY_WAITE_LOGE_2_HIGHf -6.93145752e-1f
+#define NPY_CODY_WAITE_LOGE_2_LOWf -1.42860677e-6f
+#define NPY_COEFF_P0_EXPf 9.999999999980870924916e-01f
+#define NPY_COEFF_P1_EXPf 7.257664613233124478488e-01f
+#define NPY_COEFF_P2_EXPf 2.473615434895520810817e-01f
+#define NPY_COEFF_P3_EXPf 5.114512081637298353406e-02f
+#define NPY_COEFF_P4_EXPf 6.757896990527504603057e-03f
+#define NPY_COEFF_P5_EXPf 5.082762527590693718096e-04f
+#define NPY_COEFF_Q0_EXPf 1.000000000000000000000e+00f
+#define NPY_COEFF_Q1_EXPf -2.742335390411667452936e-01f
+#define NPY_COEFF_Q2_EXPf 2.159509375685829852307e-02f
 
+ /*
+  * Constants used in vector implementation of log(x)
+  */
+#define NPY_COEFF_P0_LOGf 0.000000000000000000000e+00f
+#define NPY_COEFF_P1_LOGf 9.999999999999998702752e-01f
+#define NPY_COEFF_P2_LOGf 2.112677543073053063722e+00f
+#define NPY_COEFF_P3_LOGf 1.480000633576506585156e+00f
+#define NPY_COEFF_P4_LOGf 3.808837741388407920751e-01f
+#define NPY_COEFF_P5_LOGf 2.589979117907922693523e-02f
+#define NPY_COEFF_Q0_LOGf 1.000000000000000000000e+00f
+#define NPY_COEFF_Q1_LOGf 2.612677543073109236779e+00f
+#define NPY_COEFF_Q2_LOGf 2.453006071784736363091e+00f
+#define NPY_COEFF_Q3_LOGf 9.864942958519418960339e-01f
+#define NPY_COEFF_Q4_LOGf 1.546476374983906719538e-01f
+#define NPY_COEFF_Q5_LOGf 5.875095403124574342950e-03f
+  /*
+   * Constants used in vector implementation of sinf/cosf(x)
+   */
+#define NPY_TWO_O_PIf 0x1.45f306p-1f
+#define NPY_CODY_WAITE_PI_O_2_HIGHf -0x1.921fb0p+00f
+#define NPY_CODY_WAITE_PI_O_2_MEDf -0x1.5110b4p-22f
+#define NPY_CODY_WAITE_PI_O_2_LOWf -0x1.846988p-48f
+#define NPY_COEFF_INVF0_COSINEf 0x1.000000p+00f
+#define NPY_COEFF_INVF2_COSINEf -0x1.000000p-01f
+#define NPY_COEFF_INVF4_COSINEf 0x1.55553cp-05f
+#define NPY_COEFF_INVF6_COSINEf -0x1.6c06dcp-10f
+#define NPY_COEFF_INVF8_COSINEf 0x1.98e616p-16f
+#define NPY_COEFF_INVF3_SINEf -0x1.555556p-03f
+#define NPY_COEFF_INVF5_SINEf 0x1.11119ap-07f
+#define NPY_COEFF_INVF7_SINEf -0x1.a06bbap-13f
+#define NPY_COEFF_INVF9_SINEf 0x1.7d3bbcp-19f
+
+
+
+/*
+ * Vectorized implementation of log using AVX2 and AVX512
+ * 1) if x < 0.0f; return -NAN (invalid input)
+ * 2) Range reduction: y = x/2^k;
+ *      a) y = normalized mantissa, k is the exponent (0.5 <= y < 1)
+ * 3) Compute log(y) = P/Q, ratio of 2 polynomials P and Q
+ *      b) P = 5th order and Q = 5th order polynomials obtained from Remez's
+ *      algorithm (mini-max polynomial approximation)
+ * 5) Compute log(x) = log(y) + k*ln(2)
+ * 6) Max ULP error measured across all 32-bit FP's = 3.83 (x = 0x3f486945)
+ * 7) Max relative error measured across all 32-bit FP's = 2.359E-07 (for same
+ * x = 0x3f486945)
+ */
+
+//static NPY_GCC_OPT_3 NPY_GCC_TARGET_@ISA@ void
+//@ISA@_log_FLOAT(npy_float* op,
+//    npy_float* ip,
+//    const npy_intp array_size,
+//    const npy_intp steps)
+//{
+//    const npy_intp stride = steps / (npy_intp)sizeof(npy_float);
+//    const npy_int num_lanes = @BYTES@ / (npy_intp)sizeof(npy_float);
+//
+//    /*
+//     * Note: while generally indices are npy_intp, we ensure that our maximum index
+//     * will fit in an int32 as a precondition for this function via
+//     * IS_OUTPUT_BLOCKABLE_UNARY
+//     */
+//    npy_int32 indexarr[16];
+//    for (npy_int32 ii = 0; ii < 16; ii++) {
+//        indexarr[ii] = ii * stride;
+//    }
+//
+//    /* Load up frequently used constants */
+//    @vtype@ log_p0 = _mm@vsize@_set1_ps(NPY_COEFF_P0_LOGf);
+//    @vtype@ log_p1 = _mm@vsize@_set1_ps(NPY_COEFF_P1_LOGf);
+//    @vtype@ log_p2 = _mm@vsize@_set1_ps(NPY_COEFF_P2_LOGf);
+//    @vtype@ log_p3 = _mm@vsize@_set1_ps(NPY_COEFF_P3_LOGf);
+//    @vtype@ log_p4 = _mm@vsize@_set1_ps(NPY_COEFF_P4_LOGf);
+//    @vtype@ log_p5 = _mm@vsize@_set1_ps(NPY_COEFF_P5_LOGf);
+//    @vtype@ log_q0 = _mm@vsize@_set1_ps(NPY_COEFF_Q0_LOGf);
+//    @vtype@ log_q1 = _mm@vsize@_set1_ps(NPY_COEFF_Q1_LOGf);
+//    @vtype@ log_q2 = _mm@vsize@_set1_ps(NPY_COEFF_Q2_LOGf);
+//    @vtype@ log_q3 = _mm@vsize@_set1_ps(NPY_COEFF_Q3_LOGf);
+//    @vtype@ log_q4 = _mm@vsize@_set1_ps(NPY_COEFF_Q4_LOGf);
+//    @vtype@ log_q5 = _mm@vsize@_set1_ps(NPY_COEFF_Q5_LOGf);
+//    @vtype@ loge2 = _mm@vsize@_set1_ps(NPY_LOGE2f);
+//    @vtype@ nan = _mm@vsize@_set1_ps(NPY_NANF);
+//    @vtype@ neg_nan = _mm@vsize@_set1_ps(-NPY_NANF);
+//    @vtype@ neg_inf = _mm@vsize@_set1_ps(-NPY_INFINITYF);
+//    @vtype@ inf = _mm@vsize@_set1_ps(NPY_INFINITYF);
+//    @vtype@ zeros_f = _mm@vsize@_set1_ps(0.0f);
+//    @vtype@ ones_f = _mm@vsize@_set1_ps(1.0f);
+//    @vtype@i vindex = _mm@vsize@_loadu_si@vsize@((@vtype@i*)indexarr);
+//    @vtype@ poly, num_poly, denom_poly, exponent;
+//
+//    @mask@ inf_mask, nan_mask, sqrt2_mask, zero_mask, negx_mask;
+//    @mask@ invalid_mask = @isa@_get_partial_load_mask_ps(0, num_lanes);
+//    @mask@ divide_by_zero_mask = invalid_mask;
+//    @mask@ load_mask = @isa@_get_full_load_mask_ps();
+//    npy_intp num_remaining_elements = array_size;
+//
+//    while (num_remaining_elements > 0) {
+//
+//        if (num_remaining_elements < num_lanes) {
+//            load_mask = @isa@_get_partial_load_mask_ps(num_remaining_elements,
+//                num_lanes);
+//        }
+//
+//        @vtype@ x_in;
+//        if (stride == 1) {
+//            x_in = @isa@_masked_load_ps(load_mask, ip);
+//        }
+//        else {
+//            x_in = @isa@_masked_gather_ps(zeros_f, ip, vindex, load_mask);
+//        }
+//
+//        negx_mask = _mm@vsize@_cmp_ps@vsub@(x_in, zeros_f, _CMP_LT_OQ);
+//        zero_mask = _mm@vsize@_cmp_ps@vsub@(x_in, zeros_f, _CMP_EQ_OQ);
+//        inf_mask = _mm@vsize@_cmp_ps@vsub@(x_in, inf, _CMP_EQ_OQ);
+//        nan_mask = _mm@vsize@_cmp_ps@vsub@(x_in, x_in, _CMP_NEQ_UQ);
+//        divide_by_zero_mask = @or_masks@(divide_by_zero_mask,
+//            @and_masks@(zero_mask, load_mask));
+//        invalid_mask = @or_masks@(invalid_mask, negx_mask);
+//
+//        @vtype@ x = @isa@_set_masked_lanes_ps(x_in, zeros_f, negx_mask);
+//
+//        /* set x = normalized mantissa */
+//        exponent = @isa@_get_exponent(x);
+//        x = @isa@_get_mantissa(x);
+//
+//        /* if x < sqrt(2) {exp = exp-1; x = 2*x} */
+//        sqrt2_mask = _mm@vsize@_cmp_ps@vsub@(x, _mm@vsize@_set1_ps(NPY_SQRT1_2f), _CMP_LE_OQ);
+//        x = @isa@_blend(x, _mm@vsize@_add_ps(x, x), sqrt2_mask);
+//        exponent = @isa@_blend(exponent,
+//            _mm@vsize@_sub_ps(exponent, ones_f), sqrt2_mask);
+//
+//        /* x = x - 1 */
+//        x = _mm@vsize@_sub_ps(x, ones_f);
+//
+//        /* Polynomial approximation for log(1+x) */
+//        num_poly = @fmadd@(log_p5, x, log_p4);
+//        num_poly = @fmadd@(num_poly, x, log_p3);
+//        num_poly = @fmadd@(num_poly, x, log_p2);
+//        num_poly = @fmadd@(num_poly, x, log_p1);
+//        num_poly = @fmadd@(num_poly, x, log_p0);
+//        denom_poly = @fmadd@(log_q5, x, log_q4);
+//        denom_poly = @fmadd@(denom_poly, x, log_q3);
+//        denom_poly = @fmadd@(denom_poly, x, log_q2);
+//        denom_poly = @fmadd@(denom_poly, x, log_q1);
+//        denom_poly = @fmadd@(denom_poly, x, log_q0);
+//        poly = _mm@vsize@_div_ps(num_poly, denom_poly);
+//        poly = @fmadd@(exponent, loge2, poly);
+//
+//        /*
+//         * x < 0.0f; return -NAN
+//         * x = +/- NAN; return NAN
+//         * x = 0.0f; return -INF
+//         */
+//        poly = @isa@_set_masked_lanes_ps(poly, nan, nan_mask);
+//        poly = @isa@_set_masked_lanes_ps(poly, neg_nan, negx_mask);
+//        poly = @isa@_set_masked_lanes_ps(poly, neg_inf, zero_mask);
+//        poly = @isa@_set_masked_lanes_ps(poly, inf, inf_mask);
+//
+//        @masked_store@(op, @cvtps_epi32@(load_mask), poly);
+//
+//        ip += num_lanes * stride;
+//        op += num_lanes;
+//        num_remaining_elements -= num_lanes;
+//    }
+//
+//    if (@mask_to_int@(invalid_mask)) {
+//        npy_set_floatstatus_invalid();
+//    }
+//    if (@mask_to_int@(divide_by_zero_mask)) {
+//        npy_set_floatstatus_divbyzero();
+//    }
+//}
+//
 
 extern "C"
 UNARY_FUNC GetTrigOpFast(int func, int atopInType1, int* wantedOutType) {
