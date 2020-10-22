@@ -378,18 +378,19 @@ BooleanIndex(PyObject* self, PyObject* args)
                 int8_t* pVIn = (int8_t*)pValuesIn;
 
                 for (int64_t i = 0; i < blength; i++) {
+                    uint64_t bitmask = *(uint64_t*)pData;
+                    uint64_t mask = 0xff;
 
                     // little endian, so the first value is low bit (not high bit)
-                    uint32_t bitmask = (uint32_t)(_pext_u64(*pData, 0x0101010101010101));
                     if (bitmask != 0) {
-                        if (bitmask & 1) { *pVOut++ = *pVIn; } pVIn++;
-                        if (bitmask & 2) { *pVOut++ = *pVIn; } pVIn++;
-                        if (bitmask & 4) { *pVOut++ = *pVIn; } pVIn++;
-                        if (bitmask & 8) { *pVOut++ = *pVIn; } pVIn++;
-                        if (bitmask & 16) { *pVOut++ = *pVIn; } pVIn++;
-                        if (bitmask & 32) { *pVOut++ = *pVIn; } pVIn++;
-                        if (bitmask & 64) { *pVOut++ = *pVIn; } pVIn++;
-                        if (bitmask & 128) { *pVOut++ = *pVIn; } pVIn++;
+                        if (bitmask & mask) { *pVOut++ = *pVIn; } pVIn++;  mask <<= 8;
+                        if (bitmask & mask) { *pVOut++ = *pVIn; } pVIn++;  mask <<= 8;
+                        if (bitmask & mask) { *pVOut++ = *pVIn; } pVIn++;  mask <<= 8;
+                        if (bitmask & mask) { *pVOut++ = *pVIn; } pVIn++;  mask <<= 8;
+                        if (bitmask & mask) { *pVOut++ = *pVIn; } pVIn++;  mask <<= 8;
+                        if (bitmask & mask) { *pVOut++ = *pVIn; } pVIn++;  mask <<= 8;
+                        if (bitmask & mask) { *pVOut++ = *pVIn; } pVIn++;  mask <<= 8;
+                        if (bitmask & mask) { *pVOut++ = *pVIn; } pVIn++; 
                     }
                     else {
                         pVIn += 8;
@@ -416,17 +417,18 @@ BooleanIndex(PyObject* self, PyObject* args)
 
                 for (int64_t i = 0; i < blength; i++) {
 
+                    uint64_t bitmask = *(uint64_t*)pData;
+                    uint64_t mask = 0xff;
                     // little endian, so the first value is low bit (not high bit)
-                    uint32_t bitmask = (uint32_t)(_pext_u64(*pData, 0x0101010101010101));
                     if (bitmask != 0) {
-                        if (bitmask & 1) { *pVOut++ = *pVIn; } pVIn++;
-                        if (bitmask & 2) { *pVOut++ = *pVIn; } pVIn++;
-                        if (bitmask & 4) { *pVOut++ = *pVIn; } pVIn++;
-                        if (bitmask & 8) { *pVOut++ = *pVIn; } pVIn++;
-                        if (bitmask & 16) { *pVOut++ = *pVIn; } pVIn++;
-                        if (bitmask & 32) { *pVOut++ = *pVIn; } pVIn++;
-                        if (bitmask & 64) { *pVOut++ = *pVIn; } pVIn++;
-                        if (bitmask & 128) { *pVOut++ = *pVIn; } pVIn++;
+                        if (bitmask & mask) { *pVOut++ = *pVIn; } pVIn++;  mask <<= 8;
+                        if (bitmask & mask) { *pVOut++ = *pVIn; } pVIn++;  mask <<= 8;
+                        if (bitmask & mask) { *pVOut++ = *pVIn; } pVIn++;  mask <<= 8;
+                        if (bitmask & mask) { *pVOut++ = *pVIn; } pVIn++;  mask <<= 8;
+                        if (bitmask & mask) { *pVOut++ = *pVIn; } pVIn++;  mask <<= 8;
+                        if (bitmask & mask) { *pVOut++ = *pVIn; } pVIn++;  mask <<= 8;
+                        if (bitmask & mask) { *pVOut++ = *pVIn; } pVIn++;  mask <<= 8;
+                        if (bitmask & mask) { *pVOut++ = *pVIn; } pVIn++;
                     }
                     else {
                         pVIn += 8;
@@ -454,16 +456,17 @@ BooleanIndex(PyObject* self, PyObject* args)
                 for (int64_t i = 0; i < blength; i++) {
 
                     // little endian, so the first value is low bit (not high bit)
-                    uint32_t bitmask = (uint32_t)(_pext_u64(*pData, 0x0101010101010101));
+                    uint64_t bitmask = *(uint64_t*)pData;
+                    uint64_t mask = 0xff;
                     if (bitmask != 0) {
-                        if (bitmask & 1) { *pVOut++ = *pVIn; } pVIn++;
-                        if (bitmask & 2) { *pVOut++ = *pVIn; } pVIn++;
-                        if (bitmask & 4) { *pVOut++ = *pVIn; } pVIn++;
-                        if (bitmask & 8) { *pVOut++ = *pVIn; } pVIn++;
-                        if (bitmask & 16) { *pVOut++ = *pVIn; } pVIn++;
-                        if (bitmask & 32) { *pVOut++ = *pVIn; } pVIn++;
-                        if (bitmask & 64) { *pVOut++ = *pVIn; } pVIn++;
-                        if (bitmask & 128) { *pVOut++ = *pVIn; } pVIn++;
+                        if (bitmask & mask) { *pVOut++ = *pVIn; } pVIn++;  mask <<= 8;
+                        if (bitmask & mask) { *pVOut++ = *pVIn; } pVIn++;  mask <<= 8;
+                        if (bitmask & mask) { *pVOut++ = *pVIn; } pVIn++;  mask <<= 8;
+                        if (bitmask & mask) { *pVOut++ = *pVIn; } pVIn++;  mask <<= 8;
+                        if (bitmask & mask) { *pVOut++ = *pVIn; } pVIn++;  mask <<= 8;
+                        if (bitmask & mask) { *pVOut++ = *pVIn; } pVIn++;  mask <<= 8;
+                        if (bitmask & mask) { *pVOut++ = *pVIn; } pVIn++;  mask <<= 8;
+                        if (bitmask & mask) { *pVOut++ = *pVIn; } pVIn++;
                     }
                     else {
                         pVIn += 8;
@@ -491,16 +494,17 @@ BooleanIndex(PyObject* self, PyObject* args)
                 for (int64_t i = 0; i < blength; i++) {
 
                     // little endian, so the first value is low bit (not high bit)
-                    uint32_t bitmask = (uint32_t)(_pext_u64(*pData, 0x0101010101010101));
+                    uint64_t bitmask = *(uint64_t*)pData;
+                    uint64_t mask = 0xff;
                     if (bitmask != 0) {
-                        if (bitmask & 1) { *pVOut++ = *pVIn; } pVIn++;
-                        if (bitmask & 2) { *pVOut++ = *pVIn; } pVIn++;
-                        if (bitmask & 4) { *pVOut++ = *pVIn; } pVIn++;
-                        if (bitmask & 8) { *pVOut++ = *pVIn; } pVIn++;
-                        if (bitmask & 16) { *pVOut++ = *pVIn; } pVIn++;
-                        if (bitmask & 32) { *pVOut++ = *pVIn; } pVIn++;
-                        if (bitmask & 64) { *pVOut++ = *pVIn; } pVIn++;
-                        if (bitmask & 128) { *pVOut++ = *pVIn; } pVIn++;
+                        if (bitmask & mask) { *pVOut++ = *pVIn; } pVIn++;  mask <<= 8;
+                        if (bitmask & mask) { *pVOut++ = *pVIn; } pVIn++;  mask <<= 8;
+                        if (bitmask & mask) { *pVOut++ = *pVIn; } pVIn++;  mask <<= 8;
+                        if (bitmask & mask) { *pVOut++ = *pVIn; } pVIn++;  mask <<= 8;
+                        if (bitmask & mask) { *pVOut++ = *pVIn; } pVIn++;  mask <<= 8;
+                        if (bitmask & mask) { *pVOut++ = *pVIn; } pVIn++;  mask <<= 8;
+                        if (bitmask & mask) { *pVOut++ = *pVIn; } pVIn++;  mask <<= 8;
+                        if (bitmask & mask) { *pVOut++ = *pVIn; } pVIn++;
                     }
                     else {
                         pVIn += 8;
@@ -526,17 +530,17 @@ BooleanIndex(PyObject* self, PyObject* args)
                 for (int64_t i = 0; i < blength; i++) {
 
                     // little endian, so the first value is low bit (not high bit)
-                    uint32_t bitmask = (uint32_t)(_pext_u64(*pData, 0x0101010101010101));
+                    uint64_t bitmask = *(uint64_t*)pData;
+                    uint64_t mask = 0xff;
                     if (bitmask != 0) {
                         int counter = 8;
                         while (counter--) {
-                            if (bitmask & 1) {
+                            if (bitmask & mask) {
                                 memcpy(pValuesOut, pValuesIn, itemSize);
                                 pValuesOut += itemSize;
                             }
-
                             pValuesIn += itemSize;
-                            bitmask >>= 1;
+                            bitmask >>= 8;
                         }
                     }
                     else {
