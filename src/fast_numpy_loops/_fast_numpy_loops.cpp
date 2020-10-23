@@ -68,6 +68,19 @@ struct stUFuncToAtop {
     const int       atop_op;
 };
 
+//------------------------------------------------------------------------------------------
+// A full list of ufuncs as of Oct 2020
+// abs, absolute, add, arccos, arccosh, arcsin, arcsinh, arctan, arctan2, arctanh,
+// bitwise_and, bitwise_not, bitwise_or, bitwise_xor,
+// cbrt, ceil, conj, conjugate, copysign, cos, cosh, deg2rad, degrees, divide, divmod, equal, exp, exp2, expm1,
+// fabs, float_power, floor, floor_divide, fmax, fmin, fmod, frexp, gcd, greater, greater_equal,
+// heaviside, hypot, invert, isfinite, isinf, isnan, isnat,
+// lcm, ldexp, left_shift, less, less_equal, log, log10, log1p, log2, logaddexp, logaddexp2,
+// logical_and, logical_not, logical_or, logical_xor
+// matmul, maximum, minimum, mod, modf, multiply, negative, nextafter, not_equal, positive, power,
+// rad2deg, radians, reciprocal, remainder, right_shift, rint
+// sign, signbit, sin, sinh, spacing, sqrt, square, subtract, tan, tanh, true_divide, trunc
+
 // Binary function mapping
 static stUFuncToAtop gBinaryMapping[]={
     {"add",           BINARY_OPERATION::ADD},
@@ -105,7 +118,7 @@ static stUFuncToAtop gUnaryMapping[] = {
     {"floor",         UNARY_OPERATION::FLOOR},
     {"ceil",          UNARY_OPERATION::CEIL},
     {"trunc",         UNARY_OPERATION::TRUNC},
-    // {"round",         UNARY_OPERATION::ROUND},   NOT A UFUNC
+    {"rint",          UNARY_OPERATION::ROUND},  
     {"negative",      UNARY_OPERATION::NEGATIVE},
     {"positive",      UNARY_OPERATION::POSITIVE},
     {"sign",          UNARY_OPERATION::SIGN},
@@ -122,6 +135,7 @@ static stUFuncToAtop gUnaryMapping[] = {
 };
 
 // Trigonemtric function mapping
+// Includes exp, log functions also (since similar algo class)
 // To be completed, add atan2, hypot
 static stUFuncToAtop gTrigMapping[] = {
     {"sin",           TRIG_OPERATION::SIN},
@@ -1077,10 +1091,13 @@ PyObject* newinit(PyObject* self, PyObject* args, PyObject* kwargs) {
                 int atype = convert_dtype_to_atop[dtype];
 
                 // For unary it only has a signature of 2
-                UNARY_FUNC pUnaryFunc = GetTrigOpFast(atop, atype, &signature[1]);
+                UNARY_FUNC pUnaryFunc = NULL; // GetLogOpFast(atop, atype, &signature[1]);
                 if (!pUnaryFunc) {
-                    GetTrigOpSlow(atop, atype, &signature[1]);
+                    pUnaryFunc = GetTrigOpFast(atop, atype, &signature[1]);
                 }
+                //if (!pUnaryFunc) {
+                //    pUnaryFunc = GetTrigOpSlow(atop, atype, &signature[1]);
+                //}
                 signature[1] = convert_atop_to_dtype[signature[1]];
 
                 // Even if pUnaryFunc is NULL, still hook it since we can thread it
