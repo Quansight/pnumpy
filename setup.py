@@ -111,6 +111,7 @@ setup(
                      'src/atop/ops_compare.cpp',
                      'src/atop/ops_unary.cpp',
                      'src/atop/ops_trig.cpp',
+                     'src/atop/ops_log.cpp',
                     ],
             extra_compile_args=CFLAGS.split(),
             extra_link_args=LFLAGS.split(),
