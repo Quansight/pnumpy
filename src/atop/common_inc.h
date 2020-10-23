@@ -264,6 +264,8 @@ enum COMP_OPERATION {
 };
 
 enum UNARY_OPERATION {
+    UNARY_INVALID = 0,
+
     // One input, returns same data type
     ABS = 1,
     SIGNBIT = 2,
@@ -303,6 +305,8 @@ enum UNARY_OPERATION {
 };
 
 enum BINARY_OPERATION {
+    BINARY_INVALID = 0,
+
     // Two ops, returns same type
     ADD = 1,
     SUB = 2,
@@ -345,6 +349,7 @@ enum BINARY_OPERATION {
 };
 
 enum TRIG_OPERATION {
+    TRIG_INVALID = 0,
     // One op, returns same type
     SIN = 1,
     COS = 2,

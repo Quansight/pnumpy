@@ -1202,17 +1202,20 @@ UNARY_FUNC GetUnaryOpSlow(int func, int numpyInType1, int numpyOutType, int* wan
 
     case UNARY_OPERATION::BITWISE_NOT:
     case UNARY_OPERATION::INVERT:
-        *wantedOutType = numpyInType1;
-        switch (numpyInType1) {
-        case ATOP_INT32:   return UnaryOpSlow_INVERT<int32_t>;
-        case ATOP_UINT32:  return UnaryOpSlow_INVERT<uint32_t>;
-        case ATOP_INT64:   return UnaryOpSlow_INVERT<int64_t>;
-        case ATOP_UINT64:  return UnaryOpSlow_INVERT<uint64_t>;
-        case ATOP_BOOL:    return UnaryOpSlow_INVERT_BOOL<int8_t>;
-        case ATOP_INT8:    return UnaryOpSlow_INVERT<int8_t>;
-        case ATOP_UINT8:   return UnaryOpSlow_INVERT<uint8_t>;
-        case ATOP_INT16:   return UnaryOpSlow_INVERT<int16_t>;
-        case ATOP_UINT16:  return UnaryOpSlow_INVERT<uint16_t>;
+        // bitwise on floats not allowed
+        if (numpyInType1 <= ATOP_UINT64) {
+            *wantedOutType = numpyInType1;
+            switch (numpyInType1) {
+            case ATOP_INT32:   return UnaryOpSlow_INVERT<int32_t>;
+            case ATOP_UINT32:  return UnaryOpSlow_INVERT<uint32_t>;
+            case ATOP_INT64:   return UnaryOpSlow_INVERT<int64_t>;
+            case ATOP_UINT64:  return UnaryOpSlow_INVERT<uint64_t>;
+            case ATOP_BOOL:    return UnaryOpSlow_INVERT_BOOL<int8_t>;
+            case ATOP_INT8:    return UnaryOpSlow_INVERT<int8_t>;
+            case ATOP_UINT8:   return UnaryOpSlow_INVERT<uint8_t>;
+            case ATOP_INT16:   return UnaryOpSlow_INVERT<int16_t>;
+            case ATOP_UINT16:  return UnaryOpSlow_INVERT<uint16_t>;
+            }
         }
         break;
 
@@ -1492,54 +1495,79 @@ UNARY_FUNC GetUnaryOpFast(int func, int atopInType1, int* wantedOutType) {
         break;
 
     case UNARY_OPERATION::NEGATIVE:
-        *wantedOutType = atopInType1;
-        switch (atopInType1) {
-        case ATOP_FLOAT:  return UnaryOpFast<float, __m256, NEG_OP<float>, NEG_OP_256<__m256>>;
-        case ATOP_DOUBLE: return UnaryOpFast<double, __m256d, NEG_OP<double>, NEG_OP_256<__m256d>>;
-        case ATOP_INT64:  return UnaryOpFast<int64_t, __m256i, NEG_OP<int64_t>, NEG_OP_256i64>;
-        case ATOP_INT32:  return UnaryOpFast<int32_t, __m256i, NEG_OP<int32_t>, NEG_OP_256i32>;
-        case ATOP_INT16:  return UnaryOpFast<int16_t, __m256i, NEG_OP<int16_t>, NEG_OP_256i16>;
-        case ATOP_INT8:   return UnaryOpFast<int8_t, __m256i, NEG_OP<int8_t>, NEG_OP_256i8>;
+        // neg on bool not allowed
+        if (atopInType1 > ATOP_BOOL) {
+            *wantedOutType = atopInType1;
+            switch (atopInType1) {
+            case ATOP_FLOAT:  return UnaryOpFast<float, __m256, NEG_OP<float>, NEG_OP_256<__m256>>;
+            case ATOP_DOUBLE: return UnaryOpFast<double, __m256d, NEG_OP<double>, NEG_OP_256<__m256d>>;
+            case ATOP_INT64:  return UnaryOpFast<int64_t, __m256i, NEG_OP<int64_t>, NEG_OP_256i64>;
+            case ATOP_INT32:  return UnaryOpFast<int32_t, __m256i, NEG_OP<int32_t>, NEG_OP_256i32>;
+            case ATOP_INT16:  return UnaryOpFast<int16_t, __m256i, NEG_OP<int16_t>, NEG_OP_256i16>;
+            case ATOP_INT8:   return UnaryOpFast<int8_t, __m256i, NEG_OP<int8_t>, NEG_OP_256i8>;
+            }
         }
         break;
     case UNARY_OPERATION::INVERT:
+    case UNARY_OPERATION::BITWISE_NOT:
+        // bitwise on floats not allowed
+        if (atopInType1 <= ATOP_UINT64) {
+            *wantedOutType = atopInType1;
+        }
         break;
     case UNARY_OPERATION::FLOOR:
-        *wantedOutType = atopInType1;
-        switch (atopInType1) {
-        case ATOP_FLOAT:  return UnaryOpFast<float, __m256, FLOOR_OP<float>, FLOOR_OP_256<__m256>>;
-        case ATOP_DOUBLE: return UnaryOpFast<double, __m256d, FLOOR_OP<double>, FLOOR_OP_256<__m256d>>;
+        // Floor on bool not allowed
+        if (atopInType1 >= ATOP_FLOAT) {
+            *wantedOutType = atopInType1;
+            switch (atopInType1) {
+            case ATOP_FLOAT:  return UnaryOpFast<float, __m256, FLOOR_OP<float>, FLOOR_OP_256<__m256>>;
+            case ATOP_DOUBLE: return UnaryOpFast<double, __m256d, FLOOR_OP<double>, FLOOR_OP_256<__m256d>>;
+            }
         }
         break;
     case UNARY_OPERATION::CEIL:
-        *wantedOutType = atopInType1;
-        switch (atopInType1) {
-        case ATOP_FLOAT:  return UnaryOpFast<float, __m256, CEIL_OP<float>, CEIL_OP_256<__m256>>;
-        case ATOP_DOUBLE: return UnaryOpFast<double, __m256d, CEIL_OP<double>, CEIL_OP_256<__m256d>>;
+        // ceil on bool not allowed
+        if (atopInType1 >= ATOP_FLOAT) {
+            *wantedOutType = atopInType1;
+            switch (atopInType1) {
+            case ATOP_FLOAT:  return UnaryOpFast<float, __m256, CEIL_OP<float>, CEIL_OP_256<__m256>>;
+            case ATOP_DOUBLE: return UnaryOpFast<double, __m256d, CEIL_OP<double>, CEIL_OP_256<__m256d>>;
+            }
         }
         break;
     case UNARY_OPERATION::TRUNC:
-        *wantedOutType = atopInType1;
-        switch (atopInType1) {
-        case ATOP_FLOAT:  return UnaryOpFast<float, __m256, TRUNC_OP<float>, TRUNC_OP_256<__m256>>;
-        case ATOP_DOUBLE: return UnaryOpFast<double, __m256d, TRUNC_OP<double>, TRUNC_OP_256<__m256d>>;
+        // trunc on bool not allowed
+        if (atopInType1 >= ATOP_FLOAT) {
+            *wantedOutType = atopInType1;
+            switch (atopInType1) {
+            case ATOP_FLOAT:  return UnaryOpFast<float, __m256, TRUNC_OP<float>, TRUNC_OP_256<__m256>>;
+            case ATOP_DOUBLE: return UnaryOpFast<double, __m256d, TRUNC_OP<double>, TRUNC_OP_256<__m256d>>;
+            }
         }
         break;
     case UNARY_OPERATION::ROUND:
-        *wantedOutType = atopInType1;
-        switch (atopInType1) {
-        case ATOP_FLOAT:  return UnaryOpFast<float, __m256, ROUND_OP<float>, ROUND_OP_256<__m256>>;
-        case ATOP_DOUBLE: return UnaryOpFast<double, __m256d, ROUND_OP<double>, ROUND_OP_256<__m256d>>;
+        // round on bool not allowed
+        if (atopInType1 >= ATOP_FLOAT) {
+            *wantedOutType = atopInType1;
+            // TODO: Needs review as fails test
+            //switch (atopInType1) {
+            //case ATOP_FLOAT:  return UnaryOpFast<float, __m256, ROUND_OP<float>, ROUND_OP_256<__m256>>;
+            //case ATOP_DOUBLE: return UnaryOpFast<double, __m256d, ROUND_OP<double>, ROUND_OP_256<__m256d>>;
+            //}
         }
         break;
     case UNARY_OPERATION::SQRT:
-        *wantedOutType = ATOP_DOUBLE;
-        if (atopInType1 == ATOP_FLOAT) {
-            *wantedOutType = ATOP_FLOAT;
-        }
-        switch (atopInType1) {
-        case ATOP_FLOAT:  return UnaryOpFast<float, __m256, SQRT_OP<float>, SQRT_OP_256<__m256>>;
-        case ATOP_DOUBLE: return UnaryOpFast<double, __m256d, SQRT_OP<double>, SQRT_OP_256<__m256d>>;
+        // Numpy odd square root rules
+        // sometimes outputs float16 or float32
+        if (atopInType1 >= ATOP_FLOAT) {
+            *wantedOutType = ATOP_DOUBLE;
+            if (atopInType1 == ATOP_FLOAT) {
+                *wantedOutType = ATOP_FLOAT;
+            }
+            switch (atopInType1) {
+            case ATOP_FLOAT:  return UnaryOpFast<float, __m256, SQRT_OP<float>, SQRT_OP_256<__m256>>;
+            case ATOP_DOUBLE: return UnaryOpFast<double, __m256d, SQRT_OP<double>, SQRT_OP_256<__m256d>>;
+            }
         }
         break;
 
@@ -1555,6 +1583,7 @@ UNARY_FUNC GetUnaryOpFastStrided(int func, int atopInType1, int* wantedOutType) 
 
     switch (func) {
     case UNARY_OPERATION::FABS:
+        *wantedOutType = atopInType1;
         break;
 
     case UNARY_OPERATION::ABS:

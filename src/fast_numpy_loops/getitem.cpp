@@ -308,7 +308,7 @@ BooleanIndex(PyObject* self, PyObject* args)
     }
 
     if (PyArray_TYPE(aIndex) != NPY_BOOL) {
-        PyErr_Format(PyExc_ValueError, "Second argument must be boolean array");
+        PyErr_Format(PyExc_ValueError, "Second argument must be a boolean array");
         return NULL;
     }
 
@@ -339,7 +339,6 @@ BooleanIndex(PyObject* self, PyObject* args)
     LOGGING("boolindex total: %I64d  length: %I64d  type:%d\n", totalTrue, lengthBool, PyArray_TYPE(aValues));
 
     int8_t* pBooleanMask = (int8_t*)PyArray_BYTES(aIndex);
-
 
     // Now we know per chunk how many true there are... we can allocate the new array
     PyArrayObject* pReturnArray = AllocateLikeResize(aValues, totalTrue);
@@ -381,6 +380,7 @@ BooleanIndex(PyObject* self, PyObject* args)
                     uint64_t bitmask = *(uint64_t*)pData;
                     uint64_t mask = 0xff;
 
+                    // NOTE: the below can be optimized with vector intrinsics
                     // little endian, so the first value is low bit (not high bit)
                     if (bitmask != 0) {
                         if (bitmask & mask) { *pVOut++ = *pVIn; } pVIn++;  mask <<= 8;
