@@ -132,6 +132,7 @@ static stUFuncToAtop gUnaryMapping[] = {
     {"isfinite",      UNARY_OPERATION::ISFINITE},
     //{"isnormal",      UNARY_OPERATION::ISNORMAL},  // not a ufunc
     // TODO numpy needs to add isnotinf, isnotnan, isnotfinite
+    {"bitwise_not",   UNARY_OPERATION::BITWISE_NOT },
 };
 
 // Trigonemtric function mapping
@@ -223,7 +224,7 @@ struct stSettings {
 } g_Settings = { 1, 0, 0, 0 };
 
 #define LEDGER_START()    g_Settings.LedgerEnabled = 0; int64_t ledgerStartTime; ledgerStartTime = __rdtsc();
-#define LEDGER_END()      int64_t deltaTime = __rdtsc() - ledgerStartTime; g_Settings.LedgerEnabled = 1; printf("%lld cycle  op: %d  atype: %d   len: %lld\n", (long long)deltaTime, funcop, atype, (long long)dimensions[0]);
+#define LEDGER_END(_str_)      int64_t deltaTime = __rdtsc() - ledgerStartTime; g_Settings.LedgerEnabled = 1; printf("%lld cycle  op: %d  atype: %d   len: %lld  %s\n", (long long)deltaTime, funcop, atype, (long long)dimensions[0], _str_);
 
 
 //------------------------------------------------------------------------------
@@ -616,7 +617,7 @@ static void AtopBinaryMathFunction(char** args, const npy_intp* dimensions, cons
     // Ledger is on, turn it off and call back to ourselves to time it    
     LEDGER_START();
     AtopBinaryMathFunction(args, dimensions, steps, innerloop, funcop, atype);
-    LEDGER_END();
+    LEDGER_END("Binary");
 
 };
 
@@ -682,7 +683,7 @@ static void AtopCompareMathFunction(char** args, const npy_intp* dimensions, con
     // Ledger is on, turn it off and call back to ourselves to time it    
     LEDGER_START();
     AtopCompareMathFunction(args, dimensions, steps, innerloop, funcop, atype);
-    LEDGER_END();
+    LEDGER_END("Comp");
 
 };
 
@@ -746,7 +747,7 @@ static void AtopUnaryMathFunction(char** args, const npy_intp* dimensions, const
     // Ledger is on, turn it off and call back to ourselves to time it    
     LEDGER_START();
     AtopUnaryMathFunction(args, dimensions, steps, innerloop, funcop, atype);
-    LEDGER_END();
+    LEDGER_END("Unary");
 
 };
 
@@ -808,7 +809,7 @@ static void AtopTrigMathFunction(char** args, const npy_intp* dimensions, const 
     // Ledger is on, turn it off and call back to ourselves to time it    
     LEDGER_START();
     AtopTrigMathFunction(args, dimensions, steps, innerloop, funcop, atype);
-    LEDGER_END();
+    LEDGER_END("Trig");
 
 };
 
@@ -955,12 +956,13 @@ PyObject* newinit(PyObject* self, PyObject* args, PyObject* kwargs) {
 
                 int atype = convert_dtype_to_atop[dtype];
 
+                signature[2] = -1;
                 ANY_TWO_FUNC pBinaryFunc = GetSimpleMathOpFast(atop, atype, atype, &signature[2]);
                 REDUCE_FUNC  pReduceFunc = GetReduceMathOpFast(atop, atype);
 
-                signature[2] = convert_atop_to_dtype[signature[2]];
+                if (signature[2] != -1) {
+                    signature[2] = convert_atop_to_dtype[signature[2]];
 
-                if (pBinaryFunc) {
                     int ret = PyUFunc_ReplaceLoopBySignature((PyUFuncObject*)ufunc, g_UFuncGenericLUT[atop][atype], signature, &oldFunc);
 
                     if (ret < 0) {
@@ -1004,20 +1006,18 @@ PyObject* newinit(PyObject* self, PyObject* args, PyObject* kwargs) {
                 ANY_TWO_FUNC pBinaryFunc = GetComparisonOpFast(atop, atype, atype, &signature[2]);
                 signature[2] = convert_atop_to_dtype[signature[2]];
 
-                if (pBinaryFunc) {
-                    int ret = PyUFunc_ReplaceLoopBySignature((PyUFuncObject*)ufunc, g_UFuncCompareLUT[atop][atype], signature, &oldFunc);
+                int ret = PyUFunc_ReplaceLoopBySignature((PyUFuncObject*)ufunc, g_UFuncCompareLUT[atop][atype], signature, &oldFunc);
 
-                    if (ret < 0) {
-                        return PyErr_Format(PyExc_TypeError, "Comparison failed with %d. func %s must be the name of a ufunc.  atop:%d   atype:%d  sigs:%d, %d, %d", ret, ufunc_name, atop, atype, signature[0], signature[1], signature[2]);
-                    }
-
-                    stUFunc* pstUFunc = &g_CompFuncLUT[atop][atype];
-
-                    // Store the new function to call and the previous ufunc
-                    pstUFunc->pOldFunc = oldFunc;
-                    pstUFunc->pBinaryFunc = pBinaryFunc;
-                    pstUFunc->MaxThreads = 4;
+                if (ret < 0) {
+                    return PyErr_Format(PyExc_TypeError, "Comparison failed with %d. func %s must be the name of a ufunc.  atop:%d   atype:%d  sigs:%d, %d, %d", ret, ufunc_name, atop, atype, signature[0], signature[1], signature[2]);
                 }
+
+                stUFunc* pstUFunc = &g_CompFuncLUT[atop][atype];
+
+                // Store the new function to call and the previous ufunc
+                pstUFunc->pOldFunc = oldFunc;
+                pstUFunc->pBinaryFunc = pBinaryFunc;
+                pstUFunc->MaxThreads = 4;
             }
         }
 
@@ -1046,10 +1046,12 @@ PyObject* newinit(PyObject* self, PyObject* args, PyObject* kwargs) {
                 int atype = convert_dtype_to_atop[dtype];
 
                 // For unary it only has a signature of 2
+                signature[1] = -1;
                 UNARY_FUNC pUnaryFunc = GetUnaryOpFast(atop, atype, &signature[1]);
-                signature[1] = convert_atop_to_dtype[signature[1]];
 
-                if (pUnaryFunc) {
+                if (signature[1] != -1) {
+                    signature[1] = convert_atop_to_dtype[signature[1]];
+
                     int ret = PyUFunc_ReplaceLoopBySignature((PyUFuncObject*)ufunc, g_UFuncUnaryLUT[atop][atype], signature, &oldFunc);
 
                     if (ret < 0) {
@@ -1095,6 +1097,8 @@ PyObject* newinit(PyObject* self, PyObject* args, PyObject* kwargs) {
                 if (!pUnaryFunc) {
                     pUnaryFunc = GetTrigOpFast(atop, atype, &signature[1]);
                 }
+
+                // TODO: trig operations on ints can be internally upcast
                 //if (!pUnaryFunc) {
                 //    pUnaryFunc = GetTrigOpSlow(atop, atype, &signature[1]);
                 //}
