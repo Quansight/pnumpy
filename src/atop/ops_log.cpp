@@ -393,8 +393,11 @@ maskstore_ps(float * x, __m256i y, __m256 z) {
 static const inline __m256i
 cvtps_epi32(__m256 x) { return _mm256_cvtps_epi32(x); };
 
+//static const inline __m256
+//fma_add_ps(__m256 x, __m256 y, __m256 z) { return _mm256_fmadd_ps(x, y, z); };
+
 static const inline __m256
-fma_add_ps(__m256 x, __m256 y, __m256 z) { return _mm256_fmadd_ps(x, y, z); };
+fma_add_ps(__m256 x, __m256 y, __m256 z) { return _mm256_add_ps(z, _mm256_mul_ps(x, y)); };
 
 static const inline __m256
 get_exponent(__m256 x)
