@@ -99,10 +99,10 @@ void npy_set_floatstatus_invalid(void)
 }
 
 //-------------------------------------------------------------------
-template<typename T>
-static void UnaryOpSlow_LOG(void* pDataIn1, void* pDataOut, int64_t len, int64_t strideIn, int64_t strideOut) {
-    return UnaryOpSlow<T, const T(*)(T)>(LOG_OP<T>, pDataIn1, pDataOut, len, strideIn, strideOut);
-}
+//template<typename T>
+//static void UnaryOpSlow_LOG(void* pDataIn1, void* pDataOut, int64_t len, int64_t strideIn, int64_t strideOut) {
+//    return UnaryOpSlow<T, const T(*)(T)>(LOG_OP<T>, pDataIn1, pDataOut, len, strideIn, strideOut);
+//}
 
 
 /*
@@ -242,6 +242,8 @@ static const inline float __npy_nzerof(void)
 #define NPY_COEFF_INVF5_SINEf 0x1.11119ap-07f
 #define NPY_COEFF_INVF7_SINEf -0x1.a06bbap-13f
 #define NPY_COEFF_INVF9_SINEf 0x1.7d3bbcp-19f
+
+#define FLT_MIN          1.175494351e-38F        // min normalized positive value
 
 static const inline int mask_to_int(__m256 _x_) { return _mm256_movemask_ps(_x_); };
 

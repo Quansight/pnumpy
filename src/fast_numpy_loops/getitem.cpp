@@ -77,7 +77,7 @@ PyArrayObject* AllocateNumpyArray(int ndim, npy_intp* dims, int32_t numpyType, i
         NULL);
 
     if (!returnObject) {
-        printf("!!!out of memory allocating numpy array size:%llu  dims:%d  dtype:%d  itemsize:%lld  flags:%d  dim0:%lld\n", len, ndim, numpyType, itemsize, array_flags, (int64_t)dims[0]);
+        printf("!!!out of memory allocating numpy array size:%lld  dims:%d  dtype:%d  itemsize:%lld  flags:%d  dim0:%lld\n", len, ndim, numpyType, itemsize, array_flags, (int64_t)dims[0]);
         return nullptr;
     }
 
