@@ -1,21 +1,7 @@
-
-#include "Python.h"
-#define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
-#include "numpy/ndarrayobject.h"
-#include "numpy/ufuncobject.h"
-#include <stdint.h>
-#include <stdio.h>
-#include "../atop/atop.h"
+#include "common.h"
 #include "../atop/threads.h"
 
 #define LOGGING(...)
-#define RETURN_NONE Py_INCREF(Py_None); return Py_None;
-#define RETURN_FALSE Py_XINCREF(Py_False); return Py_False;
-#define RETURN_TRUE Py_XINCREF(Py_True); return Py_True;
-
-#define IS_BINARY_REDUCE ((args[0] == args[2])\
-        && (steps[0] == steps[2])\
-        && (steps[0] == 0))
 
 // Conversion from numpy dtype to atop dtype
 int convert_dtype_to_atop[]={
@@ -61,11 +47,6 @@ int convert_atop_to_itemsize[] = {
     4,  8,  sizeof(long double),
     1,  4,
     0
-};
-
-struct stUFuncToAtop {
-    const char*     str_ufunc_name;
-    const int       atop_op;
 };
 
 //------------------------------------------------------------------------------------------
@@ -162,6 +143,14 @@ static stUFuncToAtop gTrigMapping[] = {
 };
 
 
+// Global table lookup to get to all loops, used by ledger
+stOpCategory gOpCategory[OP_CATEGORY::OPCAT_LAST] = {
+    {"Binary", sizeof(gBinaryMapping) / sizeof(stOpCategory), OP_CATEGORY::OPCAT_BINARY, gBinaryMapping},
+    {"Unary", sizeof(gUnaryMapping) / sizeof(stOpCategory), OP_CATEGORY::OPCAT_UNARY, gUnaryMapping},
+    {"Compare", sizeof(gCompareMapping) / sizeof(stOpCategory), OP_CATEGORY::OPCAT_COMPARE, gCompareMapping},
+    {"TrigLog", sizeof(gTrigMapping) / sizeof(stOpCategory), OP_CATEGORY::OPCAT_TRIG, gTrigMapping}
+};
+
 //--------------------------------------------------------------------
 // multithreaded struct used for calling unary op codes
 struct UFUNC_CALLBACK {
@@ -216,15 +205,13 @@ stUFunc  g_UnaryFuncLUT[UNARY_OPERATION::UNARY_LAST][ATOP_LAST];
 stUFunc  g_TrigFuncLUT[TRIG_OPERATION::TRIG_LAST][ATOP_LAST];
 
 // set to 0 to disable
-struct stSettings {
-    int32_t  AtopEnabled;
-    int32_t  LedgerEnabled;
-    int32_t  RecyclerEnabled;
-    int32_t  Reserved;
-} g_Settings = { 1, 0, 0, 0 };
+stSettings g_Settings = { 1, 0, 0, 0 };
 
-#define LEDGER_START()    g_Settings.LedgerEnabled = 0; int64_t ledgerStartTime; ledgerStartTime = __rdtsc();
-#define LEDGER_END(_str_)      int64_t deltaTime = __rdtsc() - ledgerStartTime; g_Settings.LedgerEnabled = 1; printf("%lld cycle  op: %d  atype: %d   len: %lld  %s\n", (long long)deltaTime, funcop, atype, (long long)dimensions[0], _str_);
+// Macro used just before call a ufunc
+#define LEDGER_START()    g_Settings.LedgerEnabled = 0; int64_t ledgerStartTime = __rdtsc();
+
+// Macro used just after ufunc call returns
+#define LEDGER_END(_cat_) g_Settings.LedgerEnabled = 1; LedgerRecord(_cat_, ledgerStartTime, (int64_t)__rdtsc(), args, dimensions, steps, innerloop, funcop, atype);
 
 
 //------------------------------------------------------------------------------
@@ -486,13 +473,12 @@ static void AtopBinaryMathFunction(char** args, const npy_intp* dimensions, cons
             }
             else {
                 // Threaded
-                const int64_t maxStackAlloc = 1024 * 1024;  // 1 MB
                 int64_t itemsize = convert_atop_to_itemsize[atype];
                 int64_t chunks = 1 + ((n - 1) / THREADER->WORK_ITEM_CHUNK);
                 int64_t allocsize = chunks * itemsize;
 
                 // try to alloc on stack for speed
-                char* pReduceOfReduce = allocsize > maxStackAlloc ? (char*)WORKSPACE_ALLOC(allocsize) : (char*)alloca(allocsize);
+                char* pReduceOfReduce = POSSIBLY_STACK_ALLOC(allocsize);
 
                 UFUNC_CALLBACK stCallback;
 
@@ -548,7 +534,7 @@ static void AtopBinaryMathFunction(char** args, const npy_intp* dimensions, cons
                     pstUFunc->pOldFunc(args, dimensions, steps, innerloop);
                 }
                 // Free if not on the stack
-                if (allocsize > maxStackAlloc) WORKSPACE_FREE(pReduceOfReduce);
+                POSSIBLY_STACK_FREE(allocsize, pReduceOfReduce);
             }
         }
         else {
@@ -617,7 +603,7 @@ static void AtopBinaryMathFunction(char** args, const npy_intp* dimensions, cons
     // Ledger is on, turn it off and call back to ourselves to time it    
     LEDGER_START();
     AtopBinaryMathFunction(args, dimensions, steps, innerloop, funcop, atype);
-    LEDGER_END("Binary");
+    LEDGER_END(OP_CATEGORY::OPCAT_BINARY);
 
 };
 
@@ -683,7 +669,7 @@ static void AtopCompareMathFunction(char** args, const npy_intp* dimensions, con
     // Ledger is on, turn it off and call back to ourselves to time it    
     LEDGER_START();
     AtopCompareMathFunction(args, dimensions, steps, innerloop, funcop, atype);
-    LEDGER_END("Comp");
+    LEDGER_END(OP_CATEGORY::OPCAT_COMPARE);
 
 };
 
@@ -747,7 +733,7 @@ static void AtopUnaryMathFunction(char** args, const npy_intp* dimensions, const
     // Ledger is on, turn it off and call back to ourselves to time it    
     LEDGER_START();
     AtopUnaryMathFunction(args, dimensions, steps, innerloop, funcop, atype);
-    LEDGER_END("Unary");
+    LEDGER_END(OP_CATEGORY::OPCAT_UNARY);
 
 };
 
@@ -809,7 +795,7 @@ static void AtopTrigMathFunction(char** args, const npy_intp* dimensions, const 
     // Ledger is on, turn it off and call back to ourselves to time it    
     LEDGER_START();
     AtopTrigMathFunction(args, dimensions, steps, innerloop, funcop, atype);
-    LEDGER_END("Trig");
+    LEDGER_END(OP_CATEGORY::OPCAT_TRIG);
 
 };
 
@@ -1093,7 +1079,11 @@ PyObject* newinit(PyObject* self, PyObject* args, PyObject* kwargs) {
                 int atype = convert_dtype_to_atop[dtype];
 
                 // For unary it only has a signature of 2
-                UNARY_FUNC pUnaryFunc = NULL; // GetLogOpFast(atop, atype, &signature[1]);
+                UNARY_FUNC pUnaryFunc = NULL;
+
+                // TODO: Call atop's fast log library
+                // GetLogOpFast(atop, atype, &signature[1]);
+
                 if (!pUnaryFunc) {
                     pUnaryFunc = GetTrigOpFast(atop, atype, &signature[1]);
                 }
