@@ -129,8 +129,8 @@ makes it easier to support new compilers and platforms just by adding the necess
 #define VOID void
 typedef void* PVOID;
 typedef void* LPVOID;
-
 typedef void* HANDLE;
+
 #define TRUE 1
 #define FALSE 0
 typedef int BOOL;

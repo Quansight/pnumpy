@@ -92,6 +92,7 @@ extern pthread_cond_t  g_WakeupCond;
 typedef void* PVOID;
 
 typedef unsigned long       DWORD;
+typedef DWORD* LPDWORD;
 
 typedef long long           LONG_PTR, * PLONG_PTR;
 typedef unsigned long long  ULONG_PTR, * PULONG_PTR;
