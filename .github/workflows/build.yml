@@ -54,7 +54,7 @@ jobs:
           CIBW_BUILD: cp36-manylinux_x86_64 cp36-manylinux_i686
         run: |
           python -m cibuildwheel --output-dir wheelhouse
-    - name: Build wheels on MacOS
+      - name: Build wheels on MacOS
         if: runner.os == 'macos'
         env: 
           CIBW_BUILD: 	cp36-macosx_x86_64
