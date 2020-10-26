@@ -47,6 +47,8 @@ def read(*names, **kwargs):
 with open("README.md") as readme:
     long_description = readme.read()
 
+import _add_newdocs
+_add_newdocs.main()
 
 setup(
     name='fast-numpy-loops',

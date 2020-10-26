@@ -1,3 +1,7 @@
+# generated files
+src/fast_numpy_loops/FAST_NUMPY_LOOPS.h
+
+
 *.py[cod]
 __pycache__
 
