@@ -48,13 +48,14 @@ jobs:
     #       python -m pip install --upgrade setuptools wheel
     #       python -m pip install --progress-bar=off  -r ci/requirements.txt
     #       python -m cibuildwheel --output-dir wheelhouse
-    - name: Build wheels on Windows
+
+      - name: Build wheels on Windows
         if: (runner.os == 'Windows' && runner.platform == 'x64')
         env: 
           CIBW_BUILD: cp36-win_amd64
         run: |
           python -m cibuildwheel --output-dir wheelhouse
-    - name: Build wheels on Windows
+      - name: Build wheels on Windows
         if: (runner.os == 'Windows' && runner.platform == 'x32')
         env: 
           CIBW_BUILD: cp36-win32
