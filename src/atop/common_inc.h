@@ -133,14 +133,14 @@ typedef void* LPVOID;
 typedef unsigned long       DWORD;
 typedef DWORD* LPDWORD;
 
-typedef long long           INT_PTR, * PINT_PTR;
-typedef unsigned long long  UINT_PTR, * PUINT_PTR;
-
-typedef long long           LONG_PTR, * PLONG_PTR;
-typedef unsigned long long  ULONG_PTR, * PULONG_PTR;
-
-typedef ULONG_PTR SIZE_T, * PSIZE_T;
-typedef LONG_PTR  SSIZE_T, * PSSIZE_T;
+//typedef long long           INT_PTR, * PINT_PTR;
+//typedef unsigned long long  UINT_PTR, * PUINT_PTR;
+//
+//typedef long long           LONG_PTR, * PLONG_PTR;
+//typedef unsigned long long  ULONG_PTR, * PULONG_PTR;
+//
+//typedef ULONG_PTR SIZE_T, * PSIZE_T;
+//typedef LONG_PTR  SSIZE_T, * PSSIZE_T;
 
 typedef void* HANDLE;
 #define TRUE 1
@@ -427,3 +427,13 @@ void FmFree(void* _Block);
 
 #define WORKSPACE_ALLOC FmAlloc
 #define WORKSPACE_FREE FmFree
+
+#define MAX_STACK_ALLOC (1024 * 1024)
+
+// For small buffers that can be allocated on the stack
+#if defined(_WIN32) && !defined(__GNUC__)
+#define POSSIBLY_STACK_ALLOC(_alloc_size_) _alloc_size_ > MAX_STACK_ALLOC ? (char*)WORKSPACE_ALLOC(_alloc_size_) : (char*)_malloca(_alloc_size_);
+#else
+#define POSSIBLY_STACK_ALLOC(_alloc_size_) _alloc_size_ > MAX_STACK_ALLOC ? (char*)WORKSPACE_ALLOC(_alloc_size_) : (char*)alloca(_alloc_size_);
+#endif
+#define POSSIBLY_STACK_FREE(_alloc_size_, _mem_ptr_) if (_alloc_size_ > MAX_STACK_ALLOC) WORKSPACE_FREE(_mem_ptr_);

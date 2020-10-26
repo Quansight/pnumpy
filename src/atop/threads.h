@@ -87,15 +87,15 @@ extern pthread_cond_t  g_WakeupCond;
 //
 // global scope
 #define VOID void
-typedef void* PVOID;
-
-typedef unsigned long       DWORD;
-
-typedef long long           LONG_PTR, * PLONG_PTR;
-typedef unsigned long long  ULONG_PTR, * PULONG_PTR;
-
-typedef ULONG_PTR SIZE_T, * PSIZE_T;
-typedef LONG_PTR  SSIZE_T, * PSSIZE_T;
+//typedef void* PVOID;
+//
+//typedef unsigned long       DWORD;
+//
+//typedef long long           LONG_PTR, * PLONG_PTR;
+//typedef unsigned long long  ULONG_PTR, * PULONG_PTR;
+//
+//typedef ULONG_PTR SIZE_T, * PSIZE_T;
+//typedef LONG_PTR  SSIZE_T, * PSSIZE_T;
 
 typedef VOID(WINAPI* WakeSingleAddress)(PVOID);
 typedef VOID(WINAPI* WakeAllAddress)(PVOID);

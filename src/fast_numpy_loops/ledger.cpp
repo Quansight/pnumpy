@@ -1,9 +1,4 @@
-#include "Python.h"
-#define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
-#include <stdint.h>
-#include <stdio.h>
-#include "../atop/atop.h"
-
+#include "common.h"
 
 #if defined(_WIN32)
 
@@ -130,40 +125,95 @@ uint64_t GetUTCNanos() {
 #endif
 }
 
+// See ATOP_TYPES
+static const char* gStrAtopTypes[]= {
+    "BOOL",
+    "INT8", "UINT8",
+    "INT16", "UINT16",
+    "INT32", "UINT32",
+    "INT64", "UINT64",
+    "INT128", "UINT128",
+    "FLOAT32", "FLOAT64", "FLOATLONG",
+    "STRING", "UNICODE",
+    "VOID",
+    "LAST"
+};
+
 
 struct stLEDGER_ITEM {
     const char* StrName;
     int64_t     StartTime;
     int64_t     TotalTime;
 
-    int64_t     ArraySize;
+    int64_t     ArrayLength1;
+    int64_t     ArrayLength2;
+    int64_t     ArrayLength3;
 
+    int32_t     ArrayGroup;
     int32_t     ArrayOp;
-    int32_t     Type;
-
+    int32_t     AType;
+    int32_t     Reserved1;
 };
 
 //-----------------------------------------------------------
 // allocated on 64 byte alignment
 struct stLedgerRing {
+    // must be power of 2 for mask to work
     static const int64_t   RING_BUFFER_SIZE = 8096;
     static const int64_t   RING_BUFFER_MASK = 8095;
 
-    volatile int64_t       Index;
+    volatile int64_t       Head;
+    volatile int64_t       Tail;
 
     stLEDGER_ITEM          LedgerQueue[RING_BUFFER_SIZE];
 
     void Init() {
-        Index = 0;
+        Head = 0;
+        Tail = 0;
 
         for (int i = 0; i < RING_BUFFER_SIZE; i++) {
             LedgerQueue[i].StrName = 0;
             LedgerQueue[i].StartTime = 0;
             LedgerQueue[i].TotalTime = 0;
-            LedgerQueue[i].ArraySize = 0;
         }
     }
+
+    // Circular wrap around buffer
+    // If (Head - Tail)  > RING_BUFFER_SIZE then buffer has overflowed
+    stLEDGER_ITEM* GetNextEntry() {
+        return &LedgerQueue[RING_BUFFER_MASK & Tail++];
+    };
 };
 
-stLedgerRing    g_LedgerRing;
+// Global ring buffer of last RING_BUFFER_SIZE math operations
+static stLedgerRing    g_LedgerRing;
+
+
+void LedgerInit() {
+
+    // Init the ring buffer that holds entries
+    g_LedgerRing.Init();
+
+    // Build reverse lookup table
+
+}
+
+
+void LedgerRecord(int32_t op_category, int64_t start_time, int64_t end_time, char** args, const npy_intp* dimensions, const npy_intp* steps, void* innerloop, int funcop, int atype) {
+    int64_t deltaTime = end_time - start_time;
+
+    stOpCategory* pstOpCategory = &gOpCategory[op_category];
+    stLEDGER_ITEM* pEntry = g_LedgerRing.GetNextEntry();
+
+    pEntry->ArrayGroup = op_category;
+    pEntry->ArrayOp = funcop;
+    pEntry->AType = atype;
+
+    pEntry->ArrayLength1 = (int64_t)dimensions[0];
+    pEntry->ArrayLength2 = (int64_t)dimensions[1];
+
+    printf ("%lld cycle  op: %d  atype: %s   len: %lld  %s\n", (long long)deltaTime, funcop, gStrAtopTypes[atype], (long long)dimensions[0], pstOpCategory->StrName);
+       
+}
+
 
