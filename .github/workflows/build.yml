@@ -50,27 +50,49 @@ jobs:
 
       - name: Build wheels on ${{ matrix.os}}
         run: |
-          RUNNER_OS="${{ runner.os }}"
-          PLATFORM="${{ matrix.platform }}"
-          echo $RUNNER_OS
-          echo $PLATFORM
-          if [ "$RUNNER_OS" == "Windows" ]; then
+        #   RUNNER_OS="${{ runner.os }}"
+        #   PLATFORM="${{ matrix.platform }}"
+        #   echo $RUNNER_OS
+        #   echo $PLATFORM
+        #   if [ "$RUNNER_OS" == "Windows" ]; then
+        #     if [ "$PLATFORM" == "x64" ]; then
+        #       export CIBW_BUILD="cp36-win_amd64 cp37-win_amd64 cp38-win_amd64"
+        #     elif [ "$PLATFORM" == "x32" ]; then
+        #       export CIBW_BUILD="cp36-win32 cp37-win32 cp38-win32"
+        #     fi
+        #   elif [ "$RUNNER_OS" == "Linux" ]; then
+        #     if [ "$PLATFORM" == "x64" ]; then
+        #       export CIBW_BUILD="cp36-manylinux_x86_64 cp37-manylinux_x86_64 cp38-manylinux_x86_64 cp36-manylinux_aarch64 cp37-manylinux_aarch64 cp38-manylinux_aarch64 cp36-manylinux_ppc64le cp37-manylinux_ppc64le cp38-manylinux_ppc64le cp36-manylinux_s390x cp37-manylinux_s390x cp38-manylinux_s390x"
+        #     elif [ "$PLATFORM" == "x32" ]; then
+        #       export CIBW_BUILD="cp36-manylinux_i686 cp37-manylinux_i686 cp38-manylinux_i686"
+        #     fi
+        #   elif [ "$RUNNER_OS" == "macOS" ]; then
+        #     export CIBW_BUILD="cp36-macosx_x86_64 cp37-macosx_x86_64 cp38-macosx_x86_64"
+        #   fi
+        #   echo $CIBW_BUILD
+        #   python -m cibuildwheel --output-dir wheelhouse
+
+            RUNNER_OS="${{ runner.os }}"
+            PLATFORM="${{ matrix.platform }}"
+            echo $RUNNER_OS
+            echo $PLATFORM
+            if [ "$RUNNER_OS" == "Windows" ]; then
             if [ "$PLATFORM" == "x64" ]; then
-              export CIBW_BUILD="cp36-win_amd64 cp37-win_amd64 cp38-win_amd64"
+                export CIBW_BUILD="cp36-win_amd64"
             elif [ "$PLATFORM" == "x32" ]; then
-              export CIBW_BUILD="cp36-win32 cp37-win32 cp38-win32"
+                export CIBW_BUILD="cp36-win32 cp37-win32 cp38-win32"
             fi
-          elif [ "$RUNNER_OS" == "Linux" ]; then
+            elif [ "$RUNNER_OS" == "Linux" ]; then
             if [ "$PLATFORM" == "x64" ]; then
-              export CIBW_BUILD="cp36-manylinux_x86_64 cp37-manylinux_x86_64 cp38-manylinux_x86_64 cp36-manylinux_aarch64 cp37-manylinux_aarch64 cp38-manylinux_aarch64 cp36-manylinux_ppc64le cp37-manylinux_ppc64le cp38-manylinux_ppc64le cp36-manylinux_s390x cp37-manylinux_s390x cp38-manylinux_s390x"
+                export CIBW_BUILD="cp36-manylinux_x86_64 cp36-manylinux_aarch64 cp36-manylinux_ppc64le cp36-manylinux_s390x"
             elif [ "$PLATFORM" == "x32" ]; then
-              export CIBW_BUILD="cp36-manylinux_i686 cp37-manylinux_i686 cp38-manylinux_i686"
+                export CIBW_BUILD="cp36-manylinux_i686"
             fi
-          elif [ "$RUNNER_OS" == "macOS" ]; then
-            export CIBW_BUILD="cp36-macosx_x86_64 cp37-macosx_x86_64 cp38-macosx_x86_64"
-          fi
-          echo $CIBW_BUILD
-          python -m cibuildwheel --output-dir wheelhouse
+            elif [ "$RUNNER_OS" == "macOS" ]; then
+            export CIBW_BUILD="cp36-macosx_x86_64"
+            fi
+            echo $CIBW_BUILD
+            python -m cibuildwheel --output-dir wheelhouse
 
   build_sdist:
     name: Build source distribution
