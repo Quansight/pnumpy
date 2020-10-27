@@ -46,37 +46,17 @@ jobs:
         run: |
           choco install vcpython27 -f -y
 
-    #   - name: Build wheels on Windows x64
-    #     if: (runner.os == 'Windows' && matrix.platform == 'x64')
-    #     env: 
-    #       CIBW_BUILD: cp36-win_amd64
-    #     run: |
-    #       python -m cibuildwheel --output-dir wheelhouse
-    # #   - name: Build wheels on Windows x32
-    # #     if: (runner.os == 'Windows' && matrix.platform == 'x32')
-    # #     env: 
-    # #       CIBW_BUILD: cp36-win32
-    # #     run: |
-    # #       python -m cibuildwheel --output-dir wheelhouse
-    #   - name: Build wheels on Linux
-    #     if: runner.os == 'linux'
-    #     env: 
-    #       CIBW_BUILD: cp36-manylinux_x86_64 cp36-manylinux_i686
-    #     run: |
-    #       python -m cibuildwheel --output-dir wheelhouse
-    #   - name: Build wheels on MacOS
-    #     if: runner.os == 'macos'
-    #     env: 
-    #       CIBW_BUILD: cp36-macosx_x86_64
-    #     run: |
-    #       python -m cibuildwheel --output-dir wheelhouse
-
       - name: Build wheels on ${{ matrix.os}}
         run: |
           RUNNER_OS="${{ runner.os }}"
+          PLATFORM="${{ matrix.platform }}"
           echo $RUNNER_OS
+          echo $PLATFORM
           if [ "$RUNNER_OS" == 'Windows' ]; then
-            export CIBW_BUILD="cp36-win_amd64"
+            if [ "$PLATFORM" == 'x64']; then
+              export CIBW_BUILD="cp36-win_amd64"
+            # elif [ "$PLATFORM" == 'x32']; then
+            #   export CIBW_BUILD="cp36-win32"
           elif [ "$RUNNER_OS" == 'Linux' ]; then
             export CIBW_BUILD="cp36-manylinux_x86_64 cp36-manylinux_i686"
           elif [ "$RUNNER_OS" == 'macOS' ]; then
@@ -119,5 +99,5 @@ jobs:
       - uses: pypa/gh-action-pypi-publish@master
         with:
           user: __token__
-          password: ${{ secrets.test_pypi }}
-          repository_url: https://test.pypi.org/legacy/  # only for testinng
+          password: ${{ secrets.test_pypi }}  # switch to non-test pwd after testing
+          repository_url: https://test.pypi.org/legacy/  # remove line after testing
