@@ -69,8 +69,8 @@ jobs:
             fi
 
           elif [ "$RUNNER_OS" == "Linux" ]; then
-						if [ "$PLATFORM" == "x64" ]; then
-						  if [ "$PYTHON_VERSION" == "3.6" ]; then
+            if [ "$PLATFORM" == "x64" ]; then
+              if [ "$PYTHON_VERSION" == "3.6" ]; then
                 export CIBW_BUILD="cp36-manylinux_x86_64 cp36-manylinux_aarch64 cp36-manylinux_ppc64le cp36-manylinux_s390x"
               elif [ "$PYTHON_VERSION" == "3.7" ]; then
                 export CIBW_BUILD="cp37-manylinux_x86_64 cp37-manylinux_aarch64 cp37-manylinux_ppc64le cp37-manylinux_s390x"
