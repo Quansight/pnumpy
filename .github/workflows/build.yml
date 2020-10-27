@@ -91,6 +91,7 @@ jobs:
           fi
           echo $CIBW_BUILD
           python -m cibuildwheel --print-build-identifiers
+          CIBW_BEFORE_BUILD_MACOS="which pip;pip --version"
           python -m cibuildwheel --output-dir wheelhouse
 
       - uses: actions/upload-artifact@v2
