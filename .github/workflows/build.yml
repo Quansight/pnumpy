@@ -77,8 +77,8 @@ jobs:
           elif [ "$RUNNER_OS" == "macOS" ]; then
             export CIBW_BUILD="cp36-macosx_x86_64"
           fi
-					echo $CIBW_BUILD
-					python -m cibuildwheel --print-build-identifiers
+          echo $CIBW_BUILD
+          python -m cibuildwheel --print-build-identifiers
           python -m cibuildwheel --output-dir wheelhouse
 
       - uses: actions/upload-artifact@v2
