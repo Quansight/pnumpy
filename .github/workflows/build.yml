@@ -12,7 +12,7 @@ on: [push, pull_request]
 
 jobs:
   build_wheels:
-    name: Build wheels [${{ runner.os }}, ${{ matrix.platform }}, py ${{ matrix.python-version }}]
+    name: Build wheels [${{ matrix.os }}, ${{ matrix.platform }}, py ${{ matrix.python-version }}]
     runs-on: ${{ matrix.os }}
     defaults:
       run:
