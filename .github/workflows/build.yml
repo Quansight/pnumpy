@@ -74,6 +74,7 @@ jobs:
       - name: Build wheels on ${{ matrix.os}}
         run: |
           RUNNER_OS="${{ runner.os }}"
+          echo $RUNNER_OS
           if [ "$RUNNER_OS" == 'windows' ]; then
             export CIBW_BUILD="cp36-win_amd64"
           elif [ "$RUNNER_OS" == 'linux' ]; then
@@ -81,7 +82,7 @@ jobs:
           elif [ "$RUNNER_OS" == 'macos' ]; then
             export CIBW_BUILD="cp36-macosx_x86_64"
           fi
-
+          echo $CIBW_BUILD
           python -m cibuildwheel --output-dir wheelhouse
 
   build_sdist:
