@@ -80,9 +80,9 @@ jobs:
           echo $CIBW_BUILD
 					python -m cibuildwheel --output-dir wheelhouse
 
-			- uses: actions/upload-artifact@v2
-				with:
-					path: ./wheelhouse/*.whl
+      - uses: actions/upload-artifact@v2
+        with:
+          path: ./wheelhouse/*.whl
 
   build_sdist:
     name: Build source distribution
