@@ -24,17 +24,22 @@ def add_newdoc(module, function, docstring):
 
 add_newdoc('fast_numpy_loops', 'initialize',
 """
-Initialize the module
+Initialize the module. Replaces all the ufunc inner loops with a new version
+using ``PyUFunc_ReplaceLoopBySignature``. If none of the other options are
+enabled, the original inner loop function will be called. Will also call
+``numpy.setbufsize(8192 * 1024)`` to work around numpy issue 17649.
 """)
+
 
 add_newdoc('fast_numpy_loops', 'atop_enable',
 """
-enable the atop
+enable the atop inner loop implementations.
 """)
+
 
 add_newdoc('fast_numpy_loops', 'atop_disable',
 """
-disable the atop
+disable the atop inner loop implementations.
 """)
 
 
@@ -43,35 +48,38 @@ add_newdoc('fast_numpy_loops', "atop_isenabled",
 
 
 add_newdoc('fast_numpy_loops', "thread_enable",
-"enable worker threads")
+"""
+Enable worker threads for inner loops when they are large enough to justify
+the extra overhead.
+""")
 
 
 add_newdoc('fast_numpy_loops', "thread_disable",
-"disable worker threads")
+"Disable worker threads")
 
 
 add_newdoc('fast_numpy_loops', "thread_isenabled",
-"returns True if worker threads enabled else False")
+"Returns True if worker threads enabled else False")
 
 
 add_newdoc('fast_numpy_loops', "thread_getworkers",
-"get the number of worker threads")
+"Get the number of worker threads")
 
 
 add_newdoc('fast_numpy_loops', "thread_setworkers",
-"set the number of worker threads, return previous value. Must be at least 1.")
+"Set the number of worker threads, return previous value. Must be at least 1.")
 
 
 add_newdoc('fast_numpy_loops', "timer_gettsc",
-"get the time stamp counter")
+"Get the time stamp counter")
 
 
 add_newdoc('fast_numpy_loops', "timer_getutc",
-"get the time in utc nanos since unix epoch")
+"Get the time in utc nanos since unix epoch")
 
 
 add_newdoc('fast_numpy_loops', "cpustring",
-"cpu brand string plus features")
+"Cpu brand string plus features")
 
 
 add_newdoc('fast_numpy_loops', "oldinit",
@@ -79,35 +87,38 @@ add_newdoc('fast_numpy_loops', "oldinit",
 
 
 add_newdoc('fast_numpy_loops', "ledger_enable",
-"enable ledger debuggging")
+"""
+Enable ledger debuggging. This collects statistics on each run of a loop:
+input signature and dimensions, time to execute the loop and more
+""")
 
 
 add_newdoc('fast_numpy_loops', "ledger_disable",
-"disable ledger")
+"Disable ledger")
 
 
 add_newdoc('fast_numpy_loops', "ledger_isenabled",
-"returns True if ledger enabled else False")
+"Returns True if ledger enabled else False")
 
 
 add_newdoc('fast_numpy_loops', "ledger_info",
-"return ledger information")
+"Return ledger information")
 
 
 add_newdoc('fast_numpy_loops', "recycler_enable",
-"enable recycler debuggging")
+"Enable recycler to compact memory usage")
 
 
 add_newdoc('fast_numpy_loops', "recycler_disable",
-"disable recycler")
+"Disable recycler")
 
 
 add_newdoc('fast_numpy_loops', "recycler_isenabled",
-"returns True if recycler enabled else False")
+"Returns True if recycler enabled else False")
 
 
 add_newdoc('fast_numpy_loops', "recycler_info",
-"return recycler information")
+"Return recycler information")
 
 # Rewrite any of the headers that changed
 
