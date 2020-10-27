@@ -12,7 +12,7 @@ on: [push, pull_request]
 
 jobs:
   build_wheels:
-    name: Build wheels [${{ matrix.os }}, ${{ matrix.platform }}, py ${{ matrix.python-version }}]
+    name: Build wheels [${{ runner.os }}, ${{ matrix.platform }}, py ${{ matrix.python-version }}]
     runs-on: ${{ matrix.os }}
     defaults:
       run:
@@ -21,7 +21,7 @@ jobs:
       matrix:
         python-version: [3.6, 3.7, 3.8]
         os: [ubuntu-latest, macos-latest, windows-latest]
-        platform: [x64, x32]
+        platform: [x64]
         exclude:
           - os: macos-latest  # macos-10.15
             platform: x32
@@ -69,13 +69,25 @@ jobs:
             fi
 
           elif [ "$RUNNER_OS" == "Linux" ]; then
-            if [ "$PLATFORM" == "x64" ]; then
-              export CIBW_BUILD="cp36-manylinux_x86_64 cp36-manylinux_aarch64 cp36-manylinux_ppc64le cp36-manylinux_s390x"
+						if [ "$PLATFORM" == "x64" ]; then
+						  if [ "$PYTHON_VERSION" == "3.6" ]; then
+                export CIBW_BUILD="cp36-manylinux_x86_64 cp36-manylinux_aarch64 cp36-manylinux_ppc64le cp36-manylinux_s390x"
+              elif [ "$PYTHON_VERSION" == "3.7" ]; then
+                export CIBW_BUILD="cp37-manylinux_x86_64 cp37-manylinux_aarch64 cp37-manylinux_ppc64le cp37-manylinux_s390x"
+              elif [ "$PYTHON_VERSION" == "3.8" ]; then
+                export CIBW_BUILD="cp38-manylinux_x86_64 cp38-manylinux_aarch64 cp38-manylinux_ppc64le cp38-manylinux_s390x"
+              fi
             elif [ "$PLATFORM" == "x32" ]; then
               export CIBW_BUILD="cp36-manylinux_i686"
             fi
           elif [ "$RUNNER_OS" == "macOS" ]; then
-            export CIBW_BUILD="cp36-macosx_x86_64"
+            if [ "$PYTHON_VERSION" == "3.6" ]; then
+              export CIBW_BUILD="cp36-macosx_x86_64"
+            elif [ "$PYTHON_VERSION" == "3.7" ]; then
+              export CIBW_BUILD="cp37-macosx_x86_64"
+            elif [ "$PYTHON_VERSION" == "3.8" ]; then
+              export CIBW_BUILD="cp38-macosx_x86_64"
+            fi
           fi
           echo $CIBW_BUILD
           python -m cibuildwheel --print-build-identifiers
