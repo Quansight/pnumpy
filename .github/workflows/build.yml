@@ -78,7 +78,7 @@ jobs:
             export CIBW_BUILD="cp36-macosx_x86_64"
           fi
           echo $CIBW_BUILD
-					python -m cibuildwheel --output-dir wheelhouse
+          python -m cibuildwheel --output-dir wheelhouse
 
       - uses: actions/upload-artifact@v2
         with:
