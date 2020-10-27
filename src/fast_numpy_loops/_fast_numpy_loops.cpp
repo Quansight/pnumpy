@@ -145,10 +145,10 @@ static stUFuncToAtop gTrigMapping[] = {
 
 // Global table lookup to get to all loops, used by ledger
 stOpCategory gOpCategory[OP_CATEGORY::OPCAT_LAST] = {
-    {"Binary", sizeof(gBinaryMapping) / sizeof(stOpCategory), OP_CATEGORY::OPCAT_BINARY, gBinaryMapping},
-    {"Unary", sizeof(gUnaryMapping) / sizeof(stOpCategory), OP_CATEGORY::OPCAT_UNARY, gUnaryMapping},
-    {"Compare", sizeof(gCompareMapping) / sizeof(stOpCategory), OP_CATEGORY::OPCAT_COMPARE, gCompareMapping},
-    {"TrigLog", sizeof(gTrigMapping) / sizeof(stOpCategory), OP_CATEGORY::OPCAT_TRIG, gTrigMapping}
+    {"Binary", sizeof(gBinaryMapping) / sizeof(stUFuncToAtop), OP_CATEGORY::OPCAT_BINARY, gBinaryMapping},
+    {"Unary", sizeof(gUnaryMapping) / sizeof(stUFuncToAtop), OP_CATEGORY::OPCAT_UNARY, gUnaryMapping},
+    {"Compare", sizeof(gCompareMapping) / sizeof(stUFuncToAtop), OP_CATEGORY::OPCAT_COMPARE, gCompareMapping},
+    {"TrigLog", sizeof(gTrigMapping) / sizeof(stUFuncToAtop), OP_CATEGORY::OPCAT_TRIG, gTrigMapping}
 };
 
 //--------------------------------------------------------------------
@@ -1109,6 +1109,8 @@ PyObject* newinit(PyObject* self, PyObject* args, PyObject* kwargs) {
                 pstUFunc->MaxThreads = 5;
             }
         }
+
+        LedgerInit();
 
         RETURN_NONE;
     }
