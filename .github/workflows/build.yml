@@ -12,7 +12,7 @@ on: [push, pull_request]
 
 jobs:
   build_wheels:
-    name: Build wheels [${{ matrix.os }} ${{ matrix.platform}}]
+    name: Build wheels [${{ matrix.os }}, ${{ matrix.platform }}, py ${{ matrix.python-version }}]
     runs-on: ${{ matrix.os }}
     defaults:
       run:
@@ -33,10 +33,7 @@ jobs:
       - uses: actions/checkout@v2
         with:
           submodules: recursive
-      - uses: actions/upload-artifact@v2
-        with:
-          path: ./wheelhouse/*.whl
-      - name: Set up Python
+      - name: Set up python ${{ matrix.python-version }}
         uses: actions/setup-python@v2
         with:
           python-version: ${{ matrix.python-version }}
@@ -81,7 +78,11 @@ jobs:
             export CIBW_BUILD="cp36-macosx_x86_64"
           fi
           echo $CIBW_BUILD
-          python -m cibuildwheel --output-dir wheelhouse
+					python -m cibuildwheel --output-dir wheelhouse
+
+			- uses: actions/upload-artifact@v2
+				with:
+					path: ./wheelhouse/*.whl
 
   build_sdist:
     name: Build source distribution

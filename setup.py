@@ -50,7 +50,7 @@ with open("README.md") as readme:
 
 setup(
     name='fast-numpy-loops',
-    version='0.0.2',
+    version='0.0.5',
     license='MIT',
     description='Faster loops for NumPy using multithreading and other tricks',
     long_description=long_description,
