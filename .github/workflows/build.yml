@@ -57,6 +57,7 @@ jobs:
               export CIBW_BUILD="cp36-win_amd64"
             # elif [ "$PLATFORM" == 'x32']; then
             #   export CIBW_BUILD="cp36-win32"
+            fi
           elif [ "$RUNNER_OS" == 'Linux' ]; then
             export CIBW_BUILD="cp36-manylinux_x86_64 cp36-manylinux_i686"
           elif [ "$RUNNER_OS" == 'macOS' ]; then
