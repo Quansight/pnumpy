@@ -75,11 +75,11 @@ jobs:
         run: |
           RUNNER_OS="${{ runner.os }}"
           echo $RUNNER_OS
-          if [ "$RUNNER_OS" == 'windows' ]; then
+          if [ "$RUNNER_OS" == 'Windows' ]; then
             export CIBW_BUILD="cp36-win_amd64"
-          elif [ "$RUNNER_OS" == 'linux' ]; then
+          elif [ "$RUNNER_OS" == 'Linux' ]; then
             export CIBW_BUILD="cp36-manylinux_x86_64 cp36-manylinux_i686"
-          elif [ "$RUNNER_OS" == 'macos' ]; then
+          elif [ "$RUNNER_OS" == 'macOS' ]; then
             export CIBW_BUILD="cp36-macosx_x86_64"
           fi
           echo $CIBW_BUILD
