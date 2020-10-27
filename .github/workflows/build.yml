@@ -26,6 +26,8 @@ jobs:
             platform: x32
         #   - os: ubuntu-latest
         #     platform: x32
+          - os: windows-latest
+            platform: x32
     steps:
       - uses: actions/checkout@v2
         with:
@@ -55,8 +57,8 @@ jobs:
           if [ "$RUNNER_OS" == "Windows" ]; then
             if [ "$PLATFORM" == "x64" ]; then
               export CIBW_BUILD="cp36-win_amd64 cp37-win_amd64 cp38-win_amd64"
-            # elif [ "$PLATFORM" == "x32" ]; then
-            #   export CIBW_BUILD="cp36-win32 cp37-win32 cp38-win32"
+            elif [ "$PLATFORM" == "x32" ]; then
+              export CIBW_BUILD="cp36-win32 cp37-win32 cp38-win32"
             fi
           elif [ "$RUNNER_OS" == "Linux" ]; then
             if [ "$PLATFORM" == "x64" ]; then
