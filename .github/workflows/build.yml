@@ -62,7 +62,7 @@ jobs:
               elif [ "$PYTHON_VERSION" == "3.7" ]; then
                 export CIBW_BUILD="cp37-win_amd64"
               elif [ "$PYTHON_VERSION" == "3.8" ]; then
-               export CIBW_BUILD="cp38-win_amd64"  
+                export CIBW_BUILD="cp38-win_amd64"  
               fi
             elif [ "$PLATFORM" == "x32" ]; then
               export CIBW_BUILD="cp36-win32 cp37-win32 cp38-win32"
@@ -77,7 +77,8 @@ jobs:
           elif [ "$RUNNER_OS" == "macOS" ]; then
             export CIBW_BUILD="cp36-macosx_x86_64"
           fi
-          echo $CIBW_BUILD
+					echo $CIBW_BUILD
+					python -m cibuildwheel --print-build-identifiers
           python -m cibuildwheel --output-dir wheelhouse
 
       - uses: actions/upload-artifact@v2
