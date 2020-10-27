@@ -127,16 +127,16 @@ uint64_t GetUTCNanos() {
 
 // See ATOP_TYPES
 static const char* gStrAtopTypes[]= {
-    "BOOL",
-    "INT8", "UINT8",
-    "INT16", "UINT16",
-    "INT32", "UINT32",
-    "INT64", "UINT64",
-    "INT128", "UINT128",
-    "FLOAT32", "FLOAT64", "FLOATLONG",
-    "STRING", "UNICODE",
-    "VOID",
-    "LAST"
+    "bool",
+    "int8", "uint8",
+    "int16", "uint16",
+    "int32", "uint32",
+    "int64", "uint64",
+    "int128", "uint128",
+    "float32", "float64", "float80",
+    "string", "unicode",
+    "void",
+    "last"
 };
 
 
@@ -147,12 +147,15 @@ struct stLEDGER_ITEM {
 
     int64_t     ArrayLength1;
     int64_t     ArrayLength2;
-    int64_t     ArrayLength3;
+    int64_t     ArrayLength3;  // not valid for unary
 
     int32_t     ArrayGroup;
     int32_t     ArrayOp;
     int32_t     AType;
     int32_t     Reserved1;
+
+    const char* StrCatName;
+    const char* StrOpName;
 };
 
 //-----------------------------------------------------------
@@ -188,6 +191,9 @@ struct stLedgerRing {
 // Global ring buffer of last RING_BUFFER_SIZE math operations
 static stLedgerRing    g_LedgerRing;
 
+// rough estimate of last op code
+#define MAX_FUNCOP 40
+const char* g_str_ufunc_name[OPCAT_LAST][MAX_FUNCOP];
 
 void LedgerInit() {
 
@@ -195,24 +201,49 @@ void LedgerInit() {
     g_LedgerRing.Init();
 
     // Build reverse lookup table
-
+    for (int i = 0; i < OPCAT_LAST; i++) {
+        stOpCategory* pstOpCategory = &gOpCategory[i];
+        for (int j = 0; j < pstOpCategory->NumOps; j++) {
+            int k = pstOpCategory->pUFuncToAtop[j].atop_op;
+            if (k >= 0 && k < MAX_FUNCOP) {
+                // NOTE: can print out everything we hook here
+                //printf("%d %d %s\n", i, k, pstOpCategory->pUFuncToAtop[j].str_ufunc_name);
+                g_str_ufunc_name[i][k] = pstOpCategory->pUFuncToAtop[j].str_ufunc_name;
+            }
+        }
+    }
 }
 
-
+//--------------------------------------------------
+// When the ufunc is hooked, if the ledger is turned on it can be recorded.
+// The recording will go into the ring buffer for later retrieval.
+// The ring buffer only holds so much and can overflow
 void LedgerRecord(int32_t op_category, int64_t start_time, int64_t end_time, char** args, const npy_intp* dimensions, const npy_intp* steps, void* innerloop, int funcop, int atype) {
     int64_t deltaTime = end_time - start_time;
 
     stOpCategory* pstOpCategory = &gOpCategory[op_category];
+
+    // Get the next slot in the ring buffer
     stLEDGER_ITEM* pEntry = g_LedgerRing.GetNextEntry();
 
     pEntry->ArrayGroup = op_category;
     pEntry->ArrayOp = funcop;
     pEntry->AType = atype;
 
+    const char* strCatName = pstOpCategory->StrName;
+
+    // Check for reduce operation
+    if (op_category == OPCAT_BINARY && IS_BINARY_REDUCE) {
+        strCatName = "Reduce";
+    }
+
+    pEntry->StrCatName = strCatName;
+    pEntry->StrOpName = g_str_ufunc_name[op_category][funcop];
     pEntry->ArrayLength1 = (int64_t)dimensions[0];
     pEntry->ArrayLength2 = (int64_t)dimensions[1];
 
-    printf ("%lld cycle  op: %d  atype: %s   len: %lld  %s\n", (long long)deltaTime, funcop, gStrAtopTypes[atype], (long long)dimensions[0], pstOpCategory->StrName);
+    // temporary for debugging print out results
+    printf ("%lld \tlen: %lld   %s,  %s,  %s\n", (long long)deltaTime, (long long)dimensions[0], pEntry->StrOpName, gStrAtopTypes[atype], strCatName);
        
 }
 
