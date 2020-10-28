@@ -78,6 +78,8 @@ static stUFuncToAtop gBinaryMapping[]={
     {"bitwise_and",   BINARY_OPERATION::BITWISE_AND },
     {"bitwise_or",    BINARY_OPERATION::BITWISE_OR },
     {"bitwise_xor",   BINARY_OPERATION::BITWISE_XOR },
+    {"left_shift",    BINARY_OPERATION::BITWISE_LSHIFT },
+    {"right_shift",   BINARY_OPERATION::BITWISE_RSHIFT },
 
 };
 
