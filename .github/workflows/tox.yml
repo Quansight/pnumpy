@@ -43,10 +43,43 @@ jobs:
       run: tox -v
       env:
         PLATFORM: ${{ matrix.platform }}
+
+  update_docs:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v2
+      with:
+        python-version: 3.8
+
+    - uses: actions/checkout@v2
+      with:
+        submodules: recursive
+
     - name: build docs
       run: |
+        set -ex
         python -m pip install .
-        pushd doc
+        pushd doc_src
         python -m pip install --progress-bar=off -r doc_requirements.txt
         make html
-      if: ${{ matrix.os == 'ubuntu-latest' && matrix.python-version == '3.7' }}
+        popd
+        git fetch origin site
+        git checkout site
+        target=main  # fixme: use $GIT_BRANCH or so
+        rm -rf docs/$target/*
+        cp -r doc_src/build/html/* docs/$target
+        if [ $target == "main" ]; then
+            rm -rf docs/_static/*
+            cp -r doc_src/build/html/_static/* docs/_static
+        fi
+        git add docs || true
+        git config user.email "mattigit@picus.org.il"
+        git config user.name "mattibot"
+        # If there aren't changes, doesn't make a commit; push will be a no-op
+        git commit -m "auto-generating sphinx docs" || true
+        git push
