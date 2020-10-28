@@ -24,6 +24,7 @@ jobs:
         include:
           - os: windows-latest
             platform: x86
+            python-version: 3.8
     steps:
     - uses: actions/checkout@v2
       with:
@@ -32,11 +33,12 @@ jobs:
       uses: actions/setup-python@v2
       with:
         python-version: ${{ matrix.python-version }}
-        platform: $${{ matrix.platform }}
+        architecture: ${{ matrix.platform }}
     - name: Install
       run: |
         python -m pip install --upgrade pip
         python -m pip install --progress-bar=off  -r ci/requirements.txt
+        echo $(python -c"import sys; print(sys.version)")
     - name: Test
       run: tox -v
       env:
