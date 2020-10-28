@@ -48,7 +48,7 @@ jobs:
 
           if [ "$RUNNER_OS" == "Windows" ]; then
             if [ "$PLATFORM" == "x64" ]; then
-              export CIBW_BUILD="cp36-win_amd64, cp37-win_amd64, cp38-win_amd64"
+              export CIBW_BUILD="cp36-win_amd64 cp37-win_amd64 cp38-win_amd64"
               # if [ "$PYTHON_VERSION" == "3.6" ]; then
               #   export CIBW_BUILD="cp36-win_amd64"
               # elif [ "$PYTHON_VERSION" == "3.7" ]; then
