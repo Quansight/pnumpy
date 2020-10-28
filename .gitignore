@@ -1,3 +1,9 @@
+# generated files
+src/fast_numpy_loops/FAST_NUMPY_LOOPS.h
+
+# benchmark environments
+.asv
+
 *.py[cod]
 __pycache__
 

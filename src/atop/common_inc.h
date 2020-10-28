@@ -129,20 +129,8 @@ makes it easier to support new compilers and platforms just by adding the necess
 #define VOID void
 typedef void* PVOID;
 typedef void* LPVOID;
-
-typedef unsigned long       DWORD;
-typedef DWORD* LPDWORD;
-
-typedef long long           INT_PTR, * PINT_PTR;
-typedef unsigned long long  UINT_PTR, * PUINT_PTR;
-
-typedef long long           LONG_PTR, * PLONG_PTR;
-typedef unsigned long long  ULONG_PTR, * PULONG_PTR;
-
-typedef ULONG_PTR SIZE_T, * PSIZE_T;
-typedef LONG_PTR  SSIZE_T, * PSSIZE_T;
-
 typedef void* HANDLE;
+
 #define TRUE 1
 #define FALSE 0
 typedef int BOOL;
@@ -264,6 +252,8 @@ enum COMP_OPERATION {
 };
 
 enum UNARY_OPERATION {
+    UNARY_INVALID = 0,
+
     // One input, returns same data type
     ABS = 1,
     SIGNBIT = 2,
@@ -303,6 +293,8 @@ enum UNARY_OPERATION {
 };
 
 enum BINARY_OPERATION {
+    BINARY_INVALID = 0,
+
     // Two ops, returns same type
     ADD = 1,
     SUB = 2,
@@ -345,6 +337,7 @@ enum BINARY_OPERATION {
 };
 
 enum TRIG_OPERATION {
+    TRIG_INVALID = 0,
     // One op, returns same type
     SIN = 1,
     COS = 2,
@@ -422,3 +415,13 @@ void FmFree(void* _Block);
 
 #define WORKSPACE_ALLOC FmAlloc
 #define WORKSPACE_FREE FmFree
+
+#define MAX_STACK_ALLOC (1024 * 1024)
+
+// For small buffers that can be allocated on the stack
+#if defined(_WIN32) && !defined(__GNUC__)
+#define POSSIBLY_STACK_ALLOC(_alloc_size_) _alloc_size_ > MAX_STACK_ALLOC ? (char*)WORKSPACE_ALLOC(_alloc_size_) : (char*)_malloca(_alloc_size_);
+#else
+#define POSSIBLY_STACK_ALLOC(_alloc_size_) _alloc_size_ > MAX_STACK_ALLOC ? (char*)WORKSPACE_ALLOC(_alloc_size_) : (char*)alloca(_alloc_size_);
+#endif
+#define POSSIBLY_STACK_FREE(_alloc_size_, _mem_ptr_) if (_alloc_size_ > MAX_STACK_ALLOC) WORKSPACE_FREE(_mem_ptr_);

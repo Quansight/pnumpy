@@ -25,6 +25,7 @@ extern "C" {
     DllExport UNARY_FUNC GetUnaryOpFast(int func, int atopInType1, int* wantedOutType);
     DllExport UNARY_FUNC GetTrigOpFast(int func, int atopInType1, int* wantedOutType);
     DllExport UNARY_FUNC GetTrigOpSlow(int func, int atopInType1, int* wantedOutType);
+    DllExport UNARY_FUNC GetLogOpFast(int func, int atopInType1, int* wantedOutType);
 
     // CPUID capabilities
     extern DllExport int g_bmi2;

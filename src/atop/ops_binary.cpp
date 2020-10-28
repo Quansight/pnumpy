@@ -703,24 +703,31 @@ ANY_TWO_FUNC GetSimpleMathOpFast(int func, int atopInType1, int atopInType2, int
         return NULL;
 
     case BINARY_OPERATION::SUB:
-        *wantedOutType = atopInType1;
-        switch (atopInType1) {
-        case ATOP_FLOAT:  return SimpleMathOpFast<float, __m256, SubOp<float>, SUB_OP_256f32>;
-        case ATOP_DOUBLE: return SimpleMathOpFast<double, __m256d, SubOp<double>, SUB_OP_256f64>;
-        case ATOP_INT32:  return SimpleMathOpFast<int32_t, __m256i, SubOp<int32_t>, SUB_OP_256i32>;
-        case ATOP_INT64:  return SimpleMathOpFast<int64_t, __m256i, SubOp<int64_t>, SUB_OP_256i64>;
-        case ATOP_INT16:  return SimpleMathOpFast<int16_t, __m256i, SubOp<int16_t>, SUB_OP_256i16>;
-        case ATOP_INT8:   return SimpleMathOpFast<int8_t, __m256i, SubOp<int8_t>, SUB_OP_256i8>;
+        // numpy does not subtract bools
+        if (atopInType1 != ATOP_BOOL) {
+            *wantedOutType = atopInType1;
+            switch (atopInType1) {
+            case ATOP_FLOAT:  return SimpleMathOpFast<float, __m256, SubOp<float>, SUB_OP_256f32>;
+            case ATOP_DOUBLE: return SimpleMathOpFast<double, __m256d, SubOp<double>, SUB_OP_256f64>;
+            case ATOP_INT32:  return SimpleMathOpFast<int32_t, __m256i, SubOp<int32_t>, SUB_OP_256i32>;
+            case ATOP_INT64:  return SimpleMathOpFast<int64_t, __m256i, SubOp<int64_t>, SUB_OP_256i64>;
+            case ATOP_INT16:  return SimpleMathOpFast<int16_t, __m256i, SubOp<int16_t>, SUB_OP_256i16>;
+            case ATOP_INT8:   return SimpleMathOpFast<int8_t, __m256i, SubOp<int8_t>, SUB_OP_256i8>;
+            }
         }
         return NULL;
 
     case BINARY_OPERATION::DIV:
-        *wantedOutType = ATOP_DOUBLE;
-        if (atopInType1 == ATOP_FLOAT) *wantedOutType = ATOP_FLOAT;
-        switch (atopInType1) {
-        case ATOP_FLOAT:  return SimpleMathOpFast<float, __m256, DivOp<float>, DIV_OP_256f32>;
-        case ATOP_DOUBLE: return SimpleMathOpFast<double, __m256d, DivOp<double>, DIV_OP_256f64>;
-        //case ATOP_INT32:  return SimpleMathOpFastDivDouble<int32_t, __m128i, __m256d>;
+        // numpy does not divide bools
+        if (atopInType1 > ATOP_UINT64) {
+            *wantedOutType = ATOP_DOUBLE;
+            if (atopInType1 == ATOP_FLOAT || atopInType1 <= ATOP_UINT16) *wantedOutType = ATOP_FLOAT;
+            if (atopInType1 == ATOP_LONGDOUBLE) *wantedOutType = ATOP_LONGDOUBLE;
+            switch (atopInType1) {
+            case ATOP_FLOAT:  return SimpleMathOpFast<float, __m256, DivOp<float>, DIV_OP_256f32>;
+            case ATOP_DOUBLE: return SimpleMathOpFast<double, __m256d, DivOp<double>, DIV_OP_256f64>;
+                //case ATOP_INT32:  return SimpleMathOpFastDivDouble<int32_t, __m128i, __m256d>;
+            }
         }
         return NULL;
 
@@ -747,61 +754,84 @@ ANY_TWO_FUNC GetSimpleMathOpFast(int func, int atopInType1, int atopInType2, int
         return NULL;
 
     case BINARY_OPERATION::LOGICAL_AND:
-        *wantedOutType = atopInType1;
+        *wantedOutType = ATOP_BOOL;
         switch (atopInType1) {
         case ATOP_BOOL:   return SimpleMathOpFastSymmetric<int8_t, __m256i, AndOp<int8_t>, AND_OP_256>;
         }
         return NULL;
 
     case BINARY_OPERATION::BITWISE_AND:
-        *wantedOutType = atopInType1;
-        switch (atopInType1) {
-        case ATOP_INT8:
-        case ATOP_UINT8:
-        case ATOP_BOOL:   return SimpleMathOpFastSymmetric<int8_t, __m256i, AndOp<int8_t>, AND_OP_256>;
-        case ATOP_UINT16:
-        case ATOP_INT16:  return SimpleMathOpFastSymmetric<int16_t, __m256i, AndOp<int16_t>, AND_OP_256>;
-        case ATOP_UINT32:
-        case ATOP_INT32:  return SimpleMathOpFastSymmetric<int32_t, __m256i, AndOp<int32_t>, AND_OP_256>;
-        case ATOP_UINT64:
-        case ATOP_INT64:  return SimpleMathOpFastSymmetric<int64_t, __m256i, AndOp<int64_t>, AND_OP_256>;
+        // bitwise on floats not allowed
+        if (atopInType1 <= ATOP_UINT64) {
+            *wantedOutType = atopInType1;
+            switch (atopInType1) {
+            case ATOP_INT8:
+            case ATOP_UINT8:
+            case ATOP_BOOL:   return SimpleMathOpFastSymmetric<int8_t, __m256i, AndOp<int8_t>, AND_OP_256>;
+            case ATOP_UINT16:
+            case ATOP_INT16:  return SimpleMathOpFastSymmetric<int16_t, __m256i, AndOp<int16_t>, AND_OP_256>;
+            case ATOP_UINT32:
+            case ATOP_INT32:  return SimpleMathOpFastSymmetric<int32_t, __m256i, AndOp<int32_t>, AND_OP_256>;
+            case ATOP_UINT64:
+            case ATOP_INT64:  return SimpleMathOpFastSymmetric<int64_t, __m256i, AndOp<int64_t>, AND_OP_256>;
+            }
         }
         return NULL;
 
     case BINARY_OPERATION::LOGICAL_OR:
-        *wantedOutType = atopInType1;
+        *wantedOutType = ATOP_BOOL;
         switch (atopInType1) {
         case ATOP_BOOL:   return SimpleMathOpFastSymmetric<int8_t, __m256i, OrOp<int8_t>, OR_OP_256>;
         }
         return NULL;
 
     case BINARY_OPERATION::BITWISE_OR:
-        *wantedOutType = atopInType1;
-        switch (atopInType1) {
-        case ATOP_INT8:
-        case ATOP_UINT8:
-        case ATOP_BOOL:   return SimpleMathOpFastSymmetric<int8_t, __m256i, OrOp<int8_t>, OR_OP_256>;
-        case ATOP_UINT16:
-        case ATOP_INT16:  return SimpleMathOpFastSymmetric<int16_t, __m256i, OrOp<int16_t>, OR_OP_256>;
-        case ATOP_UINT32:
-        case ATOP_INT32:  return SimpleMathOpFastSymmetric<int32_t, __m256i, OrOp<int32_t>, OR_OP_256>;
-        case ATOP_UINT64:
-        case ATOP_INT64:  return SimpleMathOpFastSymmetric<int64_t, __m256i, OrOp<int64_t>, OR_OP_256>;
+        // bitwise on floats not allowed
+        if (atopInType1 <= ATOP_UINT64) {
+            *wantedOutType = atopInType1;
+            switch (atopInType1) {
+            case ATOP_INT8:
+            case ATOP_UINT8:
+            case ATOP_BOOL:   return SimpleMathOpFastSymmetric<int8_t, __m256i, OrOp<int8_t>, OR_OP_256>;
+            case ATOP_UINT16:
+            case ATOP_INT16:  return SimpleMathOpFastSymmetric<int16_t, __m256i, OrOp<int16_t>, OR_OP_256>;
+            case ATOP_UINT32:
+            case ATOP_INT32:  return SimpleMathOpFastSymmetric<int32_t, __m256i, OrOp<int32_t>, OR_OP_256>;
+            case ATOP_UINT64:
+            case ATOP_INT64:  return SimpleMathOpFastSymmetric<int64_t, __m256i, OrOp<int64_t>, OR_OP_256>;
+            }
         }
         return NULL;
 
     case BINARY_OPERATION::BITWISE_XOR:
-        *wantedOutType = atopInType1;
-        switch (atopInType1) {
-        case ATOP_INT8:
-        case ATOP_UINT8:
-        case ATOP_BOOL:   return SimpleMathOpFastSymmetric<int8_t, __m256i, XorOp<int8_t>, XOR_OP_256>;
-        case ATOP_UINT16:
-        case ATOP_INT16:  return SimpleMathOpFastSymmetric<int16_t, __m256i, XorOp<int16_t>, XOR_OP_256>;
-        case ATOP_UINT32:
-        case ATOP_INT32:  return SimpleMathOpFastSymmetric<int32_t, __m256i, XorOp<int32_t>, XOR_OP_256>;
-        case ATOP_UINT64:
-        case ATOP_INT64:  return SimpleMathOpFastSymmetric<int64_t, __m256i, XorOp<int64_t>, XOR_OP_256>;
+        // bitwise on floats not allowed
+        if (atopInType1 <= ATOP_UINT64) {
+            *wantedOutType = atopInType1;
+            switch (atopInType1) {
+            case ATOP_INT8:
+            case ATOP_UINT8:
+            case ATOP_BOOL:   return SimpleMathOpFastSymmetric<int8_t, __m256i, XorOp<int8_t>, XOR_OP_256>;
+            case ATOP_UINT16:
+            case ATOP_INT16:  return SimpleMathOpFastSymmetric<int16_t, __m256i, XorOp<int16_t>, XOR_OP_256>;
+            case ATOP_UINT32:
+            case ATOP_INT32:  return SimpleMathOpFastSymmetric<int32_t, __m256i, XorOp<int32_t>, XOR_OP_256>;
+            case ATOP_UINT64:
+            case ATOP_INT64:  return SimpleMathOpFastSymmetric<int64_t, __m256i, XorOp<int64_t>, XOR_OP_256>;
+            }
+        }
+        return NULL;
+
+    case BINARY_OPERATION::BITWISE_LSHIFT:
+        // bitwise on floats not allowed
+        if (atopInType1 > ATOP_BOOL && atopInType1 <= ATOP_UINT64) {
+            *wantedOutType = atopInType1;
+        }
+        return NULL;
+
+    case BINARY_OPERATION::BITWISE_RSHIFT:
+        // bitwise on floats not allowed
+        if (atopInType1 > ATOP_BOOL&& atopInType1 <= ATOP_UINT64) {
+            *wantedOutType = atopInType1;
         }
         return NULL;
 
