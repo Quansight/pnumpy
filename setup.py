@@ -47,6 +47,8 @@ def read(*names, **kwargs):
 with open("README.md") as readme:
     long_description = readme.read()
 
+import _add_newdocs
+_add_newdocs.main()
 
 setup(
     name='fast-numpy-loops',
@@ -102,12 +104,14 @@ setup(
             'fast_numpy_loops._fast_numpy_loops',
             sources=['src/fast_numpy_loops/_fast_numpy_loops.cpp',
                      'src/fast_numpy_loops/module_init.cpp',
+                     'src/fast_numpy_loops/ledger.cpp', 
                      'src/atop/atop.cpp',
                      'src/atop/threads.cpp',
                      'src/atop/ops_binary.cpp',
                      'src/atop/ops_compare.cpp',
                      'src/atop/ops_unary.cpp',
                      'src/atop/ops_trig.cpp',
+                     'src/atop/ops_log.cpp',
                     ],
             extra_compile_args=CFLAGS.split(),
             extra_link_args=LFLAGS.split(),
