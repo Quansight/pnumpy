@@ -1,8 +1,9 @@
+===========================
+fast-numpy-loops Change Log
+===========================
 
-Changelog
-=========
 
-0.0.0 (2020-09-09)
-------------------
+.. current developments
 
-* First release on PyPI.
+v0.0.1
+====================
