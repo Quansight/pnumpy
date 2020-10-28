@@ -18,7 +18,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
-        platform: [x32, x64]
+        platform: [x64]
         exclude:
           - os: macos-latest
             platform: x32
@@ -33,11 +33,7 @@ jobs:
 
       - name: Install cibuildwheel
         run: |
-          python -m pip install cibuildwheel==1.6.3
-      - name: Install Visual C++ for Python 2.7
-        if: runner.os == 'Windows'
-        run: |
-          choco install vcpython27 -f -y    
+          python -m pip install cibuildwheel==1.6.3  
       - name: Build wheels on ${{ matrix.os}}
         run: |
           RUNNER_OS="${{ runner.os }}"
