@@ -59,6 +59,7 @@ jobs:
     - uses: actions/checkout@v2
       with:
         submodules: recursive
+        fetch-depth: 0
 
     - name: build docs
       run: |
@@ -82,4 +83,8 @@ jobs:
         git config user.name "mattibot"
         # If there aren't changes, doesn't make a commit; push will be a no-op
         git commit -m "auto-generating sphinx docs" || true
-        git push
+    
+    - name: Push
+      uses: ad-m/github-push-action@master  
+        github_token: ${{ github.token }}
+        branch: site
