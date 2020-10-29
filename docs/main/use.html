@@ -1,0 +1,256 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>How to use it? &#8212; fast_numpy_loops v0.0.0 documentation</title>
+    <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <script id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+    <script src="_static/jquery.js"></script>
+    <script src="_static/underscore.js"></script>
+    <script src="_static/doctools.js"></script>
+    <script src="_static/language_data.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="prev" title="Installation" href="installation.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <div class="section" id="how-to-use-it">
+<h1>How to use it?<a class="headerlink" href="#how-to-use-it" title="Permalink to this headline">¶</a></h1>
+<span class="target" id="module-fast_numpy_loops"></span><p>Call <code class="docutils literal notranslate"><span class="pre">initialize</span></code> to setup the package. This imports and scans NumPy,
+replacing all the inner loops of UFuncs with wrapped versions. Then you can
+enable/disable any of the subsystems:</p>
+<blockquote>
+<div><ul>
+<li><p>threading</p>
+<p>Threading will kick in when the number of elements to be processed is more
+than 50,000. It will break the operation into chunks. Each chunk will be
+executed in its own thread.</p>
+</li>
+<li><p>ledger</p>
+<p>The ledger (disabled in version 0.1) records data on each loop execution to
+enable more accurate heuristics on memory allocation, threading behavior
+and reporting for logging and benchmarking.</p>
+</li>
+<li><p>recycler</p>
+<p>Once we can change the NumPy memory allocation strategy, we can use the
+data from the ledger to create more performant memory caches.</p>
+</li>
+<li><p>atop</p>
+<p>NumPy is making progress with faster inner loops, but an outside package
+can iterate faster to provide even faster ones. Since the Universal SIMD
+loops are in a state of flux at this time, this is disabled for version
+0.1.</p>
+</li>
+</ul>
+</div></blockquote>
+<dl class="py function">
+<dt id="fast_numpy_loops.atop_disable">
+<code class="sig-prename descclassname">fast_numpy_loops.</code><code class="sig-name descname">atop_disable</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#fast_numpy_loops.atop_disable" title="Permalink to this definition">¶</a></dt>
+<dd><p>disable the atop inner loop implementations.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt id="fast_numpy_loops.atop_enable">
+<code class="sig-prename descclassname">fast_numpy_loops.</code><code class="sig-name descname">atop_enable</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#fast_numpy_loops.atop_enable" title="Permalink to this definition">¶</a></dt>
+<dd><p>enable the atop inner loop implementations.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt id="fast_numpy_loops.atop_isenabled">
+<code class="sig-prename descclassname">fast_numpy_loops.</code><code class="sig-name descname">atop_isenabled</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#fast_numpy_loops.atop_isenabled" title="Permalink to this definition">¶</a></dt>
+<dd><p>returns True if atop enabled, else False</p>
+</dd></dl>
+
+<dl class="py function">
+<dt id="fast_numpy_loops.cpustring">
+<code class="sig-prename descclassname">fast_numpy_loops.</code><code class="sig-name descname">cpustring</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#fast_numpy_loops.cpustring" title="Permalink to this definition">¶</a></dt>
+<dd><p>Cpu brand string plus features</p>
+</dd></dl>
+
+<dl class="py function">
+<dt id="fast_numpy_loops.initialize">
+<code class="sig-prename descclassname">fast_numpy_loops.</code><code class="sig-name descname">initialize</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#fast_numpy_loops.initialize" title="Permalink to this definition">¶</a></dt>
+<dd><p>Initialize the module. Replaces all the ufunc inner loops with a new versionusing <code class="docutils literal notranslate"><span class="pre">PyUFunc_ReplaceLoopBySignature</span></code>. If none of the other options areenabled, the original inner loop function will be called. Will also call``numpy.setbufsize(8192 * 1024)`` to work around numpy issue 17649.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt id="fast_numpy_loops.ledger_disable">
+<code class="sig-prename descclassname">fast_numpy_loops.</code><code class="sig-name descname">ledger_disable</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#fast_numpy_loops.ledger_disable" title="Permalink to this definition">¶</a></dt>
+<dd><p>Disable ledger</p>
+</dd></dl>
+
+<dl class="py function">
+<dt id="fast_numpy_loops.ledger_enable">
+<code class="sig-prename descclassname">fast_numpy_loops.</code><code class="sig-name descname">ledger_enable</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#fast_numpy_loops.ledger_enable" title="Permalink to this definition">¶</a></dt>
+<dd><p>Enable ledger debuggging. This collects statistics on each run of a loop:input signature and dimensions, time to execute the loop and more</p>
+</dd></dl>
+
+<dl class="py function">
+<dt id="fast_numpy_loops.ledger_info">
+<code class="sig-prename descclassname">fast_numpy_loops.</code><code class="sig-name descname">ledger_info</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#fast_numpy_loops.ledger_info" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return ledger information</p>
+</dd></dl>
+
+<dl class="py function">
+<dt id="fast_numpy_loops.ledger_isenabled">
+<code class="sig-prename descclassname">fast_numpy_loops.</code><code class="sig-name descname">ledger_isenabled</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#fast_numpy_loops.ledger_isenabled" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns True if ledger enabled else False</p>
+</dd></dl>
+
+<dl class="py function">
+<dt id="fast_numpy_loops.recycler_disable">
+<code class="sig-prename descclassname">fast_numpy_loops.</code><code class="sig-name descname">recycler_disable</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#fast_numpy_loops.recycler_disable" title="Permalink to this definition">¶</a></dt>
+<dd><p>Disable recycler</p>
+</dd></dl>
+
+<dl class="py function">
+<dt id="fast_numpy_loops.recycler_enable">
+<code class="sig-prename descclassname">fast_numpy_loops.</code><code class="sig-name descname">recycler_enable</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#fast_numpy_loops.recycler_enable" title="Permalink to this definition">¶</a></dt>
+<dd><p>Enable recycler to compact memory usage</p>
+</dd></dl>
+
+<dl class="py function">
+<dt id="fast_numpy_loops.recycler_info">
+<code class="sig-prename descclassname">fast_numpy_loops.</code><code class="sig-name descname">recycler_info</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#fast_numpy_loops.recycler_info" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return recycler information</p>
+</dd></dl>
+
+<dl class="py function">
+<dt id="fast_numpy_loops.recycler_isenabled">
+<code class="sig-prename descclassname">fast_numpy_loops.</code><code class="sig-name descname">recycler_isenabled</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#fast_numpy_loops.recycler_isenabled" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns True if recycler enabled else False</p>
+</dd></dl>
+
+<dl class="py function">
+<dt id="fast_numpy_loops.thread_disable">
+<code class="sig-prename descclassname">fast_numpy_loops.</code><code class="sig-name descname">thread_disable</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#fast_numpy_loops.thread_disable" title="Permalink to this definition">¶</a></dt>
+<dd><p>Disable worker threads</p>
+</dd></dl>
+
+<dl class="py function">
+<dt id="fast_numpy_loops.thread_enable">
+<code class="sig-prename descclassname">fast_numpy_loops.</code><code class="sig-name descname">thread_enable</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#fast_numpy_loops.thread_enable" title="Permalink to this definition">¶</a></dt>
+<dd><p>Enable worker threads for inner loops when they are large enough to justifythe extra overhead.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt id="fast_numpy_loops.thread_getworkers">
+<code class="sig-prename descclassname">fast_numpy_loops.</code><code class="sig-name descname">thread_getworkers</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#fast_numpy_loops.thread_getworkers" title="Permalink to this definition">¶</a></dt>
+<dd><p>Get the number of worker threads</p>
+</dd></dl>
+
+<dl class="py function">
+<dt id="fast_numpy_loops.thread_isenabled">
+<code class="sig-prename descclassname">fast_numpy_loops.</code><code class="sig-name descname">thread_isenabled</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#fast_numpy_loops.thread_isenabled" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns True if worker threads enabled else False</p>
+</dd></dl>
+
+<dl class="py function">
+<dt id="fast_numpy_loops.thread_setworkers">
+<code class="sig-prename descclassname">fast_numpy_loops.</code><code class="sig-name descname">thread_setworkers</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#fast_numpy_loops.thread_setworkers" title="Permalink to this definition">¶</a></dt>
+<dd><p>Set the number of worker threads, return previous value. Must be at least 1.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt id="fast_numpy_loops.timer_gettsc">
+<code class="sig-prename descclassname">fast_numpy_loops.</code><code class="sig-name descname">timer_gettsc</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#fast_numpy_loops.timer_gettsc" title="Permalink to this definition">¶</a></dt>
+<dd><p>Get the time stamp counter</p>
+</dd></dl>
+
+<dl class="py function">
+<dt id="fast_numpy_loops.timer_getutc">
+<code class="sig-prename descclassname">fast_numpy_loops.</code><code class="sig-name descname">timer_getutc</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#fast_numpy_loops.timer_getutc" title="Permalink to this definition">¶</a></dt>
+<dd><p>Get the time in utc nanos since unix epoch</p>
+</dd></dl>
+
+</div>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="index.html">fast_numpy_loops</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<p class="caption"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="roadmap.html">Roadmap</a></li>
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">How to use it?</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="index.html">Documentation overview</a><ul>
+      <li>Previous: <a href="installation.html" title="previous chapter">Installation</a></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2020, tdimitri, mattip.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 3.2.0</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="_sources/use.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>
