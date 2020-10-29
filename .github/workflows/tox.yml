@@ -85,6 +85,7 @@ jobs:
         git commit -m "auto-generating sphinx docs" || true
     
     - name: Push
-      uses: ad-m/github-push-action@master  
+      uses: ad-m/github-push-action@master
+      with:
         github_token: ${{ github.token }}
         branch: site
