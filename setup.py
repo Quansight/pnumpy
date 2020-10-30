@@ -52,7 +52,7 @@ _add_newdocs.main()
 
 setup(
     name='accelerated-numpy',
-    version='v0.0.1',
+    version='v0.0.2',
     license='MIT',
     description='Faster loops for NumPy using multithreading and other tricks',
     long_description=long_description,
