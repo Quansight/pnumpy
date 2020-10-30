@@ -5,7 +5,7 @@ fast-numpy-loops Change Log
 
 .. current developments
 
-vv0.0.2
+v0.0.2
 ====================
 
 

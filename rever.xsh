@@ -7,6 +7,7 @@ $ACTIVITIES = [
               'ghrelease'  # Creates a Github release entry for the new tag
                ]
 $VERSION_BUMP_PATTERNS = [  # These note where/how to find the version numbers
+                         ('src/fast_numpy_loops/__init__.py', r'__version__\s*=.*', "__version__ = '$VERSION'"),
                          ('setup.py', r'version\s*=.*,', "version='$VERSION',")
                          ]
 $CHANGELOG_FILENAME = 'CHANGELOG.rst'  # Filename for the changelog
