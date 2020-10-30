@@ -6,7 +6,7 @@ fill it with the docstrings.
 from collections import defaultdict
 import io
 import os
-srcdir = os.path.join(os.path.dirname(__file__), 'src', 'fast_numpy_loops')
+srcdir = os.path.join(os.path.dirname(__file__), 'src', 'accelerated_numpy')
 
 def append_header(fid, function, docstring):
 	key = function.upper() + "_DOC"
@@ -22,7 +22,7 @@ def add_newdoc(module, function, docstring):
 	append_header(fid, function, docstring)	
 
 
-add_newdoc('fast_numpy_loops', 'initialize',
+add_newdoc('accelerated_numpy', 'initialize',
 """
 Initialize the module. Replaces all the ufunc inner loops with a new version
 using ``PyUFunc_ReplaceLoopBySignature``. If none of the other options are
@@ -31,93 +31,93 @@ enabled, the original inner loop function will be called. Will also call
 """)
 
 
-add_newdoc('fast_numpy_loops', 'atop_enable',
+add_newdoc('accelerated_numpy', 'atop_enable',
 """
 enable the atop inner loop implementations.
 """)
 
 
-add_newdoc('fast_numpy_loops', 'atop_disable',
+add_newdoc('accelerated_numpy', 'atop_disable',
 """
 disable the atop inner loop implementations.
 """)
 
 
-add_newdoc('fast_numpy_loops', "atop_isenabled",
+add_newdoc('accelerated_numpy', "atop_isenabled",
 "returns True if atop enabled, else False")
 
 
-add_newdoc('fast_numpy_loops', "thread_enable",
+add_newdoc('accelerated_numpy', "thread_enable",
 """
 Enable worker threads for inner loops when they are large enough to justify
 the extra overhead.
 """)
 
 
-add_newdoc('fast_numpy_loops', "thread_disable",
+add_newdoc('accelerated_numpy', "thread_disable",
 "Disable worker threads")
 
 
-add_newdoc('fast_numpy_loops', "thread_isenabled",
+add_newdoc('accelerated_numpy', "thread_isenabled",
 "Returns True if worker threads enabled else False")
 
 
-add_newdoc('fast_numpy_loops', "thread_getworkers",
+add_newdoc('accelerated_numpy', "thread_getworkers",
 "Get the number of worker threads")
 
 
-add_newdoc('fast_numpy_loops', "thread_setworkers",
+add_newdoc('accelerated_numpy', "thread_setworkers",
 "Set the number of worker threads, return previous value. Must be at least 1.")
 
 
-add_newdoc('fast_numpy_loops', "timer_gettsc",
+add_newdoc('accelerated_numpy', "timer_gettsc",
 "Get the time stamp counter")
 
 
-add_newdoc('fast_numpy_loops', "timer_getutc",
+add_newdoc('accelerated_numpy', "timer_getutc",
 "Get the time in utc nanos since unix epoch")
 
 
-add_newdoc('fast_numpy_loops', "cpustring",
+add_newdoc('accelerated_numpy', "cpustring",
 "Cpu brand string plus features")
 
 
-add_newdoc('fast_numpy_loops', "oldinit",
+add_newdoc('accelerated_numpy', "oldinit",
 "old, deprecated")        
 
 
-add_newdoc('fast_numpy_loops', "ledger_enable",
+add_newdoc('accelerated_numpy', "ledger_enable",
 """
 Enable ledger debuggging. This collects statistics on each run of a loop:
 input signature and dimensions, time to execute the loop and more
 """)
 
 
-add_newdoc('fast_numpy_loops', "ledger_disable",
+add_newdoc('accelerated_numpy', "ledger_disable",
 "Disable ledger")
 
 
-add_newdoc('fast_numpy_loops', "ledger_isenabled",
+add_newdoc('accelerated_numpy', "ledger_isenabled",
 "Returns True if ledger enabled else False")
 
 
-add_newdoc('fast_numpy_loops', "ledger_info",
+add_newdoc('accelerated_numpy', "ledger_info",
 "Return ledger information")
 
 
-add_newdoc('fast_numpy_loops', "recycler_enable",
+add_newdoc('accelerated_numpy', "recycler_enable",
 "Enable recycler to compact memory usage")
 
 
-add_newdoc('fast_numpy_loops', "recycler_disable",
+add_newdoc('accelerated_numpy', "recycler_disable",
 "Disable recycler")
 
 
-add_newdoc('fast_numpy_loops', "recycler_isenabled",
+add_newdoc('accelerated_numpy', "recycler_isenabled",
 "Returns True if recycler enabled else False")
 
 
-add_newdoc('fast_numpy_loops', "recycler_info",
+add_newdoc('accelerated_numpy', "recycler_info",
 "Return recycler information")
 
 # Rewrite any of the headers that changed

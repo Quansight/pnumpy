@@ -1,9 +1,9 @@
-.. fast_numpy_loops documentation master file, created by
+.. accelerated_numpy documentation master file, created by
    sphinx-quickstart on Thu Oct 22 12:01:26 2020.
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-Welcome to fast_numpy_loops's documentation!
+Welcome to accelerated_numpy's documentation!
 ============================================
 
 .. toctree::
@@ -21,19 +21,19 @@ Installation
 This is a binary package and requires compilation. We recommend using pip or
 conda to obtain a pre-built version::
 
-    $ pip install fast_numpy_loops
+    $ pip install accelerated_numpy
     # or
-    $ conda install fast_numpy_loops
+    $ conda install accelerated_numpy
 
 To use the package one it is installed::
 
-    >>> import fast_numpy_loops
-    >>> fast_numpy_loops.initialize()
+    >>> import accelerated_numpy
+    >>> accelerated_numpy.initialize()
 
 How to use it?
 --------------
 
-.. automodule:: fast_numpy_loops
+.. automodule:: accelerated_numpy
     :members:
 
 Indices and tables

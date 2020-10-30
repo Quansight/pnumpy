@@ -1,5 +1,5 @@
 ===========================
-fast_numpy_loops Change Log
+accelerated_numpy Change Log
 ===========================
 
 

@@ -14,8 +14,8 @@ Please include:
 
 # Documentation improvements
 
-FastNumPy could always use more documentation, whether as part of the
-official FastNumPy docs, in docstrings, or even on the web in blog posts,
+Accelerated Numpy could always use more documentation, whether as part of the
+official Accelerated Numpy docs, in docstrings, or even on the web in blog posts,
 articles, and such.
 
 # Feature requests and feedback

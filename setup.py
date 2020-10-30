@@ -51,7 +51,7 @@ import _add_newdocs
 _add_newdocs.main()
 
 setup(
-    name='fast-numpy-loops',
+    name='accelerated-numpy',
     version='v0.0.1',
     license='MIT',
     description='Faster loops for NumPy using multithreading and other tricks',
@@ -101,10 +101,10 @@ setup(
     },
     ext_modules=[
         Extension(
-            'fast_numpy_loops._fast_numpy_loops',
-            sources=['src/fast_numpy_loops/_fast_numpy_loops.cpp',
-                     'src/fast_numpy_loops/module_init.cpp',
-                     'src/fast_numpy_loops/ledger.cpp', 
+            'accelerated_numpy._accelerated_numpy',
+            sources=['src/accelerated_numpy/_accelerated_numpy.cpp',
+                     'src/accelerated_numpy/module_init.cpp',
+                     'src/accelerated_numpy/ledger.cpp', 
                      'src/atop/atop.cpp',
                      'src/atop/threads.cpp',
                      'src/atop/ops_binary.cpp',
@@ -115,7 +115,7 @@ setup(
                     ],
             extra_compile_args=CFLAGS.split(),
             extra_link_args=LFLAGS.split(),
-            include_dirs=['src/fast_numpy_loops', 'src/atop', np.get_include()],
+            include_dirs=['src/accelerated_numpy', 'src/atop', np.get_include()],
             py_limited_api=True,
         )
     ],
