@@ -2,7 +2,7 @@
 Override all the NumPy UFunc loops with multithreaded variants. The original
 loop will be called via a pool of threads.
 """
-__version__ = 'v0.0.3'
+__version__ = 'v0.1.0'
 __all__ = [
     'initialize', 'cpustring',
     'thread_enable', 'thread_disable', 'thread_isenabled', 'thread_getworkers', 'thread_setworkers',
