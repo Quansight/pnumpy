@@ -1,5 +1,5 @@
 ===========================
-fast-numpy-loops Change Log
+fast_numpy_loops Change Log
 ===========================
 
 
