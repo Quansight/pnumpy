@@ -78,6 +78,8 @@ static stUFuncToAtop gBinaryMapping[]={
     {"bitwise_and",   BINARY_OPERATION::BITWISE_AND },
     {"bitwise_or",    BINARY_OPERATION::BITWISE_OR },
     {"bitwise_xor",   BINARY_OPERATION::BITWISE_XOR },
+    {"left_shift",    BINARY_OPERATION::BITWISE_LSHIFT },
+    {"right_shift",   BINARY_OPERATION::BITWISE_RSHIFT },
 
 };
 
@@ -145,10 +147,10 @@ static stUFuncToAtop gTrigMapping[] = {
 
 // Global table lookup to get to all loops, used by ledger
 stOpCategory gOpCategory[OP_CATEGORY::OPCAT_LAST] = {
-    {"Binary", sizeof(gBinaryMapping) / sizeof(stOpCategory), OP_CATEGORY::OPCAT_BINARY, gBinaryMapping},
-    {"Unary", sizeof(gUnaryMapping) / sizeof(stOpCategory), OP_CATEGORY::OPCAT_UNARY, gUnaryMapping},
-    {"Compare", sizeof(gCompareMapping) / sizeof(stOpCategory), OP_CATEGORY::OPCAT_COMPARE, gCompareMapping},
-    {"TrigLog", sizeof(gTrigMapping) / sizeof(stOpCategory), OP_CATEGORY::OPCAT_TRIG, gTrigMapping}
+    {"Binary", sizeof(gBinaryMapping) / sizeof(stUFuncToAtop), OP_CATEGORY::OPCAT_BINARY, gBinaryMapping},
+    {"Unary", sizeof(gUnaryMapping) / sizeof(stUFuncToAtop), OP_CATEGORY::OPCAT_UNARY, gUnaryMapping},
+    {"Compare", sizeof(gCompareMapping) / sizeof(stUFuncToAtop), OP_CATEGORY::OPCAT_COMPARE, gCompareMapping},
+    {"TrigLog", sizeof(gTrigMapping) / sizeof(stUFuncToAtop), OP_CATEGORY::OPCAT_TRIG, gTrigMapping}
 };
 
 //--------------------------------------------------------------------
@@ -840,55 +842,6 @@ void add_T(T **args, npy_intp const *dimensions, npy_intp const *steps,
     }
 }
 
-
-extern "C"
-PyObject* oldinit(PyObject *self, PyObject *args, PyObject *kwargs) {
-    PyObject* result = NULL;
-    PyObject *ufunc = NULL;
-    const char * uname = NULL;
-    int ret = 0;
-    int signature[3] = {NPY_INT32, NPY_INT32, NPY_INT32};
-    PyUFuncGenericFunction oldfunc, newfunc;
-    // C++ warns on assigning const char * to char *
-
-    if (!PyArg_ParseTuple(args, "s:oldinit", &uname)) {
-        return NULL;
-    }
-
-    // Initialize numpy's C-API.
-    import_array();
-    import_umath();
-
-    PyObject *numpy_module = PyImport_ImportModule("numpy");
-    if (numpy_module == NULL) {
-        PyErr_SetString(PyExc_TypeError, "cannot import numpy");
-        return NULL;
-    }
-    ufunc = PyObject_GetAttrString(numpy_module, uname);
-    Py_DECREF(numpy_module);
-    if (ufunc == NULL || (!PyObject_TypeCheck(ufunc, &PyUFunc_Type))) {
-        if (ufunc) Py_XDECREF(ufunc);
-        return PyErr_Format(PyExc_TypeError, "func %s must be the name of a ufunc", uname);
-    }
-
-    // TODO: parse requested dtype into the templating type
-    newfunc = (PyUFuncGenericFunction)add_T<int32_t>;
-    ret = PyUFunc_ReplaceLoopBySignature((PyUFuncObject*)ufunc,
-                                             newfunc, signature, &oldfunc);
-
-    if (ret < 0) {
-        PyErr_SetString(PyExc_ValueError, "signature int,int->int not found");
-    }
-    if (oldfunc == newfunc) {
-        result = PyUnicode_FromString("int32,int32->int32 (repeated initialize)");
-    }
-    else {
-        result = PyUnicode_FromString("int32,int32->int32");
-    }
-    return result;
-}
-
-
 extern "C"
 PyObject* newinit(PyObject* self, PyObject* args, PyObject* kwargs) {
     int dtypes[] = { NPY_BOOL, NPY_INT8, NPY_UINT8,  NPY_INT16, NPY_UINT16,  NPY_INT32, NPY_UINT32,  NPY_INT64, NPY_UINT64, NPY_FLOAT32, NPY_FLOAT64 };
@@ -1046,7 +999,6 @@ PyObject* newinit(PyObject* self, PyObject* args, PyObject* kwargs) {
                     stUFunc* pstUFunc = &g_UnaryFuncLUT[atop][atype];
                     // Store the new function to call and the previous ufunc
                     pstUFunc->pOldFunc = oldFunc;
-                    pstUFunc->pUnaryFunc = pUnaryFunc;
                     pstUFunc->MaxThreads = 4;
                 }
             }
@@ -1109,6 +1061,8 @@ PyObject* newinit(PyObject* self, PyObject* args, PyObject* kwargs) {
                 pstUFunc->MaxThreads = 5;
             }
         }
+
+        LedgerInit();
 
         RETURN_NONE;
     }

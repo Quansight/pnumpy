@@ -821,6 +821,20 @@ ANY_TWO_FUNC GetSimpleMathOpFast(int func, int atopInType1, int atopInType2, int
         }
         return NULL;
 
+    case BINARY_OPERATION::BITWISE_LSHIFT:
+        // bitwise on floats not allowed
+        if (atopInType1 > ATOP_BOOL && atopInType1 <= ATOP_UINT64) {
+            *wantedOutType = atopInType1;
+        }
+        return NULL;
+
+    case BINARY_OPERATION::BITWISE_RSHIFT:
+        // bitwise on floats not allowed
+        if (atopInType1 > ATOP_BOOL&& atopInType1 <= ATOP_UINT64) {
+            *wantedOutType = atopInType1;
+        }
+        return NULL;
+
     }
     return NULL;
 }

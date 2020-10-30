@@ -1,20 +1,21 @@
 import numpy as np
 import fast_numpy_loops as fn
+fn.initialize()
 
 def test_enable():
     # enable/disable return the previous value
-    old = fn.atop_isenabled()
-    fn.atop_enable()
-    assert fn.atop_isenabled() == True
-    fn.atop_disable()
-    assert fn.atop_isenabled() == False
+    old = fn.thread_isenabled()
+    fn.thread_enable()
+    assert fn.thread_isenabled() == True
+    fn.thread_disable()
+    assert fn.thread_isenabled() == False
 
     # restore prior state
     if old:
-        fn.atop_enable()
+        fn.thread_enable()
     else:
-        fn.atop_disable()
-    assert fn.atop_isenabled() == old
+        fn.thread_disable()
+    assert fn.thread_isenabled() == old
 
 def test_result(rng):
     print('numpy version', np.__version__)

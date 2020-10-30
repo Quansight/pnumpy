@@ -1,6 +1,8 @@
 # generated files
 src/fast_numpy_loops/FAST_NUMPY_LOOPS.h
 
+# benchmark environments
+.asv
 
 *.py[cod]
 __pycache__
@@ -92,3 +94,6 @@ docs/_build
 
 # Mypy Cache
 .mypy_cache/
+
+# Rever
+rever/ 

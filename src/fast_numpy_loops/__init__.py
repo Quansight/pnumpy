@@ -2,19 +2,16 @@
 Override all the NumPy UFunc loops with multithreaded variants. The original
 loop will be called via a pool of threads.
 """
-__version__ = '0.0.0'
+__version__ = 'v0.0.1'
 __all__ = [
-    'initialize', 'atop_enable', 'atop_disable', 'atop_isenabled', 'cpustring',
+    'initialize', 'cpustring',
     'thread_enable', 'thread_disable', 'thread_isenabled', 'thread_getworkers', 'thread_setworkers',
     'ledger_enable', 'ledger_disable', 'ledger_isenabled', 'ledger_info',
     'recycler_enable', 'recycler_disable', 'recycler_isenabled', 'recycler_info',
     'timer_gettsc','timer_getutc']
 
-from fast_numpy_loops._fast_numpy_loops import initialize, atop_enable, atop_disable, atop_isenabled, cpustring 
+from fast_numpy_loops._fast_numpy_loops import initialize, cpustring 
 from fast_numpy_loops._fast_numpy_loops import thread_enable, thread_disable, thread_isenabled, thread_getworkers, thread_setworkers
-from fast_numpy_loops._fast_numpy_loops import timer_gettsc, timer_getutc
-from fast_numpy_loops._fast_numpy_loops import ledger_enable, ledger_disable, ledger_isenabled, ledger_info
-from fast_numpy_loops._fast_numpy_loops import recycler_enable, recycler_disable, recycler_isenabled, recycler_info
 
 import numpy as np
 
@@ -68,12 +65,12 @@ def debug_benchmark(
     atop=True,
     thread=True):
 
-    fa.atop_disable()
+    # fa.atop_disable()
     fa.thread_disable()
     # get original time
     t0=debug_timeit(func=func, ctypes=ctypes, scalar=scalar, unary=unary, outdtype=outdtype, recycle=recycle)
-    if atop:
-        fa.atop_enable()
+    # if atop:
+    #    fa.atop_enable()
     if thread:
         fa.thread_enable()
     t1=debug_timeit(func=func, ctypes=ctypes, scalar=scalar, unary=unary, outdtype=outdtype, recycle=recycle)
