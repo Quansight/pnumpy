@@ -4,13 +4,11 @@ Installation
 This is a binary package and requires compilation. We recommend using pip or
 conda to obtain a pre-built version::
 
-    $ pip install fast_numpy_loops
-    # or
-    $ conda install fast_numpy_loops
+    $ pip install accelerated_numpy
 
 To use the package one it is installed::
 
-    >>> import fast_numpy_loops
-    >>> fast_numpy_loops.initialize()
+    >>> import accelerated_numpy
+    >>> accelerated_numpy.initialize()
 
 
