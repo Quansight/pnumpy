@@ -1,5 +1,5 @@
 #include "Python.h"
-#include "FAST_NUMPY_LOOPS.h"
+#include "ACCELERATED_NUMPY.h"
 
 /*
  * Some C++ compilers do not like mixin non-designated-initializers
@@ -63,7 +63,7 @@ static PyMethodDef module_functions[] = {
 
 static PyModuleDef moduledef = {
    PyModuleDef_HEAD_INIT,
-   "fast_numpy_loops._fast_numpy_loops",                  // Module name
+   "accelerated_numpy._accelerated_numpy",                  // Module name
    m_doc,  // Module description
    0,
    module_functions,                     // Structure that defines the methods
@@ -73,7 +73,7 @@ static PyModuleDef moduledef = {
    NULL                                  // freefunc
 };
 
-extern "C" PyMODINIT_FUNC PyInit__fast_numpy_loops(void) {
+extern "C" PyMODINIT_FUNC PyInit__accelerated_numpy(void) {
     PyObject *module;
 
     module = PyModule_Create(&moduledef);

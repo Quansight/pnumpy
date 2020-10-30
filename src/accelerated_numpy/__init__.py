@@ -10,8 +10,8 @@ __all__ = [
     'recycler_enable', 'recycler_disable', 'recycler_isenabled', 'recycler_info',
     'timer_gettsc','timer_getutc']
 
-from fast_numpy_loops._fast_numpy_loops import initialize, cpustring 
-from fast_numpy_loops._fast_numpy_loops import thread_enable, thread_disable, thread_isenabled, thread_getworkers, thread_setworkers
+from accelerated_numpy._accelerated_numpy import initialize, cpustring 
+from accelerated_numpy._accelerated_numpy import thread_enable, thread_disable, thread_isenabled, thread_getworkers, thread_setworkers
 
 import numpy as np
 
