@@ -1,5 +1,5 @@
 #include "Python.h"
-#include "accelerated_numpy.h"
+#include "ACCELERATED_NUMPY.h"
 
 /*
  * Some C++ compilers do not like mixin non-designated-initializers
