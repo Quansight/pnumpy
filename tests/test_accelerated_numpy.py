@@ -1,5 +1,5 @@
 import numpy as np
-import fast_numpy_loops as fn
+import accelerated_numpy as fn
 fn.initialize()
 
 def test_enable():
