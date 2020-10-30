@@ -12,6 +12,8 @@ $VERSION_BUMP_PATTERNS = [  # These note where/how to find the version numbers
                          ]
 $CHANGELOG_FILENAME = 'CHANGELOG.rst'  # Filename for the changelog
 $CHANGELOG_TEMPLATE = 'TEMPLATE.rst'  # Filename for the news template
+$CHANGELOG_HEADER = '.. current developments\n\n$VERSION\n'
+                    '====================\n\n',
 $PUSH_TAG_REMOTE = 'git@github.com:Quansight/numpy-threading-extensions.git'  # Repo to push tags to
 
 $GITHUB_ORG = 'Quansight'  # Github org for Github releases and conda-forge
