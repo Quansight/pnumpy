@@ -1,8 +1,6 @@
 name: Build and upload to PyPI
 # publish when a (published) GitHub Release is created
 on:
-  push:
-  pull_request:
   release:
     types:
       - published
