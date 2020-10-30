@@ -5,7 +5,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Roadmap &#8212; fast_numpy_loops v0.0.1 documentation</title>
+    <title>Roadmap &#8212; accelerated_numpy v0.0.1 documentation</title>
     <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
     <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
     <script id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
@@ -16,7 +16,7 @@
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
     <link rel="next" title="Installation" href="installation.html" />
-    <link rel="prev" title="Welcome to fast_numpy_loops’s documentation!" href="index.html" />
+    <link rel="prev" title="Welcome to Accelerated Numpy’s documentation!" href="index.html" />
    
   <link rel="stylesheet" href="_static/custom.css" type="text/css" />
   
@@ -36,26 +36,32 @@
   <div class="section" id="roadmap">
 <h1>Roadmap<a class="headerlink" href="#roadmap" title="Permalink to this headline">¶</a></h1>
 <p>Version 0.1 of the package exposes the first optimization: multithreaded ufunc
-loops. Future versions of the package will extend the capabilites. Some of the
-proposed enhancements will require new API from NumPy.</p>
+loops.</p>
+<p>Future versions of the package will extend these capabilites to cover more of
+the NumPy functionality. Some of these proposed enhancements will require new
+API from NumPy.</p>
 <div class="section" id="the-ledger">
 <h2>The ledger<a class="headerlink" href="#the-ledger" title="Permalink to this headline">¶</a></h2>
 <p>At the core of the next generation of enhancements lies the ledger, which will
 record various data about the use of UFuncs in the process. This will allow
-us to learn your use case: do you call UFuncs with small arrays? Do you use
-strides or only contiguous memory? After we have profiled your use, we can
+us to learn your use case:</p>
+<ul class="simple">
+<li><p>Do you call UFuncs with small arrays?</p></li>
+<li><p>Do you use strides or only contiguous memory?</p></li>
+</ul>
+<p>After we have profiled your use, we can
 tweak the different enhancements below to better speed up your code.</p>
 </div>
 <div class="section" id="replacing-loops-with-faster-code">
 <h2>Replacing loops with faster code<a class="headerlink" href="#replacing-loops-with-faster-code" title="Permalink to this headline">¶</a></h2>
-<p>NumPy only now is beginning to use SIMD instructions to speed up loops. We have
-a few further enhancements to the current NumPy implementations. The code lives
-in the <cite>atop</cite> directory.</p>
+<p>NumPy is only now beginning to use <a class="reference external" href="https://en.wikipedia.org/wiki/SIMD">SIMD</a>
+instructions to speed up loops. We have a few further enhancements to the
+current NumPy implementations. Check out the code in the <cite>atop</cite> directory.</p>
 </div>
 <div class="section" id="using-a-better-memory-allocator">
 <h2>Using a better memory allocator<a class="headerlink" href="#using-a-better-memory-allocator" title="Permalink to this headline">¶</a></h2>
 <p>NumPy uses a small cache for data memory. We will provide a better cache and
-will use the ledger to predict when it is worthwhille to compact the fragmented
+will use the ledger to predict when it is worthwhile to compact the fragmented
 cached memory.</p>
 </div>
 </div>
@@ -67,7 +73,7 @@ cached memory.</p>
       </div>
       <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
         <div class="sphinxsidebarwrapper">
-<h1 class="logo"><a href="index.html">fast_numpy_loops</a></h1>
+<h1 class="logo"><a href="index.html">accelerated_numpy</a></h1>
 
 
 
@@ -93,7 +99,7 @@ cached memory.</p>
 <h3>Related Topics</h3>
 <ul>
   <li><a href="index.html">Documentation overview</a><ul>
-      <li>Previous: <a href="index.html" title="previous chapter">Welcome to fast_numpy_loops’s documentation!</a></li>
+      <li>Previous: <a href="index.html" title="previous chapter">Welcome to Accelerated Numpy’s documentation!</a></li>
       <li>Next: <a href="installation.html" title="next chapter">Installation</a></li>
   </ul></li>
 </ul>
