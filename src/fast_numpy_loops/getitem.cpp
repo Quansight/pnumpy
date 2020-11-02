@@ -195,15 +195,16 @@ int64_t SumBooleanMask(const int8_t* const pData, const int64_t length) {
         const auto byte_popcounts_32b = _mm256_unpackhi_epi32(byte_popcounts_32, zeros);
         const auto byte_popcounts_64 = _mm256_add_epi64(byte_popcounts_32a, byte_popcounts_32b);
 
-        // Sum 4x 8-byte counts -> 1x 32-byte count.
-        const auto byte_popcount_256 =
-            _mm256_extract_epi64(byte_popcounts_64, 0)
-            + _mm256_extract_epi64(byte_popcounts_64, 1)
-            + _mm256_extract_epi64(byte_popcounts_64, 2)
-            + _mm256_extract_epi64(byte_popcounts_64, 3);
+        // perform the operation horizontally in m0
+        union {
+            volatile int64_t  horizontal[4];
+            __m256i mathreg[1];
+        };
 
-        // Add the accumulated popcount from this loop iteration (for 32*255 bytes) to the overall result.
-        result += byte_popcount_256;
+        mathreg[0] = byte_popcounts_64;
+        for (int j = 0; j < 4; j++) {
+            result += horizontal[j];
+        }
 
         // Increment the outer loop counter by the number of inner iterations we performed.
         i += inner_loop_iters;
