@@ -269,10 +269,10 @@ static int64_t ReduceThreadCallbackNumpy(struct stMATH_WORKER_ITEM* pstWorkerIte
 
         args[0] = args[2] = pDataOut + outputAdj;
         args[1] = pDataIn2 + inputAdj2;
-        dimensions[0] = lenX;
+        dimensions[0] = (npy_intp)lenX;
         steps[0] = 0;
         steps[2] = 0;
-        steps[1] = Callback->itemSizeIn2;
+        steps[1] = (npy_intp)(Callback->itemSizeIn2);
 
         // this is also hackish
         // to set the start value, which is overloaded as first element in output value
@@ -360,7 +360,7 @@ static int64_t BinaryThreadCallbackNumpy(struct stMATH_WORKER_ITEM* pstWorkerIte
         int64_t outputAdj = pstWorkerItem->BlockSize * workBlock * Callback->itemSizeOut;
 
         char* args[3] = { pDataIn1 + inputAdj1, pDataIn2 + inputAdj2, pDataOut + outputAdj };
-        npy_intp dimensions[3] = { lenX, lenX, lenX };
+        npy_intp dimensions[3] = { (npy_intp)lenX, (npy_intp)lenX, (npy_intp)lenX };
 
         LOGGING("[%d] orig numpy working on %lld with len %lld   block: %lld\n", core, workIndex, lenX, workBlock);
         Callback->pOldFunc(args, dimensions, (npy_intp*)(Callback->steps), Callback->innerloop);
@@ -397,7 +397,7 @@ static int64_t UnaryThreadCallbackNumpy(struct stMATH_WORKER_ITEM* pstWorkerItem
 
         char* args[2] = { pDataIn1 + inputAdj1,  pDataOut + outputAdj };
         npy_intp dimensions =  (npy_intp)lenX ;
-        const npy_intp steps[2] = { Callback->itemSizeIn1 , Callback->itemSizeOut };
+        const npy_intp steps[2] = { (npy_intp)(Callback->itemSizeIn1) , (npy_intp)(Callback->itemSizeOut) };
 
         LOGGING("[%d] working on %lld with len %lld   block: %lld\n", core, workIndex, lenX, workBlock);
         Callback->pOldFunc(args, &dimensions, steps, Callback->innerloop);
@@ -528,10 +528,10 @@ static void AtopBinaryMathFunction(char** args, const npy_intp* dimensions, cons
                     args[1] = pReduceOfReduce;
 
                     // todo, check if only 1 dimension for reduce
-                    dimensions[0] = chunks;
+                    dimensions[0] = (npy_intp)chunks;
                     steps[0] = 0;
                     steps[2] = 0;
-                    steps[1] = itemsize;
+                    steps[1] = (npy_intp)itemsize;
 
                     pstUFunc->pOldFunc(args, dimensions, steps, innerloop);
                 }

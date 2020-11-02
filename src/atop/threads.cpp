@@ -666,8 +666,8 @@ int GetProcCount() {
 
     HANDLE proc = GetCurrentProcess();
 
-    uint64_t mask1;
-    uint64_t mask2;
+    DWORD mask1;
+    DWORD mask2;
     int count;
 
     count = 0;

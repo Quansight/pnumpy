@@ -143,9 +143,10 @@ typedef unsigned char       BYTE;
 #ifndef InterlockedAdd64
 #define InterlockedAdd64 _InterlockedAdd64
 #endif
+#ifndef InterlockedDecrement64
 #define InterlockedDecrement64 _InterlockedDecrement64
 #define InterlockedIncrement64 _InterlockedIncrement64
-
+#endif
 #define InterlockedIncrement _InterlockedIncrement
 
 #define FMInterlockedOr(X,Y) _InterlockedOr64((int64_t*)X,Y)
