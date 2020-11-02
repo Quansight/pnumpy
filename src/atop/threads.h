@@ -101,6 +101,8 @@ typedef  unsigned int UINT_PTR, * PUINT_PTR;
 typedef  long LONG_PTR, * PLONG_PTR;
 typedef  unsigned long ULONG_PTR, * PULONG_PTR;
 
+typedef ULONG_PTR SIZE_T, * PSIZE_T;
+typedef LONG_PTR SSIZE_T, * PSSIZE_T;
 
 #else
 typedef __int64 INT_PTR, * PINT_PTR;
@@ -109,19 +111,11 @@ typedef unsigned __int64 UINT_PTR, * PUINT_PTR;
 typedef __int64 LONG_PTR, * PLONG_PTR;
 typedef unsigned __int64 ULONG_PTR, * PULONG_PTR;
 
+typedef ULONG_PTR SIZE_T, * PSIZE_T;
+typedef LONG_PTR SSIZE_T, * PSSIZE_T;
 
 #endif
 
-//#ifndef LONG_PTR
-//typedef long long           LONG_PTR, * PLONG_PTR;
-//typedef unsigned long long  ULONG_PTR, * PULONG_PTR;
-//
-//typedef ULONG_PTR SIZE_T, * PSIZE_T;
-//typedef LONG_PTR  SSIZE_T, * PSSIZE_T;
-//
-//typedef long long           INT_PTR, * PINT_PTR;
-//typedef unsigned long long  UINT_PTR, * PUINT_PTR;
-//#endif
 #endif
 
 typedef VOID(WINAPI* WakeSingleAddress)(PVOID);
