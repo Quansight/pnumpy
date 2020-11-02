@@ -111,11 +111,11 @@ typedef LONG_PTR SSIZE_T, * PSSIZE_T;
 
 #endif
 #else
-typedef __int64 INT_PTR, * PINT_PTR;
-typedef unsigned __int64 UINT_PTR, * PUINT_PTR;
+typedef int64_t INT_PTR, * PINT_PTR;
+typedef uint64_t UINT_PTR, * PUINT_PTR;
 
-typedef __int64 LONG_PTR, * PLONG_PTR;
-typedef unsigned __int64 ULONG_PTR, * PULONG_PTR;
+typedef int64_t LONG_PTR, * PLONG_PTR;
+typedef uint64_t ULONG_PTR, * PULONG_PTR;
 
 typedef ULONG_PTR SIZE_T, * PSIZE_T;
 typedef LONG_PTR SSIZE_T, * PSSIZE_T;
