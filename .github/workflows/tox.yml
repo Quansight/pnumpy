@@ -71,7 +71,7 @@ jobs:
         popd
 
     - name: push rendered docs
-      if: github.event.pull_request.merged
+      if: github.event.pull_request.merged_by != ''
       run: |
         git fetch origin site
         git checkout site
