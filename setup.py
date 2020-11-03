@@ -51,7 +51,7 @@ import _add_newdocs
 _add_newdocs.main()
 
 setup(
-    name='fast-numpy-loops',
+    name='pnumpy',
     version='0.0.0',
     license='MIT',
     description='Faster loops for NumPy using multithreading and other tricks',
@@ -101,12 +101,12 @@ setup(
     },
     ext_modules=[
         Extension(
-            'fast_numpy_loops._fast_numpy_loops',
-            sources=['src/fast_numpy_loops/_fast_numpy_loops.cpp',
-                     'src/fast_numpy_loops/module_init.cpp',
-                     'src/fast_numpy_loops/ledger.cpp',
-                     'src/fast_numpy_loops/getitem.cpp',
-                     'src/fast_numpy_loops/recycler.cpp',
+            'pnumpy._pnumpy',
+            sources=['src/pnumpy/_pnumpy.cpp',
+                     'src/pnumpy/module_init.cpp',
+                     'src/pnumpy/ledger.cpp',
+                     'src/pnumpy/getitem.cpp',
+                     'src/pnumpy/recycler.cpp',
                      'src/atop/atop.cpp',
                      'src/atop/threads.cpp',
                      'src/atop/ops_binary.cpp',
@@ -117,7 +117,7 @@ setup(
                     ],
             extra_compile_args=CFLAGS.split(),
             extra_link_args=LFLAGS.split(),
-            include_dirs=['src/fast_numpy_loops', 'src/atop', np.get_include()],
+            include_dirs=['src/pnumpy', 'src/atop', np.get_include()],
             py_limited_api=True,
         )
     ],

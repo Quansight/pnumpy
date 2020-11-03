@@ -1,5 +1,5 @@
 # generated files
-src/fast_numpy_loops/FAST_NUMPY_LOOPS.h
+src/pnumpy/PNUMPY.h
 
 # benchmark environments
 .asv

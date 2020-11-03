@@ -1,5 +1,5 @@
 import numpy as np
-import fast_numpy_loops as fn
+import pnumpy as fn
 
 def test_enable():
     # enable/disable return the previous value
