@@ -69,6 +69,9 @@ jobs:
         python -m pip install --progress-bar=off -r doc_requirements.txt
         make html
         popd
+        echo github.event.pull_request.merged_by ${{ github.event.pull_request.merged_by }}
+        echo github.event.pull_request.merged ${{ github.event.pull_request.merged }}
+        echo github.event.pull_request ${{ github.event.pull_request }}
 
     - name: push rendered docs
       if: github.event.pull_request.merged_by != ''
