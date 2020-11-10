@@ -133,7 +133,8 @@ static const char* gStrAtopTypes[]= {
     "int32", "uint32",
     "int64", "uint64",
     "int128", "uint128",
-    "float32", "float64", "float80",
+    "float16", "float32", "float64", "float80",
+    "cfloat16", "cfloat32", "cfloat64", "cfloat80",
     "string", "unicode",
     "void",
     "last"
