@@ -18,10 +18,11 @@ int convert_dtype_to_atop[]={
 
      ATOP_INT64, ATOP_UINT64,           //NPY_LONGLONG, NPY_ULONGLONG,
      ATOP_FLOAT, ATOP_DOUBLE, ATOP_LONGDOUBLE,    //NPY_FLOAT, NPY_DOUBLE, NPY_LONGDOUBLE,
-     -1, -1, -1,                                  //NPY_CFLOAT, NPY_CDOUBLE, NPY_CLONGDOUBLE,
+     ATOP_CFLOAT, ATOP_CDOUBLE, ATOP_CLONGDOUBLE,    //NPY_FLOAT, NPY_DOUBLE, NPY_LONGDOUBLE,
      -1,                                //NPY_OBJECT = 17,
      ATOP_STRING, ATOP_UNICODE,         //NPY_STRING, NPY_UNICODE,
-     ATOP_VOID                          //NPY_VOID,
+     ATOP_VOID,                         //NPY_VOID,
+     -1, -1, ATOP_HALF_FLOAT
 };
 
 // Reverse conversion from atop dtype to numpy dtype
@@ -32,9 +33,11 @@ int convert_atop_to_dtype[] = {
      NPY_INT32, NPY_UINT32,            //NPY_INT, NPY_UINT,
      NPY_INT64, NPY_UINT64,            //NPY_LONG, NPY_ULONG,
      NPY_LONGLONG, NPY_ULONGLONG,      // Really INT128
-     NPY_FLOAT, NPY_DOUBLE, NPY_LONGDOUBLE,    //NPY_FLOAT, NPY_DOUBLE, NPY_LONGDOUBLE,
+     NPY_HALF, NPY_FLOAT, NPY_DOUBLE, NPY_LONGDOUBLE,    //NPY_FLOAT, NPY_DOUBLE, NPY_LONGDOUBLE,
+     NPY_HALF, NPY_CFLOAT, NPY_CDOUBLE, NPY_CLONGDOUBLE,    //NPY_CHALF does not exist
      NPY_STRING, NPY_UNICODE,         //NPY_STRING, NPY_UNICODE,
      NPY_VOID                          //NPY_VOID,
+
 };
 
 // Find out the sizeof() for an atop dtype
@@ -43,8 +46,9 @@ int convert_atop_to_itemsize[] = {
     2,  2,
     4,  4,
     8,  8,
-    16, 16,
-    4,  8,  sizeof(long double),
+    16, 16,  // INT128
+    2,  4,  8,  sizeof(long double),
+    4,  8,  16,  2*sizeof(long double),
     1,  4,
     0
 };
