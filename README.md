@@ -12,7 +12,7 @@ via third-party functions.
 
 ## Installation
 ```
-pip install fast_numpy_loops
+pip install pnumpy
 ```
 
 You can also install the in-development version 0.0.1 with:
@@ -29,8 +29,8 @@ pip install https://github.com/Quansight/numpy-threading-extensions/archive/main
 To use the project:
 
 ```python
-    import fast_numpy_loops
-    fast_numpy_loops.initialize()
+    import pnumpy
+    pnumpy.initialize()
 ```
 
 ## Development

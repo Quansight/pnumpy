@@ -1,6 +1,6 @@
 import numpy as np
-import fast_numpy_loops
-fast_numpy_loops.initialize()
+import pnumpy
+pnumpy.initialize()
 
 
 ########
@@ -151,10 +151,10 @@ for ufunc in ufuncs:
         def setup(self, nthreads):
             np.seterr(all='ignore')
             if nthreads > 0:
-                fast_numpy_loops.thread_enable()
-                fast_numpy_loops.thread_setworkers(nthreads)
+                pnumpy.thread_enable()
+                pnumpy.thread_setworkers(nthreads)
             else:
-                fast_numpy_loops.thread_disable()
+                pnumpy.thread_disable()
             try:
                 self.f = getattr(np, ufunc)
             except AttributeError:

@@ -39,7 +39,7 @@ struct stOpCategory {
     stUFuncToAtop*  pUFuncToAtop;
 };
 
-// defined in fast_numpy_loops
+// defined in pnumpy
 extern stOpCategory gOpCategory[OPCAT_LAST];
 
 extern void LedgerRecord(int32_t op_category, int64_t start_time, int64_t end_time, char** args, const npy_intp* dimensions, const npy_intp* steps, void* innerloop, int funcop, int atype);
