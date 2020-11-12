@@ -230,6 +230,95 @@ inline void ReduceMathOpFast(void* pDataIn1X, void* pDataOutX, void* pStartVal, 
 }
 
 
+//=====================================================================================================
+// symmetric -- arg1 and arg2 can be swapped and the operation will return the same result (like addition or multiplication)
+template<typename DOWNCAST, typename UPCAST, typename U256, typename U256d, const UPCAST MATH_OP(UPCAST, UPCAST), const U256d MATH_OP256(U256d, U256d)>
+inline void ReduceMathOpFastUpcast(void* pDataIn1X, void* pDataOutX, void* pStartVal, int64_t datalen, int64_t strideIn) {
+    DOWNCAST* pDataOut = (DOWNCAST*)pDataOutX;
+    DOWNCAST* pDataIn1 = (DOWNCAST*)pDataIn1X;
+
+    if (strideIn != 0) {
+        DOWNCAST* pEnd = (DOWNCAST*)((char*)pDataIn1X + (datalen * strideIn));
+
+        // TJD: testing indicates unrolling size of 2 is 3% faster
+        const int64_t NUM_LOOPS_UNROLLED = 2;
+        const int64_t chunkSize = NUM_LOOPS_UNROLLED * (sizeof(U256) / sizeof(DOWNCAST));
+        int64_t perReg = sizeof(U256) / sizeof(DOWNCAST);
+
+        // NOTE: numpy uses the output val to seed the first input
+        UPCAST startval = *(DOWNCAST*)pStartVal;
+
+        if (strideIn == sizeof(DOWNCAST) && datalen >= chunkSize) {
+            DOWNCAST* pEnd = &pDataIn1[chunkSize * (datalen / chunkSize)];
+            U256* pEnd_256 = (U256*)pEnd;
+            U256* pDataIn256 = (U256*)pDataIn1;
+
+            U256 m0 = LOADU(pDataIn256);
+            U256 m1 = LOADU(pDataIn256 + 1);
+
+            // Upcast expansion (consider template?)
+            U256d m10 = _mm256_cvtps_pd(_mm256_extractf128_ps(m0, 0));
+            U256d m11 = _mm256_cvtps_pd(_mm256_extractf128_ps(m0, 1));
+            U256d m12 = _mm256_cvtps_pd(_mm256_extractf128_ps(m1, 0));
+            U256d m13 = _mm256_cvtps_pd(_mm256_extractf128_ps(m1, 1));
+
+            pDataIn256 += NUM_LOOPS_UNROLLED;
+
+            while (pDataIn256 < pEnd_256) {
+                m0 = LOADU(pDataIn256);
+                m1 = LOADU(pDataIn256 + 1);
+
+                m10 = MATH_OP256(m10, _mm256_cvtps_pd(_mm256_extractf128_ps(m0, 0)));
+                m11 = MATH_OP256(m11, _mm256_cvtps_pd(_mm256_extractf128_ps(m0, 1)));
+                m12 = MATH_OP256(m12, _mm256_cvtps_pd(_mm256_extractf128_ps(m1, 0)));
+                m13 = MATH_OP256(m13, _mm256_cvtps_pd(_mm256_extractf128_ps(m1, 1)));
+
+                pDataIn256 += NUM_LOOPS_UNROLLED;
+            }
+
+            m10 = MATH_OP256(m10, m11);
+            m12 = MATH_OP256(m12, m13);
+            m10 = MATH_OP256(m10, m12);
+
+            // perform the operation horizontally in m0
+            union {
+                volatile UPCAST  horizontal[sizeof(U256d) / sizeof(UPCAST)];
+                U256d mathreg[1];
+            };
+
+            // NOTE: there is a horizontal add, there is a better way to do this
+            //m0 = _mm_add_ps(_mm256_extractf128_ps(m0, 0), _mm256_extractf128_ps(m0, 1));
+            //m0 = _mm_hadd_ps(m0, m0);
+            //m0 = _mm_hadd_ps(m0, m0);
+
+            mathreg[0] = m10;
+            for (int i = 0; i < perReg; i++) {
+                //printf("startval %lld %lld\n", (long long)startval, (long long)horizontal[i]);
+                startval = MATH_OP(horizontal[i], startval);
+            }
+            pDataIn1 = (DOWNCAST*)pDataIn256;
+        }
+
+        //printf("startval %lf stride:%lld\n", (UPCAST)startval, strideIn);
+        while (pDataIn1 != pEnd) {
+            startval = MATH_OP((UPCAST)*pDataIn1, startval);
+            pDataIn1 = STRIDE_NEXT(DOWNCAST, pDataIn1, strideIn);
+        }
+        *pDataOut = (DOWNCAST)startval;
+    }
+    else {
+        // sometimes the stridein is 0
+        // notice this when  a = np.pad(a, (25, 20), 'median', stat_length=(3, 5))
+        UPCAST startval = *(DOWNCAST*)pStartVal;
+        for (int64_t i = 0; i < datalen; i++) {
+            startval = MATH_OP((UPCAST)*pDataIn1, startval);
+        }
+
+        // downcast at end
+        *pDataOut = (DOWNCAST)startval;
+    }
+}
+
 
 
 //=====================================================================================================
@@ -847,7 +936,8 @@ REDUCE_FUNC GetReduceMathOpFast(int func, int atopInType1) {
     case BINARY_OPERATION::ADD:
         switch (atopInType1) {
         case ATOP_BOOL:   return ReduceMathOpFast<int8_t, __m256i, OrOp<int8_t>, OR_OP_256>;
-        case ATOP_FLOAT:  return ReduceMathOpFast<float, __m256, AddOp<float>, ADD_OP_256f32>;
+        //case ATOP_FLOAT:  return ReduceMathOpFast<float, __m256, AddOp<float>, ADD_OP_256f32>;
+        case ATOP_FLOAT:  return ReduceMathOpFastUpcast<float, double, __m256, __m256d, AddOp<double>, ADD_OP_256f64>;
         case ATOP_DOUBLE: return ReduceMathOpFast<double, __m256d, AddOp<double>, ADD_OP_256f64>;
         case ATOP_INT32:  return ReduceMathOpFast<int32_t, __m256i, AddOp<int32_t>, ADD_OP_256i32>;
         case ATOP_INT64:  return ReduceMathOpFast<int64_t, __m256i, AddOp<int64_t>, ADD_OP_256i64>;
