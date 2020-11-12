@@ -448,6 +448,54 @@ static int64_t UnaryThreadCallbackStrided(struct stMATH_WORKER_ITEM* pstWorkerIt
     return didSomeWork;
 }
 
+// should handle both int and float zeros
+char g_startval_zero[16] = { 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 };
+
+// should handle all little-endian int ones
+char g_startval_one[16] = { 1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 };
+float g_startval_one_float[2] = { 1.0, 1.0 };
+double g_startval_one_double[2] = { 1.0, 1.0 };
+long double g_startval_one_longdouble[2] = { 1.0, 1.0 };
+int16_t g_startval_one_half[2] = { 15360, 15360 };
+
+
+
+//============================================================================
+// Special routine to match numpy reduction start values and handle
+// np.setbufsize logic
+//
+// Returns: NULL if no special start value
+char*
+GetReduceStartVal(int funcop, int atype) {
+    switch (funcop) {
+    case BINARY_OPERATION::ADD:
+        return g_startval_zero;
+
+    case BINARY_OPERATION::MUL:
+        if (atype < ATOP_TYPES::ATOP_INT128) {
+            return g_startval_one;
+        }
+        switch (atype) {
+        case ATOP_TYPES::ATOP_FLOAT:
+        case ATOP_TYPES::ATOP_CFLOAT:
+            return (char*)g_startval_one_float;
+        case ATOP_TYPES::ATOP_DOUBLE:
+        case ATOP_TYPES::ATOP_CDOUBLE:
+            return (char*)g_startval_one_double;
+        case ATOP_TYPES::ATOP_LONGDOUBLE:
+        case ATOP_TYPES::ATOP_CLONGDOUBLE:
+            return (char*)g_startval_one_longdouble;
+        case ATOP_TYPES::ATOP_HALF_FLOAT:
+        case ATOP_TYPES::ATOP_CHALF_FLOAT:
+            return (char*)g_startval_one_half;
+        }
+
+        break;
+    }
+    return NULL;
+}
+
+
 //============================================================================
 // For binary math functions like add, sbutract, multiply.
 // 2 inputs and 1 output
@@ -457,7 +505,7 @@ static void AtopBinaryMathFunction(char** args, const npy_intp* dimensions, cons
         stUFunc* pstUFunc = &g_UFuncLUT[funcop][atype];
         npy_intp n = dimensions[0];
         stMATH_WORKER_ITEM* pWorkItem = THREADER->GetWorkItem(n);
-        LOGGING("called with %d %d   funcp: %p  len:%lld   inputs: %p %p %p  steps: %lld %lld %lld\n", funcop, atype, g_UFuncLUT[funcop][atype].pOldFunc, (long long)n, args[0], args[1], args[2], (long long)steps[0], (long long)steps[1], (long long)steps[2]);
+        LOGGING("called with %d %d   funcp: %p  len:%lld   inputs: %p %p %p  steps: %lld %lld %lld  pWorkItem: %p\n", funcop, atype, g_UFuncLUT[funcop][atype].pOldFunc, (long long)n, args[0], args[1], args[2], (long long)steps[0], (long long)steps[1], (long long)steps[2], pWorkItem);
 
         if (IS_BINARY_REDUCE) {
             // In a numpy binary reduce, the middle array is the real array
@@ -488,8 +536,11 @@ static void AtopBinaryMathFunction(char** args, const npy_intp* dimensions, cons
 
                 UFUNC_CALLBACK stCallback;
 
+                // See if we need a special start value (for SUM and PROD)
+                char* pstartval = GetReduceStartVal(funcop, atype);
+
                 // Also pass in original data out since it is used as starting value
-                stCallback.pStartVal = op1;
+                stCallback.pStartVal = pstartval == NULL ? op1 : pstartval;
 
                 // Create a data out for each work chunk
                 stCallback.pDataOut = pReduceOfReduce;
@@ -506,8 +557,11 @@ static void AtopBinaryMathFunction(char** args, const npy_intp* dimensions, cons
 
                     // This will notify the worker threads of a new work item
                     // most functions are so fast, we do not need more than 4 worker threads
+                    // Do a reduce in parallel using the pReduceOfReduce buffer
                     THREADER->WorkMain(pWorkItem, n, pstUFunc->MaxThreads);
+                    //printf("Value before last add %lf   chunks:%lld  %lld\n", (double)((int64_t*)op1)[0], chunks, itemsize);
                     pReduceFunc(pReduceOfReduce, op1, op1, chunks, itemsize);
+                    //printf("Value after last add %lf\n", (double)((int64_t*)op1)[0]);
                 }
                 else {
                     // A binary reduce for original numpy routine
@@ -522,22 +576,18 @@ static void AtopBinaryMathFunction(char** args, const npy_intp* dimensions, cons
 
                     // Finish it...
                     // Now perform same function over all the threaded results
-                    char* args[3];
+                    char* newargs[3];
 
                     // possible bug -- check how big dimensions is for reduce
                     npy_intp dimensions[1];
-                    npy_intp steps[3];
 
-                    args[0] = args[2] = op1;
-                    args[1] = pReduceOfReduce;
+                    newargs[0] = newargs[2] = op1;
+                    newargs[1] = pReduceOfReduce;
 
                     // todo, check if only 1 dimension for reduce
                     dimensions[0] = chunks;
-                    steps[0] = 0;
-                    steps[2] = 0;
-                    steps[1] = itemsize;
 
-                    pstUFunc->pOldFunc(args, dimensions, steps, innerloop);
+                    pstUFunc->pOldFunc(newargs, dimensions, steps, innerloop);
                 }
                 // Free if not on the stack
                 POSSIBLY_STACK_FREE(allocsize, pReduceOfReduce);
