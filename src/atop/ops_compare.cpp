@@ -1014,22 +1014,23 @@ ANY_TWO_FUNC GetComparisonOpFast(int func, int atopInType1, int atopInType2, int
     switch (mainType) {
     case ATOP_FLOAT:
         switch (func) {
-        case COMP_OPERATION::CMP_EQ:      return CompareFloat<_CMP_EQ_OS, COMP_EQ>;
-        case COMP_OPERATION::CMP_NE:      return CompareFloat<_CMP_NEQ_US, COMP_NE>;
-        case COMP_OPERATION::CMP_GT:      return CompareFloat<_CMP_GT_OS, COMP_GT>;
-        case COMP_OPERATION::CMP_GTE:     return CompareFloat<_CMP_GE_OS, COMP_GE>;
-        case COMP_OPERATION::CMP_LT:      return CompareFloat<_CMP_LT_OS, COMP_LT>;
-        case COMP_OPERATION::CMP_LTE:     return CompareFloat<_CMP_LE_OS, COMP_LE>;
+        // numpy does not want signaling _CMP_EQ_OQ vs _CMP_EQ_OS
+        case COMP_OPERATION::CMP_EQ:      return CompareFloat<_CMP_EQ_OQ, COMP_EQ>;
+        case COMP_OPERATION::CMP_NE:      return CompareFloat<_CMP_NEQ_UQ, COMP_NE>;
+        case COMP_OPERATION::CMP_GT:      return CompareFloat<_CMP_GT_OQ, COMP_GT>;
+        case COMP_OPERATION::CMP_GTE:     return CompareFloat<_CMP_GE_OQ, COMP_GE>;
+        case COMP_OPERATION::CMP_LT:      return CompareFloat<_CMP_LT_OQ, COMP_LT>;
+        case COMP_OPERATION::CMP_LTE:     return CompareFloat<_CMP_LE_OQ, COMP_LE>;
         }
         break;
     case ATOP_DOUBLE:
         switch (func) {
-        case COMP_OPERATION::CMP_EQ:      return CompareDouble<_CMP_EQ_OS, COMP_EQ>;
-        case COMP_OPERATION::CMP_NE:      return CompareDouble<_CMP_NEQ_US, COMP_NE>;
-        case COMP_OPERATION::CMP_GT:      return CompareDouble<_CMP_GT_OS, COMP_GT>;
-        case COMP_OPERATION::CMP_GTE:     return CompareDouble<_CMP_GE_OS, COMP_GE>;
-        case COMP_OPERATION::CMP_LT:      return CompareDouble<_CMP_LT_OS, COMP_LT>;
-        case COMP_OPERATION::CMP_LTE:     return CompareDouble<_CMP_LE_OS, COMP_LE>;
+        case COMP_OPERATION::CMP_EQ:      return CompareDouble<_CMP_EQ_OQ, COMP_EQ>;
+        case COMP_OPERATION::CMP_NE:      return CompareDouble<_CMP_NEQ_UQ, COMP_NE>;
+        case COMP_OPERATION::CMP_GT:      return CompareDouble<_CMP_GT_OQ, COMP_GT>;
+        case COMP_OPERATION::CMP_GTE:     return CompareDouble<_CMP_GE_OQ, COMP_GE>;
+        case COMP_OPERATION::CMP_LT:      return CompareDouble<_CMP_LT_OQ, COMP_LT>;
+        case COMP_OPERATION::CMP_LTE:     return CompareDouble<_CMP_LE_OQ, COMP_LE>;
         }
         break;
     case ATOP_INT32:

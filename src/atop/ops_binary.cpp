@@ -937,6 +937,7 @@ REDUCE_FUNC GetReduceMathOpFast(int func, int atopInType1) {
         switch (atopInType1) {
         case ATOP_BOOL:   return ReduceMathOpFast<int8_t, __m256i, OrOp<int8_t>, OR_OP_256>;
         //case ATOP_FLOAT:  return ReduceMathOpFast<float, __m256, AddOp<float>, ADD_OP_256f32>;
+        // internal upcast support for increased accuracy with float32
         case ATOP_FLOAT:  return ReduceMathOpFastUpcast<float, double, __m256, __m256d, AddOp<double>, ADD_OP_256f64>;
         case ATOP_DOUBLE: return ReduceMathOpFast<double, __m256d, AddOp<double>, ADD_OP_256f64>;
         case ATOP_INT32:  return ReduceMathOpFast<int32_t, __m256i, AddOp<int32_t>, ADD_OP_256i32>;
@@ -950,7 +951,9 @@ REDUCE_FUNC GetReduceMathOpFast(int func, int atopInType1) {
     case BINARY_OPERATION::MUL:
         switch (atopInType1) {
         case ATOP_BOOL:   return ReduceMathOpFast<int8_t, __m256i, AndOp<int8_t>, AND_OP_256>;
-        case ATOP_FLOAT:  return ReduceMathOpFast<float, __m256, MulOp<float>, MUL_OP_256f32>;
+        //case ATOP_FLOAT:  return ReduceMathOpFast<float, __m256, MulOp<float>, MUL_OP_256f32>;
+        // internal upcast support for increased accuracy with float32
+        case ATOP_FLOAT:  return ReduceMathOpFastUpcast<float, double, __m256, __m256d, MulOp<double>, MUL_OP_256f64>;
         case ATOP_DOUBLE: return ReduceMathOpFast<double, __m256d, MulOp<double>, MUL_OP_256f64>;
         case ATOP_INT32:  return ReduceMathOpFast<int32_t, __m256i, MulOp<int32_t>, MUL_OP_256i32>;
         case ATOP_INT16:  return ReduceMathOpFast<int16_t, __m256i, MulOp<int16_t>, MUL_OP_256i16>;
@@ -961,8 +964,9 @@ REDUCE_FUNC GetReduceMathOpFast(int func, int atopInType1) {
     case BINARY_OPERATION::MIN:
         switch (atopInType1) {
         case ATOP_BOOL:   return ReduceMathOpFast<int8_t, __m256i, MinOp<int8_t>, MIN_OP_256i8>;
-        case ATOP_FLOAT:  return ReduceMathOpFast<float, __m256, MinOp<float>, MIN_OP_256f32>;
-        case ATOP_DOUBLE: return ReduceMathOpFast<double, __m256d, MinOp<double>, MIN_OP_256f64>;
+        // Numpy handles nan differently, if found it will return nan
+        //case ATOP_FLOAT:  return ReduceMathOpFast<float, __m256, MinOp<float>, MIN_OP_256f32>;
+        //case ATOP_DOUBLE: return ReduceMathOpFast<double, __m256d, MinOp<double>, MIN_OP_256f64>;
         case ATOP_INT8:  return ReduceMathOpFast<int8_t, __m256i, MinOp<int8_t>, MIN_OP_256i8>;
         case ATOP_INT16:  return ReduceMathOpFast<int16_t, __m256i, MinOp<int16_t>, MIN_OP_256i16>;
         case ATOP_INT32:  return ReduceMathOpFast<int32_t, __m256i, MinOp<int32_t>, MIN_OP_256i32>;
@@ -976,8 +980,9 @@ REDUCE_FUNC GetReduceMathOpFast(int func, int atopInType1) {
     case BINARY_OPERATION::MAX:
         switch (atopInType1) {
         case ATOP_BOOL:   return ReduceMathOpFast<int8_t, __m256i, MaxOp<int8_t>, MAX_OP_256i8>;
-        case ATOP_FLOAT:  return ReduceMathOpFast<float, __m256, MaxOp<float>, MAX_OP_256f32>;
-        case ATOP_DOUBLE: return ReduceMathOpFast<double, __m256d, MaxOp<double>, MAX_OP_256f64>;
+        // Numpy handles nan differently, if found it will return nan
+        //case ATOP_FLOAT:  return ReduceMathOpFast<float, __m256, MaxOp<float>, MAX_OP_256f32>;
+        //case ATOP_DOUBLE: return ReduceMathOpFast<double, __m256d, MaxOp<double>, MAX_OP_256f64>;
         case ATOP_INT8:  return ReduceMathOpFast<int8_t, __m256i, MaxOp<int8_t>, MAX_OP_256i8>;
         case ATOP_INT16:  return ReduceMathOpFast<int16_t, __m256i, MaxOp<int16_t>, MAX_OP_256i16>;
         case ATOP_INT32:  return ReduceMathOpFast<int32_t, __m256i, MaxOp<int32_t>, MAX_OP_256i32>;

@@ -65,6 +65,18 @@ int convert_atop_to_itemsize[] = {
 // matmul, maximum, minimum, mod, modf, multiply, negative, nextafter, not_equal, positive, power,
 // rad2deg, radians, reciprocal, remainder, right_shift, rint
 // sign, signbit, sin, sinh, spacing, sqrt, square, subtract, tan, tanh, true_divide, trunc
+//
+// Currently NOT handled
+// conj, conjugate, copysign, deg2rad, degrees
+// float_power,
+// fmax, fmin, fmod, frexp, gcd
+// heaviside, isnat
+// lcm, ldexp, logaddexp, logaddexp2
+// nextafter
+// matmul, mod, modf
+// rad2deg, radians
+// spacing
+
 
 // Binary function mapping
 static stUFuncToAtop gBinaryMapping[]={
@@ -73,8 +85,8 @@ static stUFuncToAtop gBinaryMapping[]={
     {"multiply",      BINARY_OPERATION::MUL },
     {"true_divide",   BINARY_OPERATION::DIV },
     {"floor_divide",  BINARY_OPERATION::FLOORDIV },
-    //{"minimum",       BINARY_OPERATION::MIN },
-    //{"maximum",       BINARY_OPERATION::MAX },
+    {"minimum",       BINARY_OPERATION::MIN },
+    {"maximum",       BINARY_OPERATION::MAX },
     {"power",         BINARY_OPERATION::POWER },
     {"remainder",     BINARY_OPERATION::REMAINDER },
     {"logical_and",   BINARY_OPERATION::LOGICAL_AND },
@@ -448,6 +460,8 @@ static int64_t UnaryThreadCallbackStrided(struct stMATH_WORKER_ITEM* pstWorkerIt
     return didSomeWork;
 }
 
+//============================================================================
+// special tables for start values for some reduce functions
 // should handle both int and float zeros
 char g_startval_zero[16] = { 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 };
 
@@ -457,7 +471,6 @@ float g_startval_one_float[2] = { 1.0, 1.0 };
 double g_startval_one_double[2] = { 1.0, 1.0 };
 long double g_startval_one_longdouble[2] = { 1.0, 1.0 };
 int16_t g_startval_one_half[2] = { 15360, 15360 };
-
 
 
 //============================================================================
@@ -559,9 +572,9 @@ static void AtopBinaryMathFunction(char** args, const npy_intp* dimensions, cons
                     // most functions are so fast, we do not need more than 4 worker threads
                     // Do a reduce in parallel using the pReduceOfReduce buffer
                     THREADER->WorkMain(pWorkItem, n, pstUFunc->MaxThreads);
-                    //printf("Value before last add %lf   chunks:%lld  %lld\n", (double)((int64_t*)op1)[0], chunks, itemsize);
+                    //printf("Value before last add %lf   chunks:%lld  %lld\n", (double)((float*)op1)[0], chunks, itemsize);
                     pReduceFunc(pReduceOfReduce, op1, op1, chunks, itemsize);
-                    //printf("Value after last add %lf\n", (double)((int64_t*)op1)[0]);
+                    //printf("Value after last add %lf\n", (double)((float*)op1)[0]);
                 }
                 else {
                     // A binary reduce for original numpy routine
