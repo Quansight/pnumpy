@@ -81,15 +81,15 @@ WorkerThreadFunction(void* lpParam)
     DWORD core = (DWORD)(InterlockedIncrement64(&pWorkerRing->WorkThread));
     core = core - 1;
 
-    //if (core > 3) core += 16;
-    //core += 16;
+    // If hyperthreading is on skip every other core
+    if (pWorkerRing->HyperThreading)
+        core = core * 2;
 
     LOGGING("Thread created with parameter: %d   %p\n", core, g_WaitAddress);
 
     // On windows we set the thread affinity mask
     if (g_WaitAddress != NULL) {
-        uint64_t mask = (uint64_t)(1) << core;//core number starts from 0
-        uint64_t ret = SetThreadAffinityMask(GetCurrentThread(), mask);
+        uint64_t ret = SetThreadAffinityMask(GetCurrentThread(), (uint64_t)1 << core);
         //uint64_t ret = SetThreadAffinityMask(GetCurrentThread(), 0xFFFFFFFF);
     }
 
