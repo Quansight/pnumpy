@@ -365,7 +365,9 @@ struct stWorkerRing {
 
     // incremented when worker thread start
     volatile int64_t       WorkThread;
-    int32_t                Reserved32;
+
+    // Set to TRUE if hyperthreading is on, skipping every other core
+    int32_t                HyperThreading;
     int32_t                SleepTime;
 
     int32_t                NumaNode;
@@ -378,6 +380,7 @@ struct stWorkerRing {
 
     void Init() {
         WorkIndex = 0;
+        HyperThreading = 0;
         WorkIndexCompleted = 0;
         WorkThread = 0;
         NumaNode = 0;
@@ -413,7 +416,7 @@ struct stWorkerRing {
         // Once we increment other threads will notice
         InterlockedIncrement64(&WorkIndex);
 
-#if defined(_WIN32)
+#if defined(RT_OS_WINDOWS)
         // Are we allowed to wake threads?
         if (g_WakeAllAddress != NULL) {
 
@@ -429,13 +432,13 @@ struct stWorkerRing {
             }
         }
 
-#elif defined(__linux__)
+#elif defined(RT_OS_LINUX)
         // Linux thread wakeup
         int s = futex((int*)&WorkIndex, FUTEX_WAKE, maxThreadsToWake, NULL, NULL, 0);
         if (s == -1)
             THREADLOGGING("***error futex-FUTEX_WAKE\n");     // TODO: Change to use fprintf(stderr, msg) instead
 
-#elif defined(__APPLE__)
+#elif defined(RT_OS_DARWIN)
         // temp remove warning
         //#warning MathThreads does not yet support Darwin/macOS.
         pthread_cond_broadcast(&g_WakeupCond);
@@ -480,8 +483,7 @@ extern "C" {
 
     extern void PrintCPUInfo(char * buffer, size_t buffercount);
 
-#if defined(_WIN32)
-
+#if defined(RT_OS_WINDOWS)
     typedef HANDLE THANDLE;
     extern int GetProcCount();
 
@@ -526,6 +528,16 @@ public:
 
     int   WorkerThreadCount;
 
+    // Windows specific
+    DWORD LogicalProcessorCount = 0;
+    DWORD NumaNodeCount = 0;
+    DWORD ProcessorCoreCount = 0;
+    DWORD ProcessorL1CacheCount = 0;
+    DWORD ProcessorL2CacheCount = 0;
+    DWORD ProcessorL3CacheCount = 0;
+    DWORD ProcessorPackageCount = 0;
+
+
     // Set to true to stop threading
     BOOL  NoThreading;
 
@@ -543,6 +555,7 @@ public:
     CMathWorker() {
 
         PrintCPUInfo(CPUString, sizeof(CPUString));
+        ProcessorInformation();
 
         WorkerThreadCount = GetProcCount();
         NoThreading = FALSE;
@@ -568,6 +581,135 @@ public:
         // DO NOT DEALLOCATE DO TO threads not exiting 
         //ALIGNED_FREE(pWorkerRing);
     };
+
+
+#if defined(RT_OS_WINDOWS)
+    // Windows routine to get physical and logical processor count
+    // Helper function to count set bits in the processor mask.
+    DWORD CountSetBits(ULONG_PTR bitMask)
+    {
+        DWORD LSHIFT = sizeof(ULONG_PTR) * 8 - 1;
+        DWORD bitSetCount = 0;
+        ULONG_PTR bitTest = (ULONG_PTR)1 << LSHIFT;
+        DWORD i;
+
+        for (i = 0; i <= LSHIFT; ++i)
+        {
+            bitSetCount += ((bitMask & bitTest) ? 1 : 0);
+            bitTest /= 2;
+        }
+
+        return bitSetCount;
+    }
+
+    int ProcessorInformation()
+    {
+        BOOL done = FALSE;
+        PSYSTEM_LOGICAL_PROCESSOR_INFORMATION buffer = NULL;
+        PSYSTEM_LOGICAL_PROCESSOR_INFORMATION ptr = NULL;
+        DWORD returnLength = 0;
+        DWORD byteOffset = 0;
+        PCACHE_DESCRIPTOR Cache;
+
+
+        while (!done)
+        {
+            DWORD rc = GetLogicalProcessorInformation(buffer, &returnLength);
+
+            if (FALSE == rc)
+            {
+                if (GetLastError() == ERROR_INSUFFICIENT_BUFFER)
+                {
+                    if (buffer)
+                        free(buffer);
+
+                    buffer = (PSYSTEM_LOGICAL_PROCESSOR_INFORMATION)malloc(
+                        returnLength);
+
+                    if (NULL == buffer)
+                    {
+                        MATHLOGGING(TEXT("\nError: Allocation failure\n"));
+                        return (2);
+                    }
+                }
+                else
+                {
+                    MATHLOGGING(TEXT("\nError %d\n"), GetLastError());
+                    return (3);
+                }
+            }
+            else
+            {
+                done = TRUE;
+            }
+        }
+
+        ptr = buffer;
+
+        while (byteOffset + sizeof(SYSTEM_LOGICAL_PROCESSOR_INFORMATION) <= returnLength)
+        {
+            switch (ptr->Relationship)
+            {
+            case RelationNumaNode:
+                // Non-NUMA systems report a single record of this type.
+                NumaNodeCount++;
+                break;
+
+            case RelationProcessorCore:
+                ProcessorCoreCount++;
+
+                // A hyperthreaded core supplies more than one logical processor.
+                LogicalProcessorCount += CountSetBits(ptr->ProcessorMask);
+                break;
+
+            case RelationCache:
+                // Cache data is in ptr->Cache, one CACHE_DESCRIPTOR structure for each cache. 
+                Cache = &ptr->Cache;
+                if (Cache->Level == 1)
+                {
+                    ProcessorL1CacheCount++;
+                }
+                else if (Cache->Level == 2)
+                {
+                    ProcessorL2CacheCount++;
+                }
+                else if (Cache->Level == 3)
+                {
+                    ProcessorL3CacheCount++;
+                }
+                break;
+
+            case RelationProcessorPackage:
+                // Logical processors share a physical package.
+                ProcessorPackageCount++;
+                break;
+
+            default:
+                MATHLOGGING(TEXT("\nError: Unsupported LOGICAL_PROCESSOR_RELATIONSHIP value.\n"));
+                break;
+            }
+            byteOffset += sizeof(SYSTEM_LOGICAL_PROCESSOR_INFORMATION);
+            ptr++;
+        }
+
+        MATHLOGGING(TEXT("\nGetLogicalProcessorInformation results:\n"));
+        MATHLOGGING(TEXT("Number of NUMA nodes: %d\n"), NumaNodeCount);
+        MATHLOGGING(TEXT("Number of physical processor packages: %d\n"),  ProcessorPackageCount);
+        MATHLOGGING(TEXT("Number of processor cores: %d\n"), ProcessorCoreCount);
+        MATHLOGGING(TEXT("Number of logical processors: %d\n"), LogicalProcessorCount);
+        MATHLOGGING(TEXT("Number of processor L1/L2/L3 caches: %d/%d/%d\n"),  ProcessorL1CacheCount,  ProcessorL2CacheCount,  ProcessorL3CacheCount);
+
+        free(buffer);
+
+        return 0;
+    }
+#else
+    // Linux routine to be completed
+    int ProcessorInformation() {
+
+    }
+
+#endif
 
     //------------------------------------------------------------------------------
     // Returns number of worker threads + main thread
@@ -604,6 +746,14 @@ public:
     void StartWorkerThreads(int numaNode) {
 
         MATHLOGGING("Start worker threads\n");
+
+        if (ProcessorCoreCount < LogicalProcessorCount) {
+            // Set flag that hyperthreading is on
+            MATHLOGGING("Hyperthreading on\n");
+            WorkerThreadCount = ProcessorCoreCount;
+            pWorkerRing->HyperThreading = 1;
+        }
+
         for (int i = 0; i < WorkerThreadCount; i++) {
 
             WorkerThreadHandles[i] = StartThread(pWorkerRing);
