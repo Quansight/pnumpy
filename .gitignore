@@ -17,7 +17,6 @@ __pycache__
 *.idb
 *.pdb
 *.ipch
-*.json
 *.sqlite
 *.suo
 *.obj
@@ -64,33 +63,12 @@ htmlcov
 # Translations
 *.mo
 
-# Mr Developer
-.mr.developer.cfg
-.project
-.pydevproject
-.idea
-*.iml
-*.komodoproject
-
 # Complexity
 output/*.html
 output/*/index.html
 
 # Sphinx
 docs/_build
-
-.DS_Store
-*~
-.*.sw[po]
-.build
-.ve
-.env
-.cache
-.pytest
-.benchmarks
-.bootstrap
-.appveyor.token
-*.bak
 
 # Mypy Cache
 .mypy_cache/

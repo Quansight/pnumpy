@@ -15,10 +15,8 @@ random.seed(1)
 # but will seed it nevertheless
 np.random.seed(1)
 
-nx, ny = 1000, 1000
-# reduced squares based on indexes_rand, primarily for testing more
-# time-consuming functions (ufunc, linalg, etc)
-nxs, nys = 100, 100
+# Size of square 2d arrays to use in benchmarks
+nxy = 1024
 
 # a set of interesting types to test
 TYPES1 = [
@@ -47,7 +45,7 @@ def memoize(func):
 @memoize
 def get_values():
     rnd = np.random.RandomState(1)
-    values = np.tile(rnd.uniform(0, 100, size=nx*ny//10), 10)
+    values = np.tile(rnd.uniform(0, 100, size=nxy * nxy//32), 32)
     return values
 
 
@@ -55,7 +53,7 @@ def get_values():
 def get_squares():
     values = get_values()
     squares = {t: np.array(values,
-                              dtype=getattr(np, t)).reshape((nx, ny))
+                              dtype=getattr(np, t)).reshape((nxy, nxy))
                for t in TYPES1}
 
     # adjust complex ones to have non-degenerated imagery part -- use
@@ -67,13 +65,6 @@ def get_squares():
 
 
 @memoize
-def get_squares_():
-    # smaller squares
-    squares_ = {t: s[:nxs, :nys] for t, s in get_squares().items()}
-    return squares_
-
-
-@memoize
 def get_vectors():
     # vectors
     vectors = {t: s[0] for t, s in get_squares().items()}
@@ -82,7 +73,7 @@ def get_vectors():
 
 @memoize
 def get_indexes():
-    indexes = list(range(nx))
+    indexes = list(range(nxy))
     # so we do not have all items
     indexes.pop(5)
     indexes.pop(95)
@@ -99,23 +90,6 @@ def get_indexes_rand():
     rnd.shuffle(indexes_rand)         # in-place shuffle
     indexes_rand = np.array(indexes_rand)
     return indexes_rand
-
-
-@memoize
-def get_indexes_():
-    # smaller versions
-    indexes = get_indexes()
-    indexes_ = indexes[indexes < nxs]
-    return indexes_
-
-
-@memoize
-def get_indexes_rand_():
-    indexes_rand = get_indexes_rand()
-    indexes_rand_ = indexes_rand[indexes_rand < nxs]
-    return indexes_rand_
-
-
 
 ########
 
@@ -144,7 +118,7 @@ for name in dir(np):
 
 for ufunc in ufuncs:
     class UFunc():
-        params = [0, 2, 5, 10]
+        params = [0, 2, 4]
         param_names = ['nthreads']
         timeout = 10
 
@@ -160,7 +134,7 @@ for ufunc in ufuncs:
             except AttributeError:
                 raise NotImplementedError()
             self.args = []
-            for t, a in get_squares_().items():
+            for t, a in get_squares().items():
                 arg = (a,) * self.f.nin
                 try:
                     self.f(*arg)
@@ -176,7 +150,7 @@ for ufunc in ufuncs:
 
 class Custom():
     def setup(self):
-        self.b = np.ones(20000, dtype=bool)
+        self.b = np.ones(200000, dtype=bool)
 
     def time_nonzero(self):
         np.nonzero(self.b)
@@ -196,7 +170,7 @@ class CustomInplace():
         self.c = np.ones(500000, dtype=np.int8)
         self.i = np.ones(150000, dtype=np.int32)
         self.f = np.zeros(150000, dtype=np.float32)
-        self.d = np.zeros(75000, dtype=np.float64)
+        self.d = np.zeros(150000, dtype=np.float64)
         # fault memory
         self.f *= 1.
         self.d *= 1.
@@ -235,7 +209,7 @@ class CustomScalar():
     param_names = ['dtype']
 
     def setup(self, dtype):
-        self.d = np.ones(20000, dtype=dtype)
+        self.d = np.ones(200000, dtype=dtype)
 
     def time_add_scalar2(self, dtype):
         np.add(self.d, 1)
@@ -248,22 +222,4 @@ class CustomScalar():
 
     def time_less_than_scalar2(self, dtype):
         (self.d < 1)
-
-
-class Scalar():
-    def setup(self):
-        self.x = np.asarray(1.0)
-        self.y = np.asarray((1.0 + 1j))
-        self.z = complex(1.0, 1.0)
-
-    def time_add_scalar(self):
-        (self.x + self.x)
-
-    def time_add_scalar_conv(self):
-        (self.x + 1.0)
-
-    def time_add_scalar_conv_complex(self):
-        (self.y + self.z)
-
-
 
