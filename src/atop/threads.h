@@ -49,14 +49,24 @@ extern pthread_cond_t  g_WakeupCond;
 
 
 //-----------------------------------------------------
-// Determines the CAP on threads
-#define MAX_THREADS_WHEN_CANNOT_DETECT 5
+// If the API fails to detect how many cores, this is the default
+static const int MAX_THREADS_WHEN_CANNOT_DETECT = 5;
 
-// set this value lower to help windows wake up threads
-#define MAX_THREADS_ALLOWED 31
+// how many threads in the pool (how many threads in one pool)
+static const int MAX_WORKER_CHANNEL = 4;
 
-#define FUTEX_WAKE_DEFAULT  11
-#define FUTEX_WAKE_MAX      31
+// how many thread pools
+static const int MAX_WORKER_POOL = 4;
+
+// Not used yet.. but a worker ring per NUMA node
+static const int MAX_WORKER_RINGS = 1;
+
+static const int MAX_WORKER_HANDLES = MAX_WORKER_CHANNEL * MAX_WORKER_POOL * MAX_WORKER_RINGS;
+static const int MAX_THREADS_ALLOWED = MAX_WORKER_HANDLES - 1;
+static const int FUTEX_WAKE_MAX = MAX_WORKER_HANDLES - 1;
+static const int FUTEX_WAKE_DEFAULT = 11;
+
+
 
 
 //--------------------------------------------------------------------
@@ -144,63 +154,13 @@ typedef int64_t(*MTWORK_CALLBACK)(void* callbackArg, int core, int64_t workIndex
 // Callback routine from multithreaded chunk thread (0, 65536, 130000, etc.)
 typedef int64_t(*MTCHUNK_CALLBACK)(void* callbackArg, int core, int64_t start, int64_t length);
 
-// For auto binning we need to divide bins up amongst multiple thread
-struct stBinCount {
-    // Valid if ... > BinLow && <= BinHigh
-    int64_t BinLow;
-    int64_t BinHigh;
-    int64_t BinNum;
-    void* pUserMemory;
-};
 
-struct OLD_CALLBACK {
-
-    // Args to call
-    union {
-        VOID* pDataInBase1;
-        VOID* pValues;
-    };
-
-    union {
-        VOID* pDataInBase2;
-        VOID* pIndex;
-        VOID* pToSort;
-    };
-
-    VOID* pDataInBase3;
-
-    //-------------------------------------------------
-    union {
-        VOID* pDataOutBase1;
-        VOID* pWorkSpace;
-    };
-
-    // Total number of array elements
-    union {
-        //INT64             TotalElements;
-        int64_t             IndexSize;
-
-        // strlen is for sorting strings
-        int64_t             StrLen;
-    };
-
-    union {
-        int32_t             ScalarMode;
-        int32_t             MergeBlocks;
-    };
-
-    union {
-        int64_t             TotalElements2;
-        int64_t             ValSize;
-    };
-
-    // Default value to fill
-    void* pDefault;
-
-
-    void* pThreadWorkSpace;
-
-
+//-----------------------------------------------------------
+// A channel refers to the work items for one worker thread to be completed first
+// Keeps threads in their lanes so that L1, L2 cache performs better
+struct stWorkerChannel {
+    int64_t     CurrentBlock;
+    int64_t     LastBlock;
 };
 
 //-----------------------------------------------------------
@@ -237,7 +197,9 @@ struct stMATH_WORKER_ITEM {
 
     // Items larger than this might be worked on in parallel
     static const int64_t WORK_ITEM_CHUNK = 0x4000;
-    static const int64_t WORK_ITEM_BIG = (WORK_ITEM_CHUNK * 2);
+
+    // Wait for an array size with at least 4 worker threads
+    static const int64_t WORK_ITEM_BIG = (WORK_ITEM_CHUNK * 4);
     static const int64_t WORK_ITEM_MASK = (WORK_ITEM_CHUNK - 1);
 
     // The callback to the thread routine that does work
@@ -253,6 +215,8 @@ struct stMATH_WORKER_ITEM {
         MTWORK_CALLBACK   MTWorkCallback;
         MTCHUNK_CALLBACK  MTChunkCallback;
     };
+
+    int64_t             WorkIndex;
 
     // TotalElements is used on asymmetric last block
     int64_t             TotalElements;
@@ -270,15 +234,14 @@ struct stMATH_WORKER_ITEM {
     // If BlockNext > BlockLast -- no work to be done
     volatile int64_t    BlockNext;
 
-
     //-----------------------------------------------
     // Atomic access
     // When BlocksCompleted == BlockLast , the job is completed
     int64_t             BlocksCompleted;
 
-    OLD_CALLBACK        OldCallback;
-
-
+    // Current and Last are used to keep cores in their pool until they are completed
+    // This should help with L1,L2 caches
+    stWorkerChannel     WorkerChannel[MAX_WORKER_HANDLES];
 
     //==============================================================
     FORCE_INLINE int64_t GetWorkBlock() {
@@ -287,8 +250,10 @@ struct stMATH_WORKER_ITEM {
     }
 
     //==============================================================
-    FORCE_INLINE void CompleteWorkBlock() {
+    FORCE_INLINE void CompleteWorkBlock(int core) {
         // Indicate we completed a block
+        // if BlocksCompleted >= BlockLast, we are done
+        THREADLOGGING("[%d] Completed %I64d\n", core, BlocksCompleted);
         InterlockedIncrement64(&BlocksCompleted);
     }
 
@@ -340,6 +305,75 @@ struct stMATH_WORKER_ITEM {
         return 0;
     }
 
+    //=============================================================
+    // Called by routines that work on chunks/blocks of memory
+    // returns 0 on failure
+    // else returns length of workblock
+    FORCE_INLINE int64_t GetNextWorkBlockCoreInternal(int core, int64_t* workBlock) {
+
+        stWorkerChannel* pChannel = &WorkerChannel[core];
+        int64_t threads = ThreadWakeup + 1;
+
+        int64_t block = InterlockedIncrement64(&pChannel->CurrentBlock) - 1;
+        int64_t  lenWorkBlock;
+        int64_t logicalblock;
+
+        // Check if this work block is in our channel
+        if (block < pChannel->LastBlock) {
+            // increment global work counter
+            InterlockedIncrement64(&BlockNext);
+
+            logicalblock = block * threads + core;
+            lenWorkBlock = BlockSize;
+            if ((logicalblock + 1) == BlockLast) {
+                // check if ends on perfect boundary
+                if ((TotalElements & WORK_ITEM_MASK) != 0) {
+
+                    // This is the last block and may have an odd number of data to process
+                    lenWorkBlock = TotalElements & WORK_ITEM_MASK;
+                    THREADLOGGING("last workblock %llu  %llu  MASK  %llu\n", lenWorkBlock, TotalElements, WORK_ITEM_MASK);
+                }
+
+            }
+            *workBlock = logicalblock;
+            THREADLOGGING("[%d] logical block %lld\n", core, logicalblock);
+            return lenWorkBlock;
+        }
+
+        // channel already handled
+        return 0;
+    }
+
+    //=============================================================
+    // Called by routines that work on chunks/blocks of memory
+    // returns 0 on failure
+    // else returns length of workblock
+    FORCE_INLINE int64_t GetNextWorkBlockCore(int core, int64_t* workBlock) {
+
+        int64_t lenWorkBlock = GetNextWorkBlockCoreInternal(core, workBlock);
+
+        if (lenWorkBlock > 0) return lenWorkBlock;
+
+        // see if any work items available
+        if (BlockNext >= BlockLast) {
+            THREADLOGGING("[%d] no more work items %I64d\n", core, BlockNext);
+            return 0;
+        }
+
+        // Our channel is all done, check other channels
+        for (int i=0; i <= ThreadWakeup; i++) {
+            // Only check different cores since we know ours is done
+            if (i != core) {
+                lenWorkBlock = GetNextWorkBlockCoreInternal(i, workBlock);
+                if (lenWorkBlock > 0) {
+                    THREADLOGGING("[%d] Found work item not on my core %d\n", core, i);
+                    return lenWorkBlock;
+                }
+            }
+        }
+        return 0;
+    }
+
 
     //------------------------------------------------------------------------------
     // Call this to do work until no work left to do
@@ -354,40 +388,49 @@ struct stMATH_WORKER_ITEM {
 };
 
 
+struct stGlobalWorkerParams {
+    // Set to TRUE if hyperthreading is on, skipping every other core
+    int32_t                HyperThreading = 0;
+    int32_t                SleepTime = 1;
+
+    int32_t                NumaNode = 0;
+    int32_t                Cancelled = 0;
+
+    // Change this value to wake up less workers
+    int32_t                FutexWakeCount =  FUTEX_WAKE_DEFAULT;
+
+} ;
+
+struct stWorkerPool {
+    int64_t       WorkIndex;
+    int64_t       WorkIndexCompleted;
+};
+
 //-----------------------------------------------------------
 // allocated on 64 byte alignment
 struct stWorkerRing {
     static const int64_t   RING_BUFFER_SIZE = 1024;
     static const int64_t   RING_BUFFER_MASK = 1023;
 
-    volatile int64_t       WorkIndex;
-    volatile int64_t       WorkIndexCompleted;
+    volatile int64_t       MainWorkIndex;
+
+    // Thread pools wait on the tracker address
+    stWorkerPool        Pool[MAX_WORKER_CHANNEL];
 
     // incremented when worker thread start
     volatile int64_t       WorkThread;
+    stGlobalWorkerParams*   pParams;
 
-    // Set to TRUE if hyperthreading is on, skipping every other core
-    int32_t                HyperThreading;
-    int32_t                SleepTime;
+    stMATH_WORKER_ITEM      WorkerQueue[RING_BUFFER_SIZE];
 
-    int32_t                NumaNode;
-    int32_t                Cancelled;
+    void Init(stGlobalWorkerParams* pParams) {
+        MainWorkIndex = 0;
 
-    // Change this value to wake up less workers
-    int32_t                FutexWakeCount;
-
-    stMATH_WORKER_ITEM   WorkerQueue[RING_BUFFER_SIZE];
-
-    void Init() {
-        WorkIndex = 0;
-        HyperThreading = 0;
-        WorkIndexCompleted = 0;
+        for (int j = 0; j < MAX_WORKER_CHANNEL; j++) {
+            Pool[j].WorkIndex = 0;
+            Pool[j].WorkIndexCompleted = 0;
+        }
         WorkThread = 0;
-        NumaNode = 0;
-        Cancelled = 0;
-        SleepTime = 1;
-        // how many threads to wake up on Linux
-        FutexWakeCount = FUTEX_WAKE_DEFAULT;
 
         for (int i = 0; i < RING_BUFFER_SIZE; i++) {
             WorkerQueue[i].BlockSize = 0;
@@ -400,35 +443,38 @@ struct stWorkerRing {
     }
 
     FORCE_INLINE void Cancel() {
-        Cancelled = 1;
+        pParams->Cancelled = 1;
     }
 
     FORCE_INLINE stMATH_WORKER_ITEM* GetWorkItem() {
-        return  &WorkerQueue[WorkIndex & RING_BUFFER_MASK];
+        int64_t workIndex = InterlockedIncrement64(&MainWorkIndex);
+        stMATH_WORKER_ITEM* pWorkItem = &WorkerQueue[workIndex & RING_BUFFER_MASK];
+        pWorkItem->WorkIndex = workIndex;
+        return pWorkItem;
     }
 
     FORCE_INLINE stMATH_WORKER_ITEM* GetExistingWorkItem() {
-        return  &WorkerQueue[(WorkIndex - 1) & RING_BUFFER_MASK];
+        // Note: not safe when multiproc used
+        return  &WorkerQueue[MainWorkIndex  & RING_BUFFER_MASK];
     }
 
-    FORCE_INLINE void SetWorkItem(int32_t maxThreadsToWake) {
-        // This routine will wakup threads on Windows and Linux
-        // Once we increment other threads will notice
-        InterlockedIncrement64(&WorkIndex);
+    FORCE_INLINE void WakeupWorkItem(int pool, int32_t maxThreadsToWake) {
 
 #if defined(RT_OS_WINDOWS)
         // Are we allowed to wake threads?
         if (g_WakeAllAddress != NULL) {
 
-            if (maxThreadsToWake < 5) {
+            // New threading mode -- have to wake up entire pool
+            if (FALSE && maxThreadsToWake < 5) {
                 // In windows faster to wake single if just a few threads
                 for (int i = 0; i < maxThreadsToWake; i++) {
-                    g_WakeSingleAddress((PVOID)&WorkIndex);
+                    g_WakeSingleAddress((PVOID) & (Pool[pool].WorkIndex));
                 }
             }
             else {
+                THREADLOGGING("Waking up pool %d  maxthreads: %d  addr: %p\n", pool, maxThreadsToWake, &(Pool[pool].WorkIndex));
                 // In windows the more threads we wake up, the longer it takes to return from this OS call
-                g_WakeAllAddress((PVOID)&WorkIndex);
+                g_WakeAllAddress((PVOID) & (Pool[pool].WorkIndex));
             }
         }
 
@@ -449,8 +495,56 @@ struct stWorkerRing {
 
     }
 
-    FORCE_INLINE void CompleteWorkItem() {
-        InterlockedIncrement64(&WorkIndexCompleted);
+    //----------------------------------------------
+    // This function will wake up one or more thread pools
+    // It will set the Pool.WorkIndex to a new value
+    FORCE_INLINE int64_t SetWorkItem(int32_t maxThreadsToWake, stMATH_WORKER_ITEM* pWorkItem) {
+        // This routine will wakup threads on Windows and Linux
+        // Once we increment other threads will notice
+        int64_t workIndex = pWorkItem->WorkIndex;
+        THREADLOGGING("on work item %lld, waking %d\n", workIndex, maxThreadsToWake);
+        Pool[0].WorkIndex = workIndex;
+        if (maxThreadsToWake > 3) {
+            WakeupWorkItem(0, 3);
+            maxThreadsToWake -= 3;
+            Pool[1].WorkIndex = workIndex;
+            WakeupWorkItem(1, 4);
+            if (maxThreadsToWake > 4) {
+                maxThreadsToWake -= 4;
+                Pool[2].WorkIndex = workIndex;
+                WakeupWorkItem(2, 4);
+                if (maxThreadsToWake > 4) {
+                    maxThreadsToWake -= 4;
+                    Pool[3].WorkIndex = workIndex;
+                    WakeupWorkItem(3, 4);
+                }
+            }
+        }
+        else {
+            WakeupWorkItem(0, maxThreadsToWake);
+        }
+        return MainWorkIndex;
+    }
+
+    //----------------------------------------------
+    // This function is called when all threads are done working
+    // It will set the Pool.WorkIndexCompleted to a new value allowing it to be woken again
+    FORCE_INLINE void CompleteWorkItem(int32_t threadWakeup, stMATH_WORKER_ITEM* pWorkItem) {
+        int64_t workIndex = pWorkItem->WorkIndex;
+
+        THREADLOGGING("completing work index %lld, threads %d\n", workIndex, threadWakeup);
+        Pool[0].WorkIndexCompleted = workIndex;
+
+        if (threadWakeup > 3) {
+            Pool[1].WorkIndexCompleted = workIndex;
+            if (threadWakeup > 7) {
+                Pool[2].WorkIndexCompleted = workIndex;
+                if (threadWakeup > 11) {
+                    Pool[3].WorkIndexCompleted = workIndex;
+                }
+            }
+        }
+
     }
 };
 
@@ -524,7 +618,6 @@ public:
     static const int64_t WORK_ITEM_CHUNK = stMATH_WORKER_ITEM::WORK_ITEM_CHUNK;
     static const int64_t WORK_ITEM_BIG = stMATH_WORKER_ITEM::WORK_ITEM_BIG;
     static const int64_t WORK_ITEM_MASK = stMATH_WORKER_ITEM::WORK_ITEM_MASK;
-    static const int MAX_WORKER_HANDLES = 64;
 
     int   WorkerThreadCount;
 
@@ -546,7 +639,8 @@ public:
 
     //------------------------------------------------------------------------------
     // Data Members 
-    stWorkerRing*   pWorkerRing;
+    stWorkerRing*   pWorkerRings[MAX_WORKER_RINGS];
+    stGlobalWorkerParams GlobalWorkerParams;
 
     THANDLE         WorkerThreadHandles[MAX_WORKER_HANDLES];
     char            CPUString[512];
@@ -561,10 +655,12 @@ public:
         NoThreading = FALSE;
         NoCaching = FALSE;
 
-        pWorkerRing = (stWorkerRing*)ALIGNED_ALLOC(sizeof(stWorkerRing), 64);
-        if (pWorkerRing) {
-            pWorkerRing->WorkIndex = 0;
-            pWorkerRing->Init();
+        // We group multiple thread pools
+        for (int j = 0; j < MAX_WORKER_RINGS; j++) {
+            pWorkerRings[j] = (stWorkerRing*)ALIGNED_ALLOC(sizeof(stWorkerRing), 64);
+            if (pWorkerRings[j]) {
+                pWorkerRings[j]->Init(&GlobalWorkerParams);
+            }
         }
 
         for (int i = 0; i < WorkerThreadCount; i++) {
@@ -575,7 +671,9 @@ public:
     };
 
     ~CMathWorker() {
-        if (pWorkerRing) pWorkerRing->Cancel();
+        for (int j = 0; j < MAX_WORKER_RINGS; j++) {
+            if (pWorkerRings[j]) pWorkerRings[j]->Cancel();
+        }
         Sleep(100);
         KillWorkerThreads();
         // DO NOT DEALLOCATE DO TO threads not exiting 
@@ -646,61 +744,62 @@ public:
 
         ptr = buffer;
 
-        while (byteOffset + sizeof(SYSTEM_LOGICAL_PROCESSOR_INFORMATION) <= returnLength)
-        {
-            switch (ptr->Relationship)
+        if (ptr) {
+            while (byteOffset + sizeof(SYSTEM_LOGICAL_PROCESSOR_INFORMATION) <= returnLength)
             {
-            case RelationNumaNode:
-                // Non-NUMA systems report a single record of this type.
-                NumaNodeCount++;
-                break;
-
-            case RelationProcessorCore:
-                ProcessorCoreCount++;
-
-                // A hyperthreaded core supplies more than one logical processor.
-                LogicalProcessorCount += CountSetBits(ptr->ProcessorMask);
-                break;
-
-            case RelationCache:
-                // Cache data is in ptr->Cache, one CACHE_DESCRIPTOR structure for each cache. 
-                Cache = &ptr->Cache;
-                if (Cache->Level == 1)
+                switch (ptr->Relationship)
                 {
-                    ProcessorL1CacheCount++;
-                }
-                else if (Cache->Level == 2)
-                {
-                    ProcessorL2CacheCount++;
-                }
-                else if (Cache->Level == 3)
-                {
-                    ProcessorL3CacheCount++;
-                }
-                break;
+                case RelationNumaNode:
+                    // Non-NUMA systems report a single record of this type.
+                    NumaNodeCount++;
+                    break;
 
-            case RelationProcessorPackage:
-                // Logical processors share a physical package.
-                ProcessorPackageCount++;
-                break;
+                case RelationProcessorCore:
+                    ProcessorCoreCount++;
 
-            default:
-                MATHLOGGING(TEXT("\nError: Unsupported LOGICAL_PROCESSOR_RELATIONSHIP value.\n"));
-                break;
+                    // A hyperthreaded core supplies more than one logical processor.
+                    LogicalProcessorCount += CountSetBits(ptr->ProcessorMask);
+                    break;
+
+                case RelationCache:
+                    // Cache data is in ptr->Cache, one CACHE_DESCRIPTOR structure for each cache. 
+                    Cache = &ptr->Cache;
+                    if (Cache->Level == 1)
+                    {
+                        ProcessorL1CacheCount++;
+                    }
+                    else if (Cache->Level == 2)
+                    {
+                        ProcessorL2CacheCount++;
+                    }
+                    else if (Cache->Level == 3)
+                    {
+                        ProcessorL3CacheCount++;
+                    }
+                    break;
+
+                case RelationProcessorPackage:
+                    // Logical processors share a physical package.
+                    ProcessorPackageCount++;
+                    break;
+
+                default:
+                    MATHLOGGING(TEXT("\nError: Unsupported LOGICAL_PROCESSOR_RELATIONSHIP value.\n"));
+                    break;
+                }
+                byteOffset += sizeof(SYSTEM_LOGICAL_PROCESSOR_INFORMATION);
+                ptr++;
             }
-            byteOffset += sizeof(SYSTEM_LOGICAL_PROCESSOR_INFORMATION);
-            ptr++;
+
+            MATHLOGGING(TEXT("\nGetLogicalProcessorInformation results:\n"));
+            MATHLOGGING(TEXT("Number of NUMA nodes: %d\n"), NumaNodeCount);
+            MATHLOGGING(TEXT("Number of physical processor packages: %d\n"), ProcessorPackageCount);
+            MATHLOGGING(TEXT("Number of processor cores: %d\n"), ProcessorCoreCount);
+            MATHLOGGING(TEXT("Number of logical processors: %d\n"), LogicalProcessorCount);
+            MATHLOGGING(TEXT("Number of processor L1/L2/L3 caches: %d/%d/%d\n"), ProcessorL1CacheCount, ProcessorL2CacheCount, ProcessorL3CacheCount);
+
+            free(buffer);
         }
-
-        MATHLOGGING(TEXT("\nGetLogicalProcessorInformation results:\n"));
-        MATHLOGGING(TEXT("Number of NUMA nodes: %d\n"), NumaNodeCount);
-        MATHLOGGING(TEXT("Number of physical processor packages: %d\n"),  ProcessorPackageCount);
-        MATHLOGGING(TEXT("Number of processor cores: %d\n"), ProcessorCoreCount);
-        MATHLOGGING(TEXT("Number of logical processors: %d\n"), LogicalProcessorCount);
-        MATHLOGGING(TEXT("Number of processor L1/L2/L3 caches: %d/%d/%d\n"),  ProcessorL1CacheCount,  ProcessorL2CacheCount,  ProcessorL3CacheCount);
-
-        free(buffer);
-
         return 0;
     }
 #else
@@ -722,7 +821,7 @@ public:
     // Changes how many threads wake up in Linux
     int SetFutexWakeup(int howManyToWake) {
         if (howManyToWake < 1) {
-            // On Windows seem to need at least 1
+            // Must be at least one worker thread, or turn threading off
             howManyToWake = 1;
         }
 
@@ -731,14 +830,19 @@ public:
             howManyToWake = FUTEX_WAKE_MAX;
         }
 
-        int previousVal = pWorkerRing->FutexWakeCount;
+        int32_t maxFutex = WorkerThreadCount - 1;
+        if (howManyToWake > maxFutex) {
+            howManyToWake = maxFutex;
+        }
 
-        pWorkerRing->FutexWakeCount = howManyToWake;
+        int previousVal = GlobalWorkerParams.FutexWakeCount;
+
+        GlobalWorkerParams.FutexWakeCount = howManyToWake;
         return previousVal;
     }
 
     int GetFutexWakeup() {
-        return pWorkerRing->FutexWakeCount;
+        return GlobalWorkerParams.FutexWakeCount;
     }
 
     //------------------------------------------------------------------------------
@@ -751,14 +855,24 @@ public:
             // Set flag that hyperthreading is on
             MATHLOGGING("Hyperthreading on\n");
             WorkerThreadCount = ProcessorCoreCount;
-            pWorkerRing->HyperThreading = 1;
+            GlobalWorkerParams.HyperThreading = 1;
         }
 
-        for (int i = 0; i < WorkerThreadCount; i++) {
-
-            WorkerThreadHandles[i] = StartThread(pWorkerRing);
+        int32_t maxFutex = WorkerThreadCount - 1;
+        if (GlobalWorkerParams.FutexWakeCount > maxFutex) {
+            GlobalWorkerParams.FutexWakeCount = maxFutex;
         }
 
+        // Numa nodes would go here
+        for (int numanode = 0; numanode < 1; numanode++) {
+            for (int i = 0; i < WorkerThreadCount; i++) {
+                MATHLOGGING("Starting thread %d\n", i);
+                // 0, 1, 2, MAIN => ring 0
+                // 3,4,5,6 => ring 1
+                // 7,8,9,10 => ring 1
+                WorkerThreadHandles[i] = StartThread(pWorkerRings[numanode]);
+            }
+        }
         // Pin the main thread to a numa node?
         // TODO: work
         //uint64_t mask = ((uint64_t)1 << WorkerThreadCount);//core number starts from 0
@@ -796,7 +910,7 @@ public:
 
             didSomeWork++;
             // tell others we completed this work block
-            pstWorkerItem->CompleteWorkBlock();
+            pstWorkerItem->CompleteWorkBlock(core);
 
         }
         return didSomeWork;
@@ -855,7 +969,7 @@ public:
 
             didSomeWork++;
             // tell others we completed this work block
-            pstWorkerItem->CompleteWorkBlock();
+            pstWorkerItem->CompleteWorkBlock(core);
         }
 
         return didSomeWork;
@@ -901,7 +1015,7 @@ public:
         }
 
         // Otherwise allow parallel processing
-        stMATH_WORKER_ITEM* pWorkItem = pWorkerRing->GetWorkItem();
+        stMATH_WORKER_ITEM* pWorkItem = pWorkerRings[0]->GetWorkItem();
         return pWorkItem;
     }
 
@@ -916,12 +1030,13 @@ public:
         }
 
         // Otherwise allow parallel processing
-        stMATH_WORKER_ITEM* pWorkItem = pWorkerRing->GetWorkItem();
+        stMATH_WORKER_ITEM* pWorkItem = pWorkerRings[0]->GetWorkItem();
         return pWorkItem;
     }
 
     //------------------------------------------------------------------------------
     // Called from main thread
+    // This function will divide up the work and wake up any worker threads
     void WorkMain(
         stMATH_WORKER_ITEM* pWorkItem,
         int64_t len,
@@ -964,18 +1079,31 @@ public:
         pWorkItem->BlockNext = 0;
         pWorkItem->BlockSize = BlockSize;
 
+        int32_t threads = (threadWakeup + 1);
+        int64_t numerator = pWorkItem->BlockLast / threads;
+        int64_t modval = pWorkItem->BlockLast % threads;
+
+        // Divide the work up into channels for L1/L2 cache
+        for (int64_t i = 0; i < threads; i++) {
+            pWorkItem->WorkerChannel[i].CurrentBlock =0;
+            pWorkItem->WorkerChannel[i].LastBlock = numerator + (i < modval ? 1: 0);
+        }
+        // mark last channel?
+        pWorkItem->WorkerChannel[threads].CurrentBlock = -1;
+
         // Tell all worker threads about this new work item (futex or wakeall)
-        // TODO: Consider waking a different number of threads based on complexity
+        // We use a different number of threads based on complexity
         // NOTE: This is a common optimization point: how long it takes to wake up threads
         // uint64_t currentTSC = __rdtsc();
 
-        pWorkerRing->SetWorkItem(threadWakeup);
+        pWorkerRings[0]->SetWorkItem(threadWakeup, pWorkItem);
 
         // MATHLOGGING("Took %lld cycles to wakeup\n", __rdtsc() - currentTSC);
 
-        // Also do work
-        pWorkItem->DoWork(-1, 0);
+        // Also do work as core 0 on pool 0 on numanode 0
+        pWorkItem->DoWork(0, pWorkerRings[0]->MainWorkIndex);
 
+        // !!! BUG: Must check all workitems now depending on how many worker threads
         if (bGenericMode) {
             // Check if all workers have completed
             while (pWorkItem->BlocksCompleted < pWorkItem->BlockLast) {
@@ -993,8 +1121,11 @@ public:
             }
         }
 
+        //MATHLOGGING("Complete work item\n");
+
         // Mark this as completed
-        pWorkerRing->CompleteWorkItem();
+        pWorkerRings[0]->CompleteWorkItem(threadWakeup, pWorkItem);
+
     }
 
 

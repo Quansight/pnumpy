@@ -79,17 +79,19 @@ WorkerThreadFunction(void* lpParam)
     stWorkerRing* pWorkerRing = (stWorkerRing*)lpParam;
 
     DWORD core = (DWORD)(InterlockedIncrement64(&pWorkerRing->WorkThread));
-    core = core - 1;
-
-    // If hyperthreading is on skip every other core
-    if (pWorkerRing->HyperThreading)
-        core = core * 2;
+    // The first 3 get assigned 1,2,3  and main is reserved for 0 and pool 0
+    // The next  (3,4,5,6) are assigned 4,5,6,7 and pool 1
+    DWORD pool = core  / MAX_WORKER_CHANNEL;
 
     LOGGING("Thread created with parameter: %d   %p\n", core, g_WaitAddress);
 
     // On windows we set the thread affinity mask
     if (g_WaitAddress != NULL) {
-        uint64_t ret = SetThreadAffinityMask(GetCurrentThread(), (uint64_t)1 << core);
+        DWORD tempcore = core - 1;
+        // If hyperthreading is on skip every other core
+        if (THREADER->GlobalWorkerParams.HyperThreading)
+            tempcore = tempcore * 2;
+        uint64_t ret = SetThreadAffinityMask(GetCurrentThread(), (uint64_t)1 << tempcore);
         //uint64_t ret = SetThreadAffinityMask(GetCurrentThread(), 0xFFFFFFFF);
     }
 
@@ -98,12 +100,12 @@ WorkerThreadFunction(void* lpParam)
     //
     // Setting Cancelled will stop all worker threads
     //
-    while (pWorkerRing->Cancelled == 0) {
+    while (THREADER->GlobalWorkerParams.Cancelled == 0) {
         int64_t workIndexCompleted;
         int64_t workIndex;
 
-        workIndex = pWorkerRing->WorkIndex;
-        workIndexCompleted = pWorkerRing->WorkIndexCompleted;
+        workIndex = pWorkerRing->Pool[pool].WorkIndex;
+        workIndexCompleted = pWorkerRing->Pool[pool].WorkIndexCompleted;
 
         int64_t didSomeWork = 0;
 
@@ -111,19 +113,15 @@ WorkerThreadFunction(void* lpParam)
         if (workIndex > workIndexCompleted) {
             stMATH_WORKER_ITEM* pWorkItem = pWorkerRing->GetExistingWorkItem();
 
-#if defined(RT_OS_WINDOWS)
-            // Windows we check if the work was for our thread
-            int64_t wakeup = InterlockedDecrement64(&pWorkItem->ThreadWakeup);
-            if (wakeup >= 0) {
-                didSomeWork = pWorkItem->DoWork(core, workIndex);
+            // check if the work was for our thread
+            if (core <= pWorkItem->ThreadWakeup) {
+                LOGGING("Pos Waking %d %d %lld\n", core, pool, workIndex);
+                didSomeWork = pWorkItem->DoWork(core, pWorkerRing->MainWorkIndex);
             }
             else {
-                //printf("[%d] not doing work %lld.  %lld  %lld\n", core, wakeup, workIndex, workIndexCompleted);
-                //workIndex++;
+                LOGGING("Not Waking %d %d %lld\n", core, pool, workIndex);
+
             }
-#else
-            didSomeWork = pWorkItem->DoWork(core, workIndex);
-#endif
         }
 
         // didSomeWork contains how many work items the thread completed
@@ -140,7 +138,7 @@ WorkerThreadFunction(void* lpParam)
             //printf("Sleeping %d", core);
             if (g_WaitAddress == NULL) {
                 // For Windows 7 we just sleep
-                Sleep(pWorkerRing->SleepTime);
+                Sleep(THREADER->GlobalWorkerParams.SleepTime);
             }
             else {
                 if (!didSomeWork) {
@@ -148,26 +146,26 @@ WorkerThreadFunction(void* lpParam)
                     //workIndexCompleted++;
                 }
 
-                LOGGING("[%d] WaitAddress %llu  %llu  %d\n", core, workIndexCompleted, pWorkerRing->WorkIndex, (int)didSomeWork);
+                LOGGING("[%d][%d] WaitAddress %llu  %p  %d\n", core, pool, workIndexCompleted, &(pWorkerRing->Pool[pool].WorkIndex), (int)didSomeWork);
 
                 // Otherwise wake up using conditional variable
                 g_WaitAddress(
-                    &pWorkerRing->WorkIndex,
+                    &(pWorkerRing->Pool[pool].WorkIndex),
                     (PVOID)&workIndexCompleted,
                     8, // The size of the value being waited on (i.e. the number of bytes to read from the two pointers then compare).
                     1000000L);
             }
 #elif defined(RT_OS_LINUX)
 
-            LOGGING("[%d] WaitAddress %llu  %llu  %d\n", core, workIndexCompleted, pWorkerRing->WorkIndex, (int)didSomeWork);
+            LOGGING("[%d] WaitAddress %llu  %llu  %d\n", core, workIndexCompleted, pWorkerRing->Pool[pool].WorkIndex, (int)didSomeWork);
 
             //int futex(int *uaddr, int futex_op, int val,
             //   const struct timespec *timeout,   /* or: uint32_t val2 */
             //   int *uaddr2, int val3);
-            futex((int*)&pWorkerRing->WorkIndex, FUTEX_WAIT, (int)workIndexCompleted, NULL, NULL, 0);
+            futex((int*)&(pWorkerRing->Pool[pool].WorkIndex), FUTEX_WAIT, (int)workIndexCompleted, NULL, NULL, 0);
 
 #elif defined(RT_OS_DARWIN)
-            LOGGING("[%lu] WaitAddress %llu  %llu  %d\n", core, workIndexCompleted, pWorkerRing->WorkIndex, (int)didSomeWork);
+            LOGGING("[%lu] WaitAddress %llu  %llu  %d\n", core, workIndexCompleted, pWorkerRing->Pool[pool].WorkIndex, (int)didSomeWork);
 
             pthread_mutex_lock(&g_WakeupMutex);
             pthread_cond_wait(&g_WakeupCond, &g_WakeupMutex);
@@ -178,7 +176,7 @@ WorkerThreadFunction(void* lpParam)
 
 #endif
 
-            //printf("Waking %d", core);
+            LOGGING("Waking %d %d\n", core, pool);
 
             //YieldProcessor();
         }
