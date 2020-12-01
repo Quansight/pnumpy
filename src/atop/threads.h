@@ -480,12 +480,13 @@ struct stWorkerRing {
 
 #elif defined(RT_OS_LINUX)
         // Linux thread wakeup
-        int s = futex((int*)&WorkIndex, FUTEX_WAKE, maxThreadsToWake, NULL, NULL, 0);
+        int s = futex((int*)&(Pool[pool].WorkIndex), FUTEX_WAKE, maxThreadsToWake, NULL, NULL, 0);
         if (s == -1)
             THREADLOGGING("***error futex-FUTEX_WAKE\n");     // TODO: Change to use fprintf(stderr, msg) instead
 
 #elif defined(RT_OS_DARWIN)
         // temp remove warning
+        // TODO: Darwin needs multiple g_WakeupCond
         //#warning MathThreads does not yet support Darwin/macOS.
         pthread_cond_broadcast(&g_WakeupCond);
 #else
@@ -805,7 +806,7 @@ public:
 #else
     // Linux routine to be completed
     int ProcessorInformation() {
-
+        return 0;
     }
 
 #endif
@@ -867,9 +868,9 @@ public:
         for (int numanode = 0; numanode < 1; numanode++) {
             for (int i = 0; i < WorkerThreadCount; i++) {
                 MATHLOGGING("Starting thread %d\n", i);
-                // 0, 1, 2, MAIN => ring 0
-                // 3,4,5,6 => ring 1
-                // 7,8,9,10 => ring 1
+                // 0, 1, 2, MAIN => pool 0
+                // 3,4,5,6 => pool 1 
+                // 7,8,9,10 => pool 2
                 WorkerThreadHandles[i] = StartThread(pWorkerRings[numanode]);
             }
         }
