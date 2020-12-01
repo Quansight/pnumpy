@@ -235,6 +235,7 @@ stSettings g_Settings = { 1, 0, 0, 0 };
 //------------------------------------------------------------------------------
 //  Concurrent callback from multiple threads
 static int64_t ReduceThreadCallbackStrided(struct stMATH_WORKER_ITEM* pstWorkerItem, int core, int64_t workIndex) {
+
     int64_t didSomeWork = 0;
     UFUNC_CALLBACK* Callback = (UFUNC_CALLBACK*)pstWorkerItem->WorkCallbackArg;
 
@@ -244,19 +245,19 @@ static int64_t ReduceThreadCallbackStrided(struct stMATH_WORKER_ITEM* pstWorkerI
     int64_t workBlock;
 
     // As long as there is work to do
-    while ((lenX = pstWorkerItem->GetNextWorkBlock(&workBlock)) > 0) {
+    while ((lenX = pstWorkerItem->GetNextWorkBlockCore(core, &workBlock)) > 0) {
 
         int64_t inputAdj2 = pstWorkerItem->BlockSize * workBlock * Callback->itemSizeIn2;
         int64_t outputAdj = workBlock * Callback->itemSizeOut;
 
-        //printf("[%d] reduce on %lld with len %lld   block: %lld  itemsize: %lld\n", core, workIndex, lenX, workBlock, Callback->itemSizeIn2);
+        LOGGING("[%d] reduce on %lld with len %lld   block: %lld  itemsize: %lld\n", core, workIndex, lenX, workBlock, Callback->itemSizeIn2);
         Callback->pReduceFunc(pDataIn2 + inputAdj2, pDataOut + outputAdj, Callback->pStartVal, lenX, Callback->itemSizeIn2);
 
         // Indicate we completed a block
         didSomeWork++;
 
         // tell others we completed this work block
-        pstWorkerItem->CompleteWorkBlock();
+        pstWorkerItem->CompleteWorkBlock(core);
     }
 
     return didSomeWork;
@@ -274,7 +275,7 @@ static int64_t ReduceThreadCallbackNumpy(struct stMATH_WORKER_ITEM* pstWorkerIte
     int64_t workBlock;
 
     // As long as there is work to do
-    while ((lenX = pstWorkerItem->GetNextWorkBlock(&workBlock)) > 0) {
+    while ((lenX = pstWorkerItem->GetNextWorkBlockCore(core, &workBlock)) > 0) {
 
         int64_t inputAdj2 = pstWorkerItem->BlockSize * workBlock * Callback->itemSizeIn2;
         int64_t outputAdj = workBlock * Callback->itemSizeOut;
@@ -314,7 +315,7 @@ static int64_t ReduceThreadCallbackNumpy(struct stMATH_WORKER_ITEM* pstWorkerIte
         didSomeWork++;
 
         // tell others we completed this work block
-        pstWorkerItem->CompleteWorkBlock();
+        pstWorkerItem->CompleteWorkBlock(core);
     }
 
     return didSomeWork;
@@ -334,7 +335,7 @@ static int64_t BinaryThreadCallbackStrided(struct stMATH_WORKER_ITEM* pstWorkerI
     int64_t workBlock;
 
     // As long as there is work to do
-    while ((lenX = pstWorkerItem->GetNextWorkBlock(&workBlock)) > 0) {
+    while ((lenX = pstWorkerItem->GetNextWorkBlockCore(core, &workBlock)) > 0) {
 
         int64_t inputAdj1 = pstWorkerItem->BlockSize * workBlock * Callback->itemSizeIn1;
         int64_t inputAdj2 = pstWorkerItem->BlockSize * workBlock * Callback->itemSizeIn2;
@@ -347,7 +348,7 @@ static int64_t BinaryThreadCallbackStrided(struct stMATH_WORKER_ITEM* pstWorkerI
         didSomeWork++;
 
         // tell others we completed this work block
-        pstWorkerItem->CompleteWorkBlock();
+        pstWorkerItem->CompleteWorkBlock(core);
         //printf("|%d %d", core, (int)workBlock);
     }
 
@@ -369,7 +370,7 @@ static int64_t BinaryThreadCallbackNumpy(struct stMATH_WORKER_ITEM* pstWorkerIte
     int64_t workBlock;
 
     // As long as there is work to do
-    while ((lenX = pstWorkerItem->GetNextWorkBlock(&workBlock)) > 0) {
+    while ((lenX = pstWorkerItem->GetNextWorkBlockCore(core, &workBlock)) > 0) {
 
         int64_t inputAdj1 = pstWorkerItem->BlockSize * workBlock * Callback->itemSizeIn1;
         int64_t inputAdj2 = pstWorkerItem->BlockSize * workBlock * Callback->itemSizeIn2;
@@ -385,7 +386,7 @@ static int64_t BinaryThreadCallbackNumpy(struct stMATH_WORKER_ITEM* pstWorkerIte
         didSomeWork++;
 
         // tell others we completed this work block
-        pstWorkerItem->CompleteWorkBlock();
+        pstWorkerItem->CompleteWorkBlock(core);
         //printf("|%d %d", core, (int)workBlock);
     }
 
@@ -406,7 +407,7 @@ static int64_t UnaryThreadCallbackNumpy(struct stMATH_WORKER_ITEM* pstWorkerItem
     int64_t workBlock;
 
     // As long as there is work to do
-    while ((lenX = pstWorkerItem->GetNextWorkBlock(&workBlock)) > 0) {
+    while ((lenX = pstWorkerItem->GetNextWorkBlockCore(core, &workBlock)) > 0) {
 
         int64_t inputAdj1 = pstWorkerItem->BlockSize * workBlock * Callback->itemSizeIn1;
         int64_t outputAdj = pstWorkerItem->BlockSize * workBlock * Callback->itemSizeOut;
@@ -422,7 +423,7 @@ static int64_t UnaryThreadCallbackNumpy(struct stMATH_WORKER_ITEM* pstWorkerItem
         didSomeWork++;
 
         // tell others we completed this work block
-        pstWorkerItem->CompleteWorkBlock();
+        pstWorkerItem->CompleteWorkBlock(core);
         //printf("|%d %d", core, (int)workBlock);
     }
 
@@ -441,7 +442,7 @@ static int64_t UnaryThreadCallbackStrided(struct stMATH_WORKER_ITEM* pstWorkerIt
     int64_t workBlock;
 
     // As long as there is work to do
-    while ((lenX = pstWorkerItem->GetNextWorkBlock(&workBlock)) > 0) {
+    while ((lenX = pstWorkerItem->GetNextWorkBlockCore(core, &workBlock)) > 0) {
 
         int64_t inputAdj1 = pstWorkerItem->BlockSize * workBlock * Callback->itemSizeIn1;
         int64_t outputAdj = pstWorkerItem->BlockSize * workBlock * Callback->itemSizeOut;
@@ -453,7 +454,7 @@ static int64_t UnaryThreadCallbackStrided(struct stMATH_WORKER_ITEM* pstWorkerIt
         didSomeWork++;
 
         // tell others we completed this work block
-        pstWorkerItem->CompleteWorkBlock();
+        pstWorkerItem->CompleteWorkBlock(core);
         //printf("|%d %d", core, (int)workBlock);
     }
 
@@ -1029,7 +1030,7 @@ PyObject* newinit(PyObject* self, PyObject* args, PyObject* kwargs) {
                     pstUFunc->pOldFunc = oldFunc;
                     pstUFunc->pBinaryFunc = pBinaryFunc;
                     pstUFunc->pReduceFunc = pReduceFunc;
-                    pstUFunc->MaxThreads = 4;
+                    pstUFunc->MaxThreads = 3;
                 }
             }
         }
@@ -1072,7 +1073,7 @@ PyObject* newinit(PyObject* self, PyObject* args, PyObject* kwargs) {
                 // Store the new function to call and the previous ufunc
                 pstUFunc->pOldFunc = oldFunc;
                 pstUFunc->pBinaryFunc = pBinaryFunc;
-                pstUFunc->MaxThreads = 4;
+                pstUFunc->MaxThreads = 3;
             }
         }
 
@@ -1116,7 +1117,7 @@ PyObject* newinit(PyObject* self, PyObject* args, PyObject* kwargs) {
                     // Store the new function to call and the previous ufunc
                     pstUFunc->pOldFunc = oldFunc;
                     pstUFunc->pUnaryFunc = pUnaryFunc;
-                    pstUFunc->MaxThreads = 4;
+                    pstUFunc->MaxThreads = 3;
                 }
             }
         }
@@ -1175,7 +1176,7 @@ PyObject* newinit(PyObject* self, PyObject* args, PyObject* kwargs) {
 
                 // NULL allowed here, it will use the default
                 pstUFunc->pUnaryFunc = pUnaryFunc;
-                pstUFunc->MaxThreads = 5;
+                pstUFunc->MaxThreads = 7;
             }
         }
 
