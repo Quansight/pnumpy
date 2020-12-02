@@ -66,6 +66,7 @@ static const int MAX_THREADS_ALLOWED = MAX_WORKER_HANDLES - 1;
 static const int FUTEX_WAKE_MAX = MAX_WORKER_HANDLES - 1;
 static const int FUTEX_WAKE_DEFAULT = 11;
 
+extern int32_t  g_ZigZag;  // set to 0 to disable
 
 
 
@@ -154,7 +155,6 @@ typedef int64_t(*MTWORK_CALLBACK)(void* callbackArg, int core, int64_t workIndex
 // Callback routine from multithreaded chunk thread (0, 65536, 130000, etc.)
 typedef int64_t(*MTCHUNK_CALLBACK)(void* callbackArg, int core, int64_t start, int64_t length);
 
-
 //-----------------------------------------------------------
 // A channel refers to the work items for one worker thread to be completed first
 // Keeps threads in their lanes so that L1, L2 cache performs better
@@ -216,10 +216,12 @@ struct stMATH_WORKER_ITEM {
         MTCHUNK_CALLBACK  MTChunkCallback;
     };
 
+    //=============== 64 BYTE =======================
     int64_t             WorkIndex;
 
     // TotalElements is used on asymmetric last block
     int64_t             TotalElements;
+
 
     // How many elements per block to work on
     int64_t             BlockSize;
@@ -227,6 +229,9 @@ struct stMATH_WORKER_ITEM {
 
     // The last block to work on
     volatile int64_t    BlockLast;
+
+
+    //=============== 64 BYTE =======================
 
     //-------------------------------------------------
     // The next block (atomic)
@@ -238,6 +243,7 @@ struct stMATH_WORKER_ITEM {
     // Atomic access
     // When BlocksCompleted == BlockLast , the job is completed
     int64_t             BlocksCompleted;
+
 
     // Current and Last are used to keep cores in their pool until they are completed
     // This should help with L1,L2 caches
@@ -320,6 +326,13 @@ struct stMATH_WORKER_ITEM {
 
         // Check if this work block is in our channel
         if (block < pChannel->LastBlock) {
+            // check zig zag..
+
+            if (g_ZigZag & 1) {
+                // go backwards
+                block = pChannel->LastBlock - block - 1;
+            }
+
             // increment global work counter
             InterlockedIncrement64(&BlockNext);
 
@@ -503,6 +516,11 @@ struct stWorkerRing {
         // This routine will wakup threads on Windows and Linux
         // Once we increment other threads will notice
         int64_t workIndex = pWorkItem->WorkIndex;
+
+        // zigzag mode
+        if (g_ZigZag)
+            g_ZigZag ^= 1;
+
         THREADLOGGING("on work item %lld, waking %d\n", workIndex, maxThreadsToWake);
         Pool[0].WorkIndex = workIndex;
         if (maxThreadsToWake > 3) {

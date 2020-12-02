@@ -17,6 +17,9 @@ WakeSingleAddress g_WakeSingleAddress = InitWakeCalls();
 WakeAllAddress g_WakeAllAddress;
 WaitAddress g_WaitAddress;
 
+extern "C" {
+    int32_t  g_ZigZag = 0;
+}
 
 //-----------------------------------------------------------------
 // Not every version of Windows has this useful API so we have to check for it dynamically
