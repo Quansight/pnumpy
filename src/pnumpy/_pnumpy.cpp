@@ -169,6 +169,9 @@ stOpCategory gOpCategory[OP_CATEGORY::OPCAT_LAST] = {
     {"TrigLog", sizeof(gTrigMapping) / sizeof(stUFuncToAtop), OP_CATEGORY::OPCAT_TRIG, gTrigMapping}
 };
 
+// Python dictionary keeping track of all functions we hook
+PyObject* gpUnaryDict = NULL;
+
 //--------------------------------------------------------------------
 // multithreaded struct used for calling unary op codes
 struct UFUNC_CALLBACK {
@@ -958,6 +961,30 @@ PyObject* oldinit(PyObject *self, PyObject *args, PyObject *kwargs) {
     return result;
 }
 
+// Add to global dict
+void AddToDict(const char* ufunc_name, int dtype, void* pstUFunc) {
+    // Create a tuple pair of ufuncname/dtype
+    PyObject* pTuple = PyTuple_New(2);
+    PyTuple_SetItem(pTuple, 0, PyUnicode_FromString(ufunc_name));
+    PyTuple_SetItem(pTuple, 1, PyLong_FromLong(dtype));
+    PyDict_SetItem(gpUnaryDict, pTuple, PyLong_FromLongLong((long long)pstUFunc));
+}
+
+stUFunc* GetFromDict(const char* ufunc_name, int dtype) {
+    // Create a tuple pair of ufuncname/dtype
+    if (gpUnaryDict) {
+        PyObject* pTuple = PyTuple_New(2);
+        PyTuple_SetItem(pTuple, 0, PyUnicode_FromString(ufunc_name));
+        PyTuple_SetItem(pTuple, 1, PyLong_FromLong(dtype));
+        PyObject* pAnswer=PyDict_GetItem(gpUnaryDict, pTuple);
+        Py_DecRef(pTuple);
+        if (pAnswer) {
+            return (stUFunc*)PyLong_AsLongLong(pAnswer);
+        }
+    }
+    return NULL;
+}
+
 
 extern "C"
 PyObject* newinit(PyObject* self, PyObject* args, PyObject* kwargs) {
@@ -985,6 +1012,9 @@ PyObject* newinit(PyObject* self, PyObject* args, PyObject* kwargs) {
             PyObject_CallObject(setbufsize, buffersize);
             Py_XDECREF(buffersize);
         }
+
+        // Keep track of all the routines/dtypes we hook
+        gpUnaryDict = PyDict_New();
 
         // Loop over all binary ufuncs we want to replace
         int64_t num_ufuncs = sizeof(gBinaryMapping) / sizeof(stUFuncToAtop);
@@ -1022,7 +1052,7 @@ PyObject* newinit(PyObject* self, PyObject* args, PyObject* kwargs) {
                     int ret = PyUFunc_ReplaceLoopBySignature((PyUFuncObject*)ufunc, g_UFuncGenericLUT[atop][atype], signature, &oldFunc);
 
                     if (ret < 0) {
-                        return PyErr_Format(PyExc_TypeError, "Math failed with %d. func %s must be the name of a ufunc.  atop:%d   atype:%d  sigs:%d, %d, %d", ret, ufunc_name, atop, atype, signature[0], signature[1], signature[2]);
+                        return PyErr_Format(PyExc_TypeError, "Binary failed with %d. func %s must be the name of a ufunc.  atop:%d   atype:%d  sigs:%d, %d, %d", ret, ufunc_name, atop, atype, signature[0], signature[1], signature[2]);
                     }
 
                     stUFunc* pstUFunc = &g_UFuncLUT[atop][atype];
@@ -1031,6 +1061,7 @@ PyObject* newinit(PyObject* self, PyObject* args, PyObject* kwargs) {
                     pstUFunc->pBinaryFunc = pBinaryFunc;
                     pstUFunc->pReduceFunc = pReduceFunc;
                     pstUFunc->MaxThreads = 3;
+                    AddToDict(ufunc_name, dtype, pstUFunc);
                 }
             }
         }
@@ -1074,6 +1105,7 @@ PyObject* newinit(PyObject* self, PyObject* args, PyObject* kwargs) {
                 pstUFunc->pOldFunc = oldFunc;
                 pstUFunc->pBinaryFunc = pBinaryFunc;
                 pstUFunc->MaxThreads = 3;
+                AddToDict(ufunc_name, dtype, pstUFunc);
             }
         }
 
@@ -1118,6 +1150,7 @@ PyObject* newinit(PyObject* self, PyObject* args, PyObject* kwargs) {
                     pstUFunc->pOldFunc = oldFunc;
                     pstUFunc->pUnaryFunc = pUnaryFunc;
                     pstUFunc->MaxThreads = 3;
+                    AddToDict(ufunc_name, dtype, pstUFunc);
                 }
             }
         }
@@ -1177,6 +1210,7 @@ PyObject* newinit(PyObject* self, PyObject* args, PyObject* kwargs) {
                 // NULL allowed here, it will use the default
                 pstUFunc->pUnaryFunc = pUnaryFunc;
                 pstUFunc->MaxThreads = 7;
+                AddToDict(ufunc_name, dtype, pstUFunc);
             }
         }
 
@@ -1203,6 +1237,73 @@ extern "C"
 PyObject* atop_isenabled(PyObject* self, PyObject* args) {
     if (g_Settings.AtopEnabled) {
         RETURN_TRUE;
+    }
+    RETURN_FALSE;
+}
+
+extern "C"
+// Takes 0 params
+// or takes 2 params: string func name, dtype num
+// example: atop_info('add',11)
+PyObject * atop_info(PyObject * self, PyObject * args) {
+    if (g_Settings.AtopEnabled) {
+
+        const char* uname = NULL;
+        int dtype = 0;
+
+        // If no params passed, just return the dict
+        if (PyTuple_Size(args) == 0) {
+            Py_IncRef(gpUnaryDict);
+            return gpUnaryDict;
+        }
+        if (!PyArg_ParseTuple(args, "si:atop_info", &uname, &dtype)) {
+            return NULL;
+        }
+        stUFunc* pstUFunc= GetFromDict(uname, dtype);
+        if (pstUFunc) {
+            PyObject* pUnaryDict = PyDict_New();
+            PyDict_SetItemString(pUnaryDict, "MaxThreads",PyLong_FromLong(pstUFunc->MaxThreads));
+            PyDict_SetItemString(pUnaryDict, "MinElementsToThread", PyLong_FromLong(pstUFunc->MinElementsToThread));
+            PyDict_SetItemString(pUnaryDict, "pBinaryFunc", PyLong_FromLongLong((long long)(pstUFunc->pBinaryFunc)));
+            PyDict_SetItemString(pUnaryDict, "pOldFunc", PyLong_FromLongLong((long long)(pstUFunc->pOldFunc)));
+            PyDict_SetItemString(pUnaryDict, "pReduceFunc", PyLong_FromLongLong((long long)(pstUFunc->pReduceFunc)));
+            PyDict_SetItemString(pUnaryDict, "pUnaryFunc", PyLong_FromLongLong((long long)(pstUFunc->pUnaryFunc)));
+            return pUnaryDict;
+        }
+
+    }
+    RETURN_FALSE;
+}
+
+
+extern "C"
+// Takes 0 params
+// or takes 3 params: string func name, dtype num
+// example: atop_setworkers('add',11, 7)
+PyObject * atop_setworkers(PyObject * self, PyObject * args) {
+    if (g_Settings.AtopEnabled) {
+
+        const char* uname = NULL;
+        int dtype = 0;
+        int workers = 0;
+
+        // If no params passed, just return the dict
+        if (PyTuple_Size(args) == 0) {
+            Py_IncRef(gpUnaryDict);
+            return gpUnaryDict;
+        }
+        if (!PyArg_ParseTuple(args, "sii:atop_setworkers", &uname, &dtype, &workers)) {
+            return NULL;
+        }
+        stUFunc* pstUFunc = GetFromDict(uname, dtype);
+        if (pstUFunc) {
+            if (workers > 0 && workers < 64) {
+                int32_t prevVal = pstUFunc->MaxThreads;
+                pstUFunc->MaxThreads = workers;
+                return PyLong_FromLong(prevVal);
+            }
+        }
+
     }
     RETURN_FALSE;
 }
