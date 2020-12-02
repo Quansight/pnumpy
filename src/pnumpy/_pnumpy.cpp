@@ -1311,3 +1311,19 @@ extern "C"
 PyObject * recycler_info(PyObject * self, PyObject * args) {
     RETURN_NONE;
 }
+
+
+extern "C"
+PyObject * thread_zigzag(PyObject * self, PyObject * args) {
+    // Return TRUE if toggled on
+    // Return FALSE if toggle off
+    if (THREADER->GlobalWorkerParams.ZigZag == 0) {
+        THREADER->GlobalWorkerParams.ZigZag = 3;
+        RETURN_TRUE;
+    }
+    else {
+        THREADER->GlobalWorkerParams.ZigZag = 0;
+        RETURN_FALSE;
+    }
+}
+

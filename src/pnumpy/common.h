@@ -13,7 +13,7 @@ struct stSettings {
     int32_t  AtopEnabled;
     int32_t  LedgerEnabled;
     int32_t  RecyclerEnabled;
-    int32_t  Reserved;
+    int32_t  ZigZag;  // set to 0 to disable
 };
 
 extern stSettings g_Settings;

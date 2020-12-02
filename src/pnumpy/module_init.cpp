@@ -26,6 +26,7 @@ extern "C" PyObject* recycler_enable(PyObject * self, PyObject * args);
 extern "C" PyObject* recycler_disable(PyObject * self, PyObject * args);
 extern "C" PyObject* recycler_isenabled(PyObject * self, PyObject * args);
 extern "C" PyObject* recycler_info(PyObject * self, PyObject * args);
+extern "C" PyObject* thread_zigzag(PyObject * self, PyObject * args);
 
 extern "C" PyObject* timer_gettsc(PyObject * self, PyObject * args);
 extern "C" PyObject* timer_getutc(PyObject * self, PyObject * args);
@@ -59,6 +60,7 @@ static PyMethodDef module_functions[] = {
     {"recycler_disable",   (PyCFunction)recycler_disable,  METH_VARARGS, RECYCLER_DISABLE_DOC},
     {"recycler_isenabled", (PyCFunction)recycler_isenabled,  METH_VARARGS, RECYCLER_ISENABLED_DOC},
     {"recycler_info",      (PyCFunction)recycler_info,  METH_VARARGS, RECYCLER_INFO_DOC},
+    {"thread_zigzag",      (PyCFunction)thread_zigzag,  METH_VARARGS, "toggle zigzag mode"},
     {NULL, NULL, 0,  NULL}
 };
 

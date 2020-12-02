@@ -17,7 +17,6 @@ WakeSingleAddress g_WakeSingleAddress = InitWakeCalls();
 WakeAllAddress g_WakeAllAddress;
 WaitAddress g_WaitAddress;
 
-
 //-----------------------------------------------------------------
 // Not every version of Windows has this useful API so we have to check for it dynamically
 WakeSingleAddress InitWakeCalls()
