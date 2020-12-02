@@ -1312,16 +1312,17 @@ PyObject * recycler_info(PyObject * self, PyObject * args) {
     RETURN_NONE;
 }
 
-extern int32_t  g_ZigZag;  // set to 0 to disable
 
 extern "C"
 PyObject * thread_zigzag(PyObject * self, PyObject * args) {
-    if (g_ZigZag == 0) {
-        g_ZigZag = 3;
+    // Return TRUE if toggled on
+    // Return FALSE if toggle off
+    if (THREADER->GlobalWorkerParams.ZigZag == 0) {
+        THREADER->GlobalWorkerParams.ZigZag = 3;
         RETURN_TRUE;
     }
     else {
-        g_ZigZag = 0;
+        THREADER->GlobalWorkerParams.ZigZag = 0;
         RETURN_FALSE;
     }
 }

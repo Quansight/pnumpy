@@ -66,9 +66,6 @@ static const int MAX_THREADS_ALLOWED = MAX_WORKER_HANDLES - 1;
 static const int FUTEX_WAKE_MAX = MAX_WORKER_HANDLES - 1;
 static const int FUTEX_WAKE_DEFAULT = 11;
 
-extern int32_t  g_ZigZag;  // set to 0 to disable
-
-
 
 //--------------------------------------------------------------------
 //BOOL
@@ -244,6 +241,10 @@ struct stMATH_WORKER_ITEM {
     // When BlocksCompleted == BlockLast , the job is completed
     int64_t             BlocksCompleted;
 
+    // Set to 0 to turn off.  Used to traverse arrays in zigzag pattern
+    int32_t             ZigZag;
+    int32_t             reserved1;
+
 
     // Current and Last are used to keep cores in their pool until they are completed
     // This should help with L1,L2 caches
@@ -328,7 +329,7 @@ struct stMATH_WORKER_ITEM {
         if (block < pChannel->LastBlock) {
             // check zig zag..
 
-            if (g_ZigZag & 1) {
+            if (ZigZag & 1) {
                 // go backwards
                 block = pChannel->LastBlock - block - 1;
             }
@@ -412,6 +413,9 @@ struct stGlobalWorkerParams {
     // Change this value to wake up less workers
     int32_t                FutexWakeCount =  FUTEX_WAKE_DEFAULT;
 
+    // Set to 0 to turn off.  Used to traverse arrays in zigzag pattern
+    int32_t                ZigZag=0;
+
 } ;
 
 struct stWorkerPool {
@@ -433,6 +437,7 @@ struct stWorkerRing {
     // incremented when worker thread start
     volatile int64_t       WorkThread;
     stGlobalWorkerParams*   pParams;
+
 
     stMATH_WORKER_ITEM      WorkerQueue[RING_BUFFER_SIZE];
 
@@ -463,6 +468,7 @@ struct stWorkerRing {
         int64_t workIndex = InterlockedIncrement64(&MainWorkIndex);
         stMATH_WORKER_ITEM* pWorkItem = &WorkerQueue[workIndex & RING_BUFFER_MASK];
         pWorkItem->WorkIndex = workIndex;
+        pWorkItem->ZigZag = pParams->ZigZag;
         return pWorkItem;
     }
 
@@ -518,8 +524,8 @@ struct stWorkerRing {
         int64_t workIndex = pWorkItem->WorkIndex;
 
         // zigzag mode
-        if (g_ZigZag)
-            g_ZigZag ^= 1;
+        if (pParams-> ZigZag)
+            pParams->ZigZag ^= 1;
 
         THREADLOGGING("on work item %lld, waking %d\n", workIndex, maxThreadsToWake);
         Pool[0].WorkIndex = workIndex;
