@@ -1030,7 +1030,7 @@ PyObject* newinit(PyObject* self, PyObject* args, PyObject* kwargs) {
                     pstUFunc->pOldFunc = oldFunc;
                     pstUFunc->pBinaryFunc = pBinaryFunc;
                     pstUFunc->pReduceFunc = pReduceFunc;
-                    pstUFunc->MaxThreads = 7;
+                    pstUFunc->MaxThreads = 3;
                 }
             }
         }
