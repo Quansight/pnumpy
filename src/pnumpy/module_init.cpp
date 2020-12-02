@@ -13,6 +13,8 @@ extern "C" PyObject* newinit(PyObject* self, PyObject* args, PyObject* kwargs);
 extern "C" PyObject* atop_enable(PyObject * self, PyObject * args);
 extern "C" PyObject* atop_disable(PyObject * self, PyObject * args);
 extern "C" PyObject* atop_isenabled(PyObject * self, PyObject * args);
+extern "C" PyObject* atop_info(PyObject * self, PyObject * args);
+extern "C" PyObject* atop_setworkers(PyObject * self, PyObject * args);
 extern "C" PyObject* thread_enable(PyObject * self, PyObject * args);
 extern "C" PyObject* thread_disable(PyObject * self, PyObject * args);
 extern "C" PyObject* thread_isenabled(PyObject * self, PyObject * args);
@@ -43,6 +45,8 @@ static PyMethodDef module_functions[] = {
     {"atop_enable",      (PyCFunction)atop_enable, METH_VARARGS, ATOP_ENABLE_DOC},
     {"atop_disable",     (PyCFunction)atop_disable, METH_VARARGS, ATOP_DISABLE_DOC},
     {"atop_isenabled",   (PyCFunction)atop_isenabled, METH_VARARGS, ATOP_ISENABLED_DOC},
+    {"atop_info",        (PyCFunction)atop_info, METH_VARARGS, "return dict"},
+    {"atop_setworkers",  (PyCFunction)atop_setworkers, METH_VARARGS, "set workers for a func"},
     {"thread_enable",    (PyCFunction)thread_enable, METH_VARARGS, THREAD_ENABLE_DOC},
     {"thread_disable",   (PyCFunction)thread_disable, METH_VARARGS, THREAD_DISABLE_DOC},
     {"thread_isenabled", (PyCFunction)thread_isenabled, METH_VARARGS, THREAD_ISENABLED_DOC},

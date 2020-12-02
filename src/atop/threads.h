@@ -441,12 +441,13 @@ struct stWorkerRing {
 
     stMATH_WORKER_ITEM      WorkerQueue[RING_BUFFER_SIZE];
 
-    void Init(stGlobalWorkerParams* pParams) {
+    void Init(stGlobalWorkerParams* pGlobalParams) {
         MainWorkIndex = 0;
+        pParams = pGlobalParams;
 
         for (int j = 0; j < MAX_WORKER_CHANNEL; j++) {
             Pool[j].WorkIndex = 0;
-            Pool[j].WorkIndexCompleted = 0;
+            Pool[j].WorkIndexCompleted = 0;            
         }
         WorkThread = 0;
 
