@@ -28,17 +28,18 @@ enable/disable any of the subsystems:
 """
 __version__ = '0.0.0'
 __all__ = [
-    'initialize', 'atop_enable', 'atop_disable', 'atop_isenabled', 'cpustring',
+    'initialize', 'atop_enable', 'atop_disable', 'atop_isenabled', 'atop_info', 'atop_setworkers','cpustring',
     'thread_enable', 'thread_disable', 'thread_isenabled', 'thread_getworkers', 'thread_setworkers',
     'ledger_enable', 'ledger_disable', 'ledger_isenabled', 'ledger_info',
     'recycler_enable', 'recycler_disable', 'recycler_isenabled', 'recycler_info',
     'timer_gettsc','timer_getutc']
 
-from pnumpy._pnumpy import initialize, atop_enable, atop_disable, atop_isenabled, cpustring 
+from pnumpy._pnumpy import atop_enable, atop_disable, atop_isenabled, atop_info, atop_setworkers, cpustring 
 from pnumpy._pnumpy import thread_enable, thread_disable, thread_isenabled, thread_getworkers, thread_setworkers
 from pnumpy._pnumpy import timer_gettsc, timer_getutc
 from pnumpy._pnumpy import ledger_enable, ledger_disable, ledger_isenabled, ledger_info
 from pnumpy._pnumpy import recycler_enable, recycler_disable, recycler_isenabled, recycler_info
+from pnumpy._pnumpy import initialize as _initialize
 
 import numpy as np
 
@@ -115,4 +116,7 @@ def benchmark(
     print("add   scalar", debug_benchmark(np.add, ctypes=ctypes, scalar=True, unary=False,recycle=recycle, atop=atop, thread=thread))
     print("abs         ", debug_benchmark(np.abs, ctypes=ctypes, scalar=False, unary=True,recycle=recycle, atop=atop, thread=thread))
     print("isnan       ", debug_benchmark(np.abs, ctypes=ctypes, scalar=False, unary=True,recycle=recycle, atop=atop, thread=thread))
+
+def initialize():
+    _initialize()
 
