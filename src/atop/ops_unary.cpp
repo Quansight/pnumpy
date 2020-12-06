@@ -64,6 +64,7 @@ static const __m256i g_shuffle4 = _mm256_set_epi8(12, 8, 4, 0, (char)0x80, (char
 // interleave hi lo across 128 bit lanes
 static const __m256i g_permute = _mm256_set_epi32(7, 3, 6, 2, 5, 1, 4, 0);
 static const __m256i g_ones = _mm256_set1_epi8(1);
+static const __m128i g_ones128 = _mm_set1_epi8(1);
 
 //// Examples of how to store a constant in vector math
 //MEM_ALIGN(64)
@@ -440,52 +441,33 @@ static inline void UnaryNanFastFloat(MathFunctionPtr MATH_OP, void* pDataIn, voi
     int64_t chunkSize = 32; // sizeof(U256) / sizeof(T);
 
     if (sizeof(bool) == strideOut && sizeof(T) == strideIn) {
-        int8_t* pEnd = (int8_t*)pDataOut + len;
+        const __m256* pSrc1Fast = (const __m256*)pDataIn;
         __m256i* pDestFast = (__m256i*)pDataOut;
+        int8_t* pEnd = (int8_t*)pDataOut + len;
+
         __m256i* pDestFastEnd = &pDestFast[len / 32];
-        U256* pIn1_256 = (U256*)pDataIn;
-
-        if (pDestFast != pDestFastEnd) {
-            const __m256i shuffle1 = g_shuffle1;
-            const __m256i shuffle2 = g_shuffle2;
-            const __m256i shuffle3 = g_shuffle3;
-            const __m256i shuffle4 = g_shuffle4;
-            const __m256i permute = g_permute;
-            const __m256i ones = _mm256_set1_epi8(1);
-
-            do  {
-                //// Use 256 bit registers which hold 8 floats or 4 doubles
-                // Older code below disabled for faster code
-                //U256 m0 = LOADU(pIn1_256);
-                //pIn1_256++;
-                //// nans will NOT equal eachother
-                //// NOTE: on my intel chip CMP_NEQ_OQ does not work for nans 
-                //// +/-inf will equal eachother
-                //*pOut_i64++ = gBooleanLUT64Inverse[_mm256_movemask_ps(_mm256_cmp_ps(m0, m0, _CMP_EQ_OQ)) & 255];
-
-                // Load 8 float32 4 times in a row to produce 32 booleans
-                U256 f0 = LOADU(pIn1_256);
-                __m256i m0 = _mm256_shuffle_epi8(_mm256_castps_si256(_mm256_cmp_ps(f0, f0, _CMP_EQ_OQ)), shuffle1);
-                U256 f1 = LOADU(pIn1_256 + 1);
-                __m256i m1 = _mm256_shuffle_epi8(_mm256_castps_si256(_mm256_cmp_ps(f1, f1, _CMP_EQ_OQ)), shuffle2);
-                U256 f2 = LOADU(pIn1_256 + 2);
-                __m256i m2 = _mm256_shuffle_epi8(_mm256_castps_si256(_mm256_cmp_ps(f2, f2, _CMP_EQ_OQ)), shuffle3);
-                U256 f3 = LOADU(pIn1_256 + 3);
-                __m256i m3 = _mm256_shuffle_epi8(_mm256_castps_si256(_mm256_cmp_ps(f3, f3, _CMP_EQ_OQ)), shuffle4);
-                m0 = _mm256_or_si256(_mm256_or_si256(m0, m1), _mm256_or_si256(m2, m3));
-
-                // write 32 booleans at a time
-                STOREU(pDestFast, _mm256_add_epi8(_mm256_permutevar8x32_epi32(m0, permute), ones));
-
-                pIn1_256 += 4;
-                pDestFast++;
-            } while (pDestFast != pDestFastEnd);
+        while (pDestFast != pDestFastEnd) {
+            // the shuffle will move all 8 comparisons together
+            __m256 m0 = _mm256_loadu_ps((const float*)(pSrc1Fast + 0));
+            __m256i m10 = _mm256_castps_si256(_mm256_cmp_ps(m0, m0, _CMP_NEQ_UQ));
+            __m256 m1 = _mm256_loadu_ps((const float*)(pSrc1Fast + 1));
+            __m256i m11 = _mm256_castps_si256(_mm256_cmp_ps(m1, m1, _CMP_NEQ_UQ));
+            __m256 m2 = _mm256_loadu_ps((const float*)(pSrc1Fast + 2));
+            __m256i m12 = _mm256_castps_si256(_mm256_cmp_ps(m2, m2, _CMP_NEQ_UQ));
+            __m256 m3 = _mm256_loadu_ps((const float*)(pSrc1Fast + 3));
+            __m256i m13 = _mm256_castps_si256(_mm256_cmp_ps(m3, m3, _CMP_NEQ_UQ));
+            m10 = _mm256_packs_epi32(m10, m11);
+            m12 = _mm256_packs_epi32(m12, m13);
+            m10 = _mm256_packs_epi16(m10, m12);
+            STOREU(pDestFast, _mm256_and_si256(_mm256_permutevar8x32_epi32(m10, g_permute), g_ones));
+            pSrc1Fast += 4;
+            pDestFast++;
         }
 
-        float* pDataInX = (float*)pIn1_256;
+        float* pDataInX = (float*)pSrc1Fast;
         int8_t* pDataOutX = (int8_t*)pDestFast;
         while (pDataOutX < pEnd) {
-            *pDataOutX++ = MATH_OP(*pDataInX);
+            *pDataOutX++ = *pDataInX != *pDataInX;
             pDataInX++;
         }
         return;
@@ -512,23 +494,44 @@ static inline void UnaryNanFastDouble(MathFunctionPtr MATH_OP, void* pDataIn, vo
 
     int64_t chunkSize = sizeof(U256) / sizeof(T);
     if (sizeof(bool) == strideOut && sizeof(T) == strideIn && len >= chunkSize) {
-        bool* pEnd = &pOut[chunkSize * (len / chunkSize)];
-        int32_t* pEnd_i32 = (int32_t*)pEnd;
 
-        U256* pIn1_256 = (U256*)pDataIn;
-        int32_t* pOut_i32 = (int32_t*)pDataOut;
+        const __m128d* pSrc1Fast = (const __m128d*)pDataIn;
+        INT64* pDestFast = (INT64*)pDataOut;
+        int8_t* pEnd = (int8_t*)pDataOut + len;
 
-        while (pOut_i32 < pEnd_i32) {
-            // Use 256 bit registers which hold 8 floats or 4 doubles
-            U256 m0 = LOADU(pIn1_256++);
+        INT64* pDestFastEnd = &pDestFast[len / 8];
+        while (pDestFast != pDestFastEnd) {
+            // the shuffle will move all 8 comparisons together
+            __m128d m0 = _mm_loadu_pd((const double*)(pSrc1Fast + 0));
+            __m128i m10 = _mm_castpd_si128(_mm_cmp_pd(m0, m0, _CMP_NEQ_UQ));
+            __m128d m1 = _mm_loadu_pd((const double*)(pSrc1Fast + 1));
+            __m128i m11 = _mm_castpd_si128(_mm_cmp_pd(m1, m1, _CMP_NEQ_UQ));
+            m10 = _mm_packs_epi32(m10, m11);
 
-            // A nan aware compare will return FALSE, since isnan(), invert 
-            *pOut_i32++ = gBooleanLUT32Inverse[_mm256_movemask_pd(_mm256_cmp_pd(m0, m0, _CMP_EQ_OQ)) & 15];
+            __m128d m2 = _mm_loadu_pd((const double*)(pSrc1Fast + 2));
+            __m128i m12 = _mm_castpd_si128(_mm_cmp_pd(m2, m2, _CMP_NEQ_UQ));
+            __m128d m3 = _mm_loadu_pd((const double*)(pSrc1Fast + 3));
+            __m128i m13 = _mm_castpd_si128(_mm_cmp_pd(m3, m3, _CMP_NEQ_UQ));
+            m12 = _mm_packs_epi32(m12, m13);
+
+            m10 = _mm_packs_epi16(m10, m12);
+            m10 = _mm_packs_epi16(m10, m10);
+
+            // Write 8 booleans
+            _mm_storel_epi64((__m128i*)pDestFast, _mm_and_si128(m10, g_ones128));
+
+            pSrc1Fast += 4;
+            pDestFast++;
         }
 
-        // update thin pointers to last location of wide pointers
-        pIn = (T*)pIn1_256;
-        pOut = (bool*)pOut_i32;
+        double* pDataInX = (double*)pSrc1Fast;
+        int8_t* pDataOutX = (int8_t*)pDestFast;
+        while (pDataOutX < pEnd) {
+            *pDataOutX++ = *pDataInX != *pDataInX;
+            pDataInX++;
+        }
+
+        return;
     }
 
     // Slow loop, handle 1 at a time
