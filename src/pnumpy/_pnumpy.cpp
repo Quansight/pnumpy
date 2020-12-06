@@ -417,7 +417,7 @@ static int64_t UnaryThreadCallbackNumpy(struct stMATH_WORKER_ITEM* pstWorkerItem
 
         char* args[2] = { pDataIn1 + inputAdj1,  pDataOut + outputAdj };
         npy_intp dimensions =  (npy_intp)lenX ;
-        const npy_intp steps[2] = { Callback->itemSizeIn1 , Callback->itemSizeOut };
+        const npy_intp steps[2] = { (npy_intp)Callback->itemSizeIn1 , (npy_intp)Callback->itemSizeOut };
 
         LOGGING("[%d] working on %lld with len %lld   block: %lld\n", core, workIndex, lenX, workBlock);
         Callback->pOldFunc(args, &dimensions, steps, Callback->innerloop);

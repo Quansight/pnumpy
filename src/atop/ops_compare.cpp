@@ -44,6 +44,9 @@ static FORCE_INLINE const __m256d MM_SET(double* pData) { return _mm256_set1_pd(
 //inline __m256d LOADU(const __m256d* x) { return _mm256_stream_pd((double const *)x); };
 //inline __m256 LOADU(const __m256* x) { return _mm256_stream_ps((float const *)x); };
 //inline __m256i LOADU(const __m256i* x) { return _mm256_stream_si256((__m256i const *)x); };
+//inline __m128d LOADUX(const __m128d* x) { return _mm_loadu_pd((double const*)x); };
+//inline __m128 LOADUX(const __m128* x) { return _mm_loadu_ps((float const*)x); };
+//inline __m128i LOADUX(const __m128i* x) { return _mm_loadu_si128((__m128i const*)x); };
 
 #else
 //#define LOADU(X) *(X)
@@ -53,6 +56,10 @@ static FORCE_INLINE const __m256d MM_SET(double* pData) { return _mm256_set1_pd(
 inline __m256d LOADU(const __m256d* x) { return _mm256_loadu_pd((double const*)x); };
 inline __m256 LOADU(const __m256* x) { return _mm256_loadu_ps((float const*)x); };
 inline __m256i LOADU(const __m256i* x) { return _mm256_loadu_si256((__m256i const*)x); };
+
+inline __m128d LOADU(const __m128d* x) { return _mm_loadu_pd((double const*)x); };
+inline __m128 LOADU(const __m128* x) { return _mm_loadu_ps((float const*)x); };
+inline __m128i LOADU(const __m128i* x) { return _mm_loadu_si128((__m128i const*)x); };
 
 #endif
 
@@ -95,7 +102,9 @@ static const __m256i g_shuffle4 = _mm256_set_epi8(12, 8, 4, 0, (char)0x80, (char
 
 // interleave hi lo across 128 bit lanes
 static const __m256i g_permute = _mm256_set_epi32(7, 3, 6, 2, 5, 1, 4, 0);
+static const __m256i g_permutelo = _mm256_set_epi32(7, 3, 6, 2, 5, 1, 4, 0);
 static const __m256i g_ones = _mm256_set1_epi8(1);
+static const __m128i g_ones128 = _mm_set1_epi8(1);
 
 // This will compute 32 x int32 comparison at a time, returning 32 bools
 template<typename T> FORCE_INLINE const __m256i COMP32i_EQS(T x1, T y1, T x2, T y2, T x3, T y3, T x4, T y4) {
@@ -322,20 +331,32 @@ static void CompareFloat(void* pDataIn, void* pDataIn2, void* pDataOut, int64_t 
     if (strideOut == sizeof(int8_t)) {
         if (strideIn1 == 0) {
             if (strideIn2 == sizeof(float)) {
-                const __m256* pSrc2Fast = (const __m256*)pDataIn2;
-                int64_t* pDestFast = (int64_t*)pDataOut;
-                __m256 m0 = MM_SET((float*)pDataIn);
-                int64_t fastCount = len / 8;
-                for (int64_t i = 0; i < fastCount; i++) {
-                    int32_t bitmask = _mm256_movemask_ps(_mm256_cmp_ps(m0, LOADU(pSrc2Fast + i), COMP_OPCODE));
-                    pDestFast[i] = gBooleanLUT64[bitmask & 255];
+                __m256* pSrc2Fast = (__m256*)pDataIn2;
+                __m256 m5 = MM_SET((float*)pDataIn);
+                int8_t* pEnd = (int8_t*)pDataOut + len;
+
+                __m256i* pDestFast = (__m256i*)pDataOut;
+                __m256i* pDestFastEnd = &pDestFast[len / 32];
+                while (pDestFast != pDestFastEnd) {
+                    __m256i m0 = _mm256_castps_si256(_mm256_cmp_ps(m5, LOADU(pSrc2Fast + 0), COMP_OPCODE));
+                    __m256i m1 = _mm256_castps_si256(_mm256_cmp_ps(m5, LOADU(pSrc2Fast + 1), COMP_OPCODE));
+                    __m256i m2 = _mm256_castps_si256(_mm256_cmp_ps(m5, LOADU(pSrc2Fast + 2), COMP_OPCODE));
+                    __m256i m3 = _mm256_castps_si256(_mm256_cmp_ps(m5, LOADU(pSrc2Fast + 3), COMP_OPCODE));
+                    m0 = _mm256_packs_epi32(m0, m1);
+                    m2 = _mm256_packs_epi32(m2, m3);
+                    m0 = _mm256_packs_epi16(m0, m2);
+
+                    STOREU(pDestFast, _mm256_and_si256(_mm256_permutevar8x32_epi32(m0, g_permute), g_ones));
+
+                    pSrc2Fast += 4;
+                    pDestFast++;
                 }
-                len = len - (fastCount * 8);
-                const float* pDataInX = (float*)pDataIn;
-                const float* pDataIn2X = &((float*)pDataIn2)[fastCount * 8];
-                int8_t* pDataOutX = &((int8_t*)pDataOut)[fastCount * 8];
-                for (int64_t i = 0; i < len; i++) {
-                    pDataOutX[i] = COMPARE(pDataInX[0], pDataIn2X[i]);
+
+                float* pDataInX = (float*)pSrc2Fast;
+                float arg1 = *(float*)pDataIn;
+                int8_t* pDataOutX = (int8_t*)pDestFast;
+                while (pDataOutX < pEnd) {
+                    *pDataOutX++ = COMPARE(arg1, *pDataInX++);
                 }
                 return;
             }
@@ -344,20 +365,22 @@ static void CompareFloat(void* pDataIn, void* pDataIn2, void* pDataOut, int64_t 
         if (strideIn2 == 0) {
             if (strideIn1 == sizeof(float)) {
                 __m256* pSrc1Fast = (__m256*)pDataIn;
-                __m256i* pDestFast = (__m256i*)pDataOut;
                 __m256 m5 = MM_SET((float*)pDataIn2);
                 int8_t* pEnd = (int8_t*)pDataOut + len;
 
+                __m256i* pDestFast = (__m256i*)pDataOut;
                 __m256i* pDestFastEnd = &pDestFast[len / 32];
                 while (pDestFast != pDestFastEnd) {
-                    // the shuffle will move all 8 comparisons together
-                    __m256i m0 = _mm256_shuffle_epi8(_mm256_castps_si256(_mm256_cmp_ps(LOADU(pSrc1Fast+0), m5, COMP_OPCODE)), g_shuffle1);
-                    __m256i m1 = _mm256_shuffle_epi8(_mm256_castps_si256(_mm256_cmp_ps(LOADU(pSrc1Fast+1), m5, COMP_OPCODE)), g_shuffle2);
-                    __m256i m2 = _mm256_shuffle_epi8(_mm256_castps_si256(_mm256_cmp_ps(LOADU(pSrc1Fast+2), m5, COMP_OPCODE)), g_shuffle3);
-                    __m256i m3 = _mm256_shuffle_epi8(_mm256_castps_si256(_mm256_cmp_ps(LOADU(pSrc1Fast+3), m5, COMP_OPCODE)), g_shuffle4);
-                    m0 = _mm256_or_si256(_mm256_or_si256(m0, m1), _mm256_or_si256(m2, m3));
+                    __m256i m0 = _mm256_castps_si256(_mm256_cmp_ps(LOADU(pSrc1Fast + 0), m5, COMP_OPCODE));
+                    __m256i m1 = _mm256_castps_si256(_mm256_cmp_ps(LOADU(pSrc1Fast + 1), m5, COMP_OPCODE));
+                    __m256i m2 = _mm256_castps_si256(_mm256_cmp_ps(LOADU(pSrc1Fast + 2), m5, COMP_OPCODE));
+                    __m256i m3 = _mm256_castps_si256(_mm256_cmp_ps(LOADU(pSrc1Fast + 3), m5, COMP_OPCODE));
+                    m0 = _mm256_packs_epi32(m0, m1);
+                    m2 = _mm256_packs_epi32(m2, m3);
+                    m0 = _mm256_packs_epi16(m0, m2);
 
                     STOREU(pDestFast, _mm256_and_si256(_mm256_permutevar8x32_epi32(m0, g_permute), g_ones));
+
                     pSrc1Fast += 4;
                     pDestFast ++;
                 }
@@ -368,66 +391,78 @@ static void CompareFloat(void* pDataIn, void* pDataIn2, void* pDataOut, int64_t 
                 while (pDataOutX < pEnd) {
                     *pDataOutX++ = COMPARE(*pDataInX++, arg2);
                 }
-
-                //int64_t fastCount = len / 8;
-                //for (int64_t i = 0; i < fastCount; i++) {
-                //    int32_t bitmask = _mm256_movemask_ps(_mm256_cmp_ps(LOADU(pSrc1Fast + i), m0, COMP_OPCODE));
-                //    pDestFast[i] = gBooleanLUT64[bitmask & 255];
-                //}
-                //len = len - (fastCount * 8);
-                //const float* pDataInX = &((float*)pDataIn)[fastCount * 8];
-                //const float* pDataIn2X = (float*)pDataIn2;
-                //int8_t* pDataOutX = &((int8_t*)pDataOut)[fastCount * 8];
-                //for (int64_t i = 0; i < len; i++) {
-                //    pDataOutX[i] = COMPARE(pDataInX[i], pDataIn2X[0]);
-                //}
                 return;
             }
         }
         else {
             if (strideIn1 == sizeof(float) && strideIn2 == sizeof(float)) {
-                const __m256* pSrc1Fast = (const __m256*)pDataIn;
-                const __m256* pSrc2Fast = (const __m256*)pDataIn2;
-                __m256i* pDestFast = (__m256i*)pDataOut;
-                int8_t* pEnd = (int8_t*)pDataOut + len;
+                if (pDataIn != pDataIn2) {
+                    // Normal path, data not the same
+                    const __m256* pSrc1Fast = (const __m256*)pDataIn;
+                    const __m256* pSrc2Fast = (const __m256*)pDataIn2;
+                    __m256i* pDestFast = (__m256i*)pDataOut;
+                    int8_t* pEnd = (int8_t*)pDataOut + len;
 
-                __m256i* pDestFastEnd = &pDestFast[len / 32];
-                //int64_t* pDestFast = (int64_t*)pDataOut;
-                //int64_t fastCount = len / 8;
-                //for (int64_t i = 0; i < fastCount; i++) {
-                //    // Alternate way
-                //    int32_t bitmask = _mm256_movemask_ps(_mm256_cmp_ps(LOADU(pSrc1Fast + i), LOADU(pSrc2Fast + i), COMP_OPCODE));
-                //    pDestFast[i] = gBooleanLUT64[bitmask & 255];
-                //}
-                //len = len - (fastCount * 8);
-                //const float* pDataInX = &((float*)pDataIn)[fastCount * 8];
-                //const float* pDataIn2X = &((float*)pDataIn2)[fastCount * 8];
-                //int8_t* pDataOutX = &((int8_t*)pDataOut)[fastCount * 8];
-                //for (int64_t i = 0; i < len; i++) {
-                //    pDataOutX[i] = COMPARE(pDataInX[i], pDataIn2X[i]);
-                //}
-                while (pDestFast != pDestFastEnd) {
-                    // the shuffle will move all 8 comparisons together
-                    __m256i m0 = _mm256_shuffle_epi8(_mm256_castps_si256(_mm256_cmp_ps(LOADU(pSrc1Fast + 0), LOADU(pSrc2Fast + 0), COMP_OPCODE)), g_shuffle1);
-                    __m256i m1 = _mm256_shuffle_epi8(_mm256_castps_si256(_mm256_cmp_ps(LOADU(pSrc1Fast + 1), LOADU(pSrc2Fast + 1), COMP_OPCODE)), g_shuffle2);
-                    __m256i m2 = _mm256_shuffle_epi8(_mm256_castps_si256(_mm256_cmp_ps(LOADU(pSrc1Fast + 2), LOADU(pSrc2Fast + 2), COMP_OPCODE)), g_shuffle3);
-                    __m256i m3 = _mm256_shuffle_epi8(_mm256_castps_si256(_mm256_cmp_ps(LOADU(pSrc1Fast + 3), LOADU(pSrc2Fast + 3), COMP_OPCODE)), g_shuffle4);
-                    m0 = _mm256_or_si256(_mm256_or_si256(m0, m1), _mm256_or_si256(m2, m3));
+                    __m256i* pDestFastEnd = &pDestFast[len / 32];
+                    while (pDestFast != pDestFastEnd) {
+                        // the shuffle will move all 8 comparisons together
+                        __m256i m0 = _mm256_castps_si256(_mm256_cmp_ps(LOADU(pSrc1Fast + 0), LOADU(pSrc2Fast + 0), COMP_OPCODE));
+                        __m256i m1 = _mm256_castps_si256(_mm256_cmp_ps(LOADU(pSrc1Fast + 1), LOADU(pSrc2Fast + 1), COMP_OPCODE));
+                        __m256i m2 = _mm256_castps_si256(_mm256_cmp_ps(LOADU(pSrc1Fast + 2), LOADU(pSrc2Fast + 2), COMP_OPCODE));
+                        __m256i m3 = _mm256_castps_si256(_mm256_cmp_ps(LOADU(pSrc1Fast + 3), LOADU(pSrc2Fast + 3), COMP_OPCODE));
+                        m0 = _mm256_packs_epi32(m0, m1);
+                        m2 = _mm256_packs_epi32(m2, m3);
+                        m0 = _mm256_packs_epi16(m0, m2);
+                        STOREU(pDestFast, _mm256_and_si256(_mm256_permutevar8x32_epi32(m0, g_permute), g_ones));
+                        pSrc1Fast += 4;
+                        pSrc2Fast += 4;
+                        pDestFast++;
+                    }
 
-                    STOREU(pDestFast, _mm256_and_si256(_mm256_permutevar8x32_epi32(m0, g_permute), g_ones));
-                    pSrc1Fast += 4;
-                    pSrc2Fast += 4;
-                    pDestFast++;
+                    float* pDataInX = (float*)pSrc1Fast;
+                    float* pData2InX = (float*)pSrc2Fast;
+                    int8_t* pDataOutX = (int8_t*)pDestFast;
+                    while (pDataOutX < pEnd) {
+                        *pDataOutX++ = COMPARE(*pDataInX++, *pData2InX++);
+                    }
+
+                    return;
                 }
+                else {
+                    // Same comparison
+                    const __m256* pSrc1Fast = (const __m256*)pDataIn;
+                    __m256i* pDestFast = (__m256i*)pDataOut;
+                    int8_t* pEnd = (int8_t*)pDataOut + len;
 
-                float* pDataInX = (float*)pSrc1Fast;
-                float* pData2InX = (float*)pSrc2Fast;
-                int8_t* pDataOutX = (int8_t*)pDestFast;
-                while (pDataOutX < pEnd) {
-                    *pDataOutX++ = COMPARE(*pDataInX++, *pData2InX++);
+                    __m256i* pDestFastEnd = &pDestFast[len / 32];
+                    while (pDestFast != pDestFastEnd) {
+                        // the shuffle will move all 8 comparisons together
+                        __m256 m0 = LOADU(pSrc1Fast + 0);
+                        __m256i m10 = _mm256_castps_si256(_mm256_cmp_ps(m0, m0, COMP_OPCODE));
+                        __m256 m1 = LOADU(pSrc1Fast + 1);
+                        __m256i m11 = _mm256_castps_si256(_mm256_cmp_ps(m1, m1, COMP_OPCODE));
+                        __m256 m2 = LOADU(pSrc1Fast + 2);
+                        __m256i m12 = _mm256_castps_si256(_mm256_cmp_ps(m2, m2, COMP_OPCODE));
+                        __m256 m3 = LOADU(pSrc1Fast + 3);
+                        __m256i m13 = _mm256_castps_si256(_mm256_cmp_ps(m3, m3, COMP_OPCODE));
+                        m10 = _mm256_packs_epi32(m10, m11);
+                        m12 = _mm256_packs_epi32(m12, m13);
+                        m10 = _mm256_packs_epi16(m10, m12);
+                        STOREU(pDestFast, _mm256_and_si256(_mm256_permutevar8x32_epi32(m10, g_permute), g_ones));
+                        pSrc1Fast += 4;
+                        pDestFast++;
+                    }
+
+                    float* pDataInX = (float*)pSrc1Fast;
+                    int8_t* pDataOutX = (int8_t*)pDestFast;
+                    while (pDataOutX < pEnd) {
+                        *pDataOutX++ = COMPARE(*pDataInX, *pDataInX);
+                        pDataInX++;
+                    }
+
+                    return;
+
                 }
-
-                return;
             }
         }
     }
@@ -453,77 +488,232 @@ static void CompareDouble(void* pDataIn, void* pDataIn2, void* pDataOut, int64_t
 
     // check for strided output first
     if (strideOut == sizeof(int8_t)) {
-        int32_t* pDestFast = (int32_t*)pDataOut;
 
-        if (strideIn1 == 0)
-        {
+        if (strideIn1 == 0) {
             if (strideIn2 == sizeof(double)) {
+                __m128d* pSrc2Fast = (__m128d*)pDataIn2;
+                __m128d m5 = _mm_set1_pd(*(double*)pDataIn);
+                int8_t* pEnd = (int8_t*)pDataOut + len;
 
-                const __m256d* pSrc2Fast = (const __m256d*)pDataIn2;
-                int64_t fastCount = len / 4;
+                INT64* pDestFast = (INT64*)pDataOut;
+                INT64* pDestFastEnd = &pDestFast[len / 8];
+                while (pDestFast != pDestFastEnd) {
+                    __m128i m0 = _mm_castpd_si128(_mm_cmp_pd(m5, LOADU(pSrc2Fast + 0), COMP_OPCODE));
+                    __m128i m1 = _mm_castpd_si128(_mm_cmp_pd(m5, LOADU(pSrc2Fast + 1), COMP_OPCODE));
+                    m0 = _mm_packs_epi32(m0, m1);
 
-                __m256d m0 = MM_SET((double*)pDataIn);
-                for (int64_t i = 0; i < fastCount; i++)
-                {
-                    int32_t bitmask = _mm256_movemask_pd(_mm256_cmp_pd(m0, LOADU(pSrc2Fast + i), COMP_OPCODE));
-                    pDestFast[i] = gBooleanLUT32[bitmask & 15];
+                    __m128i m2 = _mm_castpd_si128(_mm_cmp_pd(m5, LOADU(pSrc2Fast + 2), COMP_OPCODE));
+                    __m128i m3 = _mm_castpd_si128(_mm_cmp_pd(m5, LOADU(pSrc2Fast + 3), COMP_OPCODE));
+                    m2 = _mm_packs_epi32(m2, m3);
+                    m0 = _mm_packs_epi16(m0, m2);
+                    m0 = _mm_packs_epi16(m0, m0);
+
+                    // Write 8 booleans
+                    _mm_storel_epi64((__m128i*)pDestFast, _mm_and_si128(m0, g_ones128));
+
+                    pSrc2Fast += 4;
+                    pDestFast++;
                 }
-                len = len - (fastCount * 4);
-                const double arg1 = *(double*)pDataIn;
-                const double* pDataIn2X = &((double*)pDataIn2)[fastCount * 4];
-                int8_t* pDataOutX = &((int8_t*)pDataOut)[fastCount * 4];
-                for (int64_t i = 0; i < len; i++) {
-                    pDataOutX[i] = COMPARE(arg1, pDataIn2X[i]);
+
+                double* pDataInX = (double*)pSrc2Fast;
+                double arg1 = *(double*)pDataIn;
+                int8_t* pDataOutX = (int8_t*)pDestFast;
+                while (pDataOutX < pEnd) {
+                    *pDataOutX++ = COMPARE(arg1, *pDataInX++);
                 }
                 return;
             }
         }
         else
-        if (strideIn2 == 0)
-        {
-            if (strideIn1 == sizeof(double)) {
-                const __m256d* pSrc1Fast = (const __m256d*)pDataIn;
-                int64_t fastCount = len / 4;
+            if (strideIn2 == 0) {
+                if (strideIn1 == sizeof(double)) {
+                    __m128d * pSrc1Fast = (__m128d*)pDataIn;
+                    __m128d m5 = _mm_set1_pd(*(double*)pDataIn2);
+                    int8_t* pEnd = (int8_t*)pDataOut + len;
 
-                __m256d m0 = MM_SET((double*)pDataIn2);
-                for (int64_t i = 0; i < fastCount; i++)
-                {
-                    int32_t bitmask = _mm256_movemask_pd(_mm256_cmp_pd(LOADU(pSrc1Fast + i), m0, COMP_OPCODE));
-                    pDestFast[i] = gBooleanLUT32[bitmask & 15];
-                }
-                len = len - (fastCount * 4);
-                const double* pDataInX = &((double*)pDataIn)[fastCount * 4];
-                const double arg2 = *(double*)pDataIn2;
-                int8_t* pDataOutX = &((int8_t*)pDataOut)[fastCount * 4];
-                for (int64_t i = 0; i < len; i++) {
-                    pDataOutX[i] = COMPARE(pDataInX[i], arg2);
-                }
-                return;
-            }
-        }
-        else {
-            if (strideIn2 == sizeof(double) && strideIn1 == sizeof(double)) {
-                const __m256d* pSrc1Fast = (const __m256d*)pDataIn;
-                const __m256d* pSrc2Fast = (const __m256d*)pDataIn2;
-                int64_t fastCount = len / 4;
+                    INT64* pDestFast = (INT64*)pDataOut;
+                    INT64* pDestFastEnd = &pDestFast[len / 8];
+                    while (pDestFast != pDestFastEnd) {
+                        __m128i m0 = _mm_castpd_si128(_mm_cmp_pd(LOADU(pSrc1Fast + 0), m5, COMP_OPCODE));
+                        __m128i m1 = _mm_castpd_si128(_mm_cmp_pd(LOADU(pSrc1Fast + 1), m5, COMP_OPCODE));
+                        m0 = _mm_packs_epi32(m0, m1);
 
-                for (int64_t i = 0; i < fastCount; i++)
-                {
-                    int32_t bitmask = _mm256_movemask_pd(_mm256_cmp_pd(LOADU(pSrc1Fast + i), LOADU(pSrc2Fast + i), COMP_OPCODE));
-                    //printf("bitmask is %d\n", bitmask);
-                    //printf("bitmask & 15 is %d\n", bitmask & 15);
-                    pDestFast[i] = gBooleanLUT32[bitmask & 15];
+                        __m128i m2 = _mm_castpd_si128(_mm_cmp_pd(LOADU(pSrc1Fast + 2), m5, COMP_OPCODE));
+                        __m128i m3 = _mm_castpd_si128(_mm_cmp_pd(LOADU(pSrc1Fast + 3), m5, COMP_OPCODE));
+                        m2 = _mm_packs_epi32(m2, m3);
+                        m0 = _mm_packs_epi16(m0, m2);
+                        m0 = _mm_packs_epi16(m0, m0);
+
+                        // Write 8 booleans
+                        _mm_storel_epi64((__m128i*)pDestFast, _mm_and_si128(m0, g_ones128));
+
+                        pSrc1Fast += 4;
+                        pDestFast++;
+                    }
+
+                    double* pDataInX = (double*)pSrc1Fast;
+                    double arg2 = *(double*)pDataIn2;
+                    int8_t* pDataOutX = (int8_t*)pDestFast;
+                    while (pDataOutX < pEnd) {
+                        *pDataOutX++ = COMPARE(*pDataInX++, arg2);
+                    }
+                    return;
                 }
-                len = len - (fastCount * 4);
-                const double* pDataInX = &((double*)pDataIn)[fastCount * 4];
-                const double* pDataIn2X = &((double*)pDataIn2)[fastCount * 4];
-                int8_t* pDataOutX = &((int8_t*)pDataOut)[fastCount * 4];
-                for (int64_t i = 0; i < len; i++) {
-                    pDataOutX[i] = COMPARE(pDataInX[i], pDataIn2X[i]);
-                }
-                return;
             }
-        }
+            else {
+                if (strideIn1 == sizeof(double) && strideIn2 == sizeof(double)) {
+                    if (pDataIn != pDataIn2) {
+                        // Normal path, data not the same
+                        const __m128d* pSrc1Fast = (const __m128d*)pDataIn;
+                        const __m128d* pSrc2Fast = (const __m128d*)pDataIn2;
+                        INT64* pDestFast = (INT64*)pDataOut;
+                        int8_t* pEnd = (int8_t*)pDataOut + len;
+
+                        INT64* pDestFastEnd = &pDestFast[len / 8];
+                        while (pDestFast != pDestFastEnd) {
+                            // the shuffle will move all 8 comparisons together
+                            __m128i m0 = _mm_castpd_si128(_mm_cmp_pd(LOADU(pSrc1Fast + 0), LOADU(pSrc2Fast + 0), COMP_OPCODE));
+                            __m128i m1 = _mm_castpd_si128(_mm_cmp_pd(LOADU(pSrc1Fast + 1), LOADU(pSrc2Fast + 1), COMP_OPCODE));
+                            m0 = _mm_packs_epi32(m0, m1);
+                            __m128i m2 = _mm_castpd_si128(_mm_cmp_pd(LOADU(pSrc1Fast + 2), LOADU(pSrc2Fast + 2), COMP_OPCODE));
+                            __m128i m3 = _mm_castpd_si128(_mm_cmp_pd(LOADU(pSrc1Fast + 3), LOADU(pSrc2Fast + 3), COMP_OPCODE));
+                            m2 = _mm_packs_epi32(m2, m3);
+                            m0 = _mm_packs_epi16(m0, m2);
+                            m0 = _mm_packs_epi16(m0, m0);
+
+                            // Write 8 booleans
+                            _mm_storel_epi64((__m128i*)pDestFast, _mm_and_si128(m0, g_ones128));
+
+                            pSrc1Fast += 4;
+                            pSrc2Fast += 4;
+                            pDestFast++;
+                        }
+
+                        double* pDataInX = (double*)pSrc1Fast;
+                        double* pData2InX = (double*)pSrc2Fast;
+                        int8_t* pDataOutX = (int8_t*)pDestFast;
+                        while (pDataOutX < pEnd) {
+                            *pDataOutX++ = COMPARE(*pDataInX++, *pData2InX++);
+                        }
+
+                        return;
+
+                    }
+                    else {
+                        // Same comparison
+                        const __m128d* pSrc1Fast = (const __m128d*)pDataIn;
+                        INT64* pDestFast = (INT64*)pDataOut;
+                        int8_t* pEnd = (int8_t*)pDataOut + len;
+
+                        INT64* pDestFastEnd = &pDestFast[len / 8];
+                        while (pDestFast != pDestFastEnd) {
+                            // the shuffle will move all 8 comparisons together
+                            __m128d m0 = LOADU(pSrc1Fast + 0);
+                            __m128i m10 = _mm_castpd_si128(_mm_cmp_pd(m0, m0, COMP_OPCODE));
+                            __m128d m1 = LOADU(pSrc1Fast + 1);
+                            __m128i m11 = _mm_castpd_si128(_mm_cmp_pd(m1, m1, COMP_OPCODE));
+                            m10 = _mm_packs_epi32(m10, m11);
+
+                            __m128d m2 = LOADU(pSrc1Fast + 2);
+                            __m128i m12 = _mm_castpd_si128(_mm_cmp_pd(m2, m2, COMP_OPCODE));
+                            __m128d m3 = LOADU(pSrc1Fast + 3);
+                            __m128i m13 = _mm_castpd_si128(_mm_cmp_pd(m3, m3, COMP_OPCODE));
+                            m12 = _mm_packs_epi32(m12, m13);
+
+                            m10 = _mm_packs_epi16(m10, m12);
+                            m10 = _mm_packs_epi16(m10, m10);
+
+                            // Write 8 booleans
+                            _mm_storel_epi64((__m128i*)pDestFast, _mm_and_si128(m10, g_ones128));
+
+                            pSrc1Fast += 4;
+                            pDestFast++;
+                        }
+
+                        double* pDataInX = (double*)pSrc1Fast;
+                        int8_t* pDataOutX = (int8_t*)pDestFast;
+                        while (pDataOutX < pEnd) {
+                            *pDataOutX++ = COMPARE(*pDataInX, *pDataInX);
+                            pDataInX++;
+                        }
+
+                        return;
+
+                    }
+                }
+            }
+
+        //int32_t* pDestFast = (int32_t*)pDataOut;
+
+        //if (strideIn1 == 0)
+        //{
+        //    if (strideIn2 == sizeof(double)) {
+
+        //        const __m256d* pSrc2Fast = (const __m256d*)pDataIn2;
+        //        int64_t fastCount = len / 4;
+
+        //        __m256d m0 = MM_SET((double*)pDataIn);
+        //        for (int64_t i = 0; i < fastCount; i++)
+        //        {
+        //            int32_t bitmask = _mm256_movemask_pd(_mm256_cmp_pd(m0, LOADU(pSrc2Fast + i), COMP_OPCODE));
+        //            pDestFast[i] = gBooleanLUT32[bitmask & 15];
+        //        }
+        //        len = len - (fastCount * 4);
+        //        const double arg1 = *(double*)pDataIn;
+        //        const double* pDataIn2X = &((double*)pDataIn2)[fastCount * 4];
+        //        int8_t* pDataOutX = &((int8_t*)pDataOut)[fastCount * 4];
+        //        for (int64_t i = 0; i < len; i++) {
+        //            pDataOutX[i] = COMPARE(arg1, pDataIn2X[i]);
+        //        }
+        //        return;
+        //    }
+        //}
+        //else
+        //if (strideIn2 == 0)
+        //{
+        //    if (strideIn1 == sizeof(double)) {
+        //        const __m256d* pSrc1Fast = (const __m256d*)pDataIn;
+        //        int64_t fastCount = len / 4;
+
+        //        __m256d m0 = MM_SET((double*)pDataIn2);
+        //        for (int64_t i = 0; i < fastCount; i++)
+        //        {
+        //            int32_t bitmask = _mm256_movemask_pd(_mm256_cmp_pd(LOADU(pSrc1Fast + i), m0, COMP_OPCODE));
+        //            pDestFast[i] = gBooleanLUT32[bitmask & 15];
+        //        }
+        //        len = len - (fastCount * 4);
+        //        const double* pDataInX = &((double*)pDataIn)[fastCount * 4];
+        //        const double arg2 = *(double*)pDataIn2;
+        //        int8_t* pDataOutX = &((int8_t*)pDataOut)[fastCount * 4];
+        //        for (int64_t i = 0; i < len; i++) {
+        //            pDataOutX[i] = COMPARE(pDataInX[i], arg2);
+        //        }
+        //        return;
+        //    }
+        //}
+        //else {
+        //    if (strideIn2 == sizeof(double) && strideIn1 == sizeof(double)) {
+        //        const __m256d* pSrc1Fast = (const __m256d*)pDataIn;
+        //        const __m256d* pSrc2Fast = (const __m256d*)pDataIn2;
+        //        int64_t fastCount = len / 4;
+
+        //        for (int64_t i = 0; i < fastCount; i++)
+        //        {
+        //            int32_t bitmask = _mm256_movemask_pd(_mm256_cmp_pd(LOADU(pSrc1Fast + i), LOADU(pSrc2Fast + i), COMP_OPCODE));
+        //            //printf("bitmask is %d\n", bitmask);
+        //            //printf("bitmask & 15 is %d\n", bitmask & 15);
+        //            pDestFast[i] = gBooleanLUT32[bitmask & 15];
+        //        }
+        //        len = len - (fastCount * 4);
+        //        const double* pDataInX = &((double*)pDataIn)[fastCount * 4];
+        //        const double* pDataIn2X = &((double*)pDataIn2)[fastCount * 4];
+        //        int8_t* pDataOutX = &((int8_t*)pDataOut)[fastCount * 4];
+        //        for (int64_t i = 0; i < len; i++) {
+        //            pDataOutX[i] = COMPARE(pDataInX[i], pDataIn2X[i]);
+        //        }
+        //        return;
+        //    }
+        //}
     }
     // generic rare case
     double* pDataInX = (double*)pDataIn;

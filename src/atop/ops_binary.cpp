@@ -90,7 +90,14 @@ template<typename T> static const inline __m256d HYPOT_OP_256(__m256d x, __m256d
 #endif
 
 //=========================================================================================
-static const inline __m256  ADD_OP_256f32(__m256 x, __m256 y) { return _mm256_add_ps(x, y); }
+static const inline __m256  ADD_OP_256f32(__m256 x, __m256 y) {
+    // NOTE: on MSVC compiler mm256_add emits another function, trying to shift and add
+    __m128 m0=_mm_add_ps(_mm256_extractf128_ps(x, 0), _mm256_extractf128_ps(y, 0));
+    __m128 m1 = _mm_add_ps(_mm256_extractf128_ps(x, 1), _mm256_extractf128_ps(y, 1));
+    return _mm256_set_m128(m1, m0);
+    //return _mm256_add_ps(x, y);
+}
+
 static const inline __m256d ADD_OP_256f64(__m256d x, __m256d y) { return _mm256_add_pd(x, y); }
 static const inline __m256i ADD_OP_256i8(__m256i x, __m256i y) { return _mm256_add_epi8(x, y); }
 static const inline __m256i ADD_OP_256i16(__m256i x, __m256i y) { return _mm256_add_epi16(x, y); }
@@ -516,37 +523,69 @@ inline void SimpleMathOpFastSymmetric(void* pDataIn1X, void* pDataIn2X, void* pD
         LOGGING("mathopfast datalen %llu  chunkSize %llu  perReg %llu\n", datalen, chunkSize, perReg);
 
         if (strideIn2 == sizeof(T) && strideIn1 == sizeof(T)) {
-            if (datalen >= chunkSize) {
-                T* pEnd = &pDataOut[chunkSize * (datalen / chunkSize)];
-                U256* pEnd_256 = (U256*)pEnd;
-                U256* pIn1_256 = (U256*)pDataIn1;
-                U256* pIn2_256 = (U256*)pDataIn2;
-                U256* pOut_256 = (U256*)pDataOut;
+            if (pDataIn1 != pDataIn2) {
+                // Normal path... diff pointers
+                if (datalen >= chunkSize) {
+                    T* pEnd = &pDataOut[chunkSize * (datalen / chunkSize)];
+                    U256* pEnd_256 = (U256*)pEnd;
+                    U256* pIn1_256 = (U256*)pDataIn1;
+                    U256* pIn2_256 = (U256*)pDataIn2;
+                    U256* pOut_256 = (U256*)pDataOut;
 
-                do {
-                    // clang requires LOADU on last operand
+                    do {
+                        // clang requires LOADU on last operand
 #ifdef RT_COMPILER_MSVC
-                    STOREU(pOut_256, MATH_OP256(LOADU(pIn1_256), *pIn2_256));
+                        STOREU(pOut_256, MATH_OP256(LOADU(pIn1_256), *pIn2_256));
 #else
-                    STOREU(pOut_256, MATH_OP256(LOADU(pIn1_256), LOADU(pIn2_256)));
+                        STOREU(pOut_256, MATH_OP256(LOADU(pIn1_256), LOADU(pIn2_256)));
 #endif
-                    pOut_256 += NUM_LOOPS_UNROLLED;
-                    pIn1_256 += NUM_LOOPS_UNROLLED;
-                    pIn2_256 += NUM_LOOPS_UNROLLED;
-                } while (pOut_256 < pEnd_256);
+                        pOut_256 += NUM_LOOPS_UNROLLED;
+                        pIn1_256 += NUM_LOOPS_UNROLLED;
+                        pIn2_256 += NUM_LOOPS_UNROLLED;
+                    } while (pOut_256 < pEnd_256);
 
-                // update pointers to last location of wide pointers
-                pDataIn1 = (T*)pIn1_256;
-                pDataIn2 = (T*)pIn2_256;
-                pDataOut = (T*)pOut_256;
-                datalen = datalen & (chunkSize - 1);
+                    // update pointers to last location of wide pointers
+                    pDataIn1 = (T*)pIn1_256;
+                    pDataIn2 = (T*)pIn2_256;
+                    pDataOut = (T*)pOut_256;
+                    datalen = datalen & (chunkSize - 1);
+                }
+
+                for (int64_t i = 0; i < datalen; i++) {
+                    pDataOut[i] = MATH_OP(pDataIn1[i], pDataIn2[i]);
+                }
+
+                return;
             }
+            else {
+                // When pointers are the same
+                if (datalen >= chunkSize) {
+                    T* pEnd = &pDataOut[chunkSize * (datalen / chunkSize)];
+                    U256* pEnd_256 = (U256*)pEnd;
+                    U256* pIn1_256 = (U256*)pDataIn1;
+                    U256* pOut_256 = (U256*)pDataOut;
 
-            for (int64_t i = 0; i < datalen; i++) {
-                pDataOut[i] = MATH_OP(pDataIn1[i], pDataIn2[i]);
+                    do {
+                        // clang requires LOADU on last operand
+                        U256 m0 = LOADU(pIn1_256);
+                        STOREU(pOut_256, MATH_OP256(m0, m0));
+                        pOut_256 += NUM_LOOPS_UNROLLED;
+                        pIn1_256 += NUM_LOOPS_UNROLLED;
+                    } while (pOut_256 < pEnd_256);
+
+                    // update pointers to last location of wide pointers
+                    pDataIn1 = (T*)pIn1_256;
+                    pDataOut = (T*)pOut_256;
+                    datalen = datalen & (chunkSize - 1);
+                }
+
+                for (int64_t i = 0; i < datalen; i++) {
+                    pDataOut[i] = MATH_OP(pDataIn1[i], pDataIn1[i]);
+                }
+
+                return;
+
             }
-
-            return;
         }
         if (strideIn1 == 0)
         {
