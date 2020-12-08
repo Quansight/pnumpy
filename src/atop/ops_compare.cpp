@@ -622,8 +622,8 @@ static void CompareDouble(void* pDataIn, void* pDataIn2, void* pDataOut, int64_t
                 __m128d m5 = _mm_set1_pd(*(double*)pDataIn);
                 int8_t* pEnd = (int8_t*)pDataOut + len;
 
-                INT64* pDestFast = (INT64*)pDataOut;
-                INT64* pDestFastEnd = &pDestFast[len / 8];
+                int64_t* pDestFast = (int64_t*)pDataOut;
+                int64_t* pDestFastEnd = &pDestFast[len / 8];
                 while (pDestFast != pDestFastEnd) {
                     __m128i m0 = _mm_castpd_si128(_mm_cmp_pd(m5, LOADU(pSrc2Fast + 0), COMP_OPCODE));
                     __m128i m1 = _mm_castpd_si128(_mm_cmp_pd(m5, LOADU(pSrc2Fast + 1), COMP_OPCODE));
@@ -658,8 +658,8 @@ static void CompareDouble(void* pDataIn, void* pDataIn2, void* pDataOut, int64_t
                     __m128d m5 = _mm_set1_pd(*(double*)pDataIn2);
                     int8_t* pEnd = (int8_t*)pDataOut + len;
 
-                    INT64* pDestFast = (INT64*)pDataOut;
-                    INT64* pDestFastEnd = &pDestFast[len / 8];
+                    int64_t* pDestFast = (int64_t*)pDataOut;
+                    int64_t* pDestFastEnd = &pDestFast[len / 8];
                     while (pDestFast != pDestFastEnd) {
                         __m128i m0 = _mm_castpd_si128(_mm_cmp_pd(LOADU(pSrc1Fast + 0), m5, COMP_OPCODE));
                         __m128i m1 = _mm_castpd_si128(_mm_cmp_pd(LOADU(pSrc1Fast + 1), m5, COMP_OPCODE));
@@ -693,10 +693,10 @@ static void CompareDouble(void* pDataIn, void* pDataIn2, void* pDataOut, int64_t
                         // Normal path, data not the same
                         const __m128d* pSrc1Fast = (const __m128d*)pDataIn;
                         const __m128d* pSrc2Fast = (const __m128d*)pDataIn2;
-                        INT64* pDestFast = (INT64*)pDataOut;
+                        int64_t* pDestFast = (int64_t*)pDataOut;
                         int8_t* pEnd = (int8_t*)pDataOut + len;
 
-                        INT64* pDestFastEnd = &pDestFast[len / 8];
+                        int64_t* pDestFastEnd = &pDestFast[len / 8];
                         while (pDestFast != pDestFastEnd) {
                             // the shuffle will move all 8 comparisons together
                             __m128i m0 = _mm_castpd_si128(_mm_cmp_pd(LOADU(pSrc1Fast + 0), LOADU(pSrc2Fast + 0), COMP_OPCODE));
@@ -729,10 +729,10 @@ static void CompareDouble(void* pDataIn, void* pDataIn2, void* pDataOut, int64_t
                     else {
                         // Same comparison
                         const __m128d* pSrc1Fast = (const __m128d*)pDataIn;
-                        INT64* pDestFast = (INT64*)pDataOut;
+                        int64_t* pDestFast = (int64_t*)pDataOut;
                         int8_t* pEnd = (int8_t*)pDataOut + len;
 
-                        INT64* pDestFastEnd = &pDestFast[len / 8];
+                        int64_t* pDestFastEnd = &pDestFast[len / 8];
                         while (pDestFast != pDestFastEnd) {
                             // the shuffle will move all 8 comparisons together
                             __m128d m0 = LOADU(pSrc1Fast + 0);
