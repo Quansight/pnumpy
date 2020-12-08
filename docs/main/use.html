@@ -74,21 +74,27 @@ loops are in a state of flux at this time, this is disabled for version
 </dd></dl>
 
 <dl class="py function">
+<dt id="pnumpy.atop_info">
+<code class="sig-prename descclassname">pnumpy.</code><code class="sig-name descname">atop_info</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#pnumpy.atop_info" title="Permalink to this definition">¶</a></dt>
+<dd><p>return dict</p>
+</dd></dl>
+
+<dl class="py function">
 <dt id="pnumpy.atop_isenabled">
 <code class="sig-prename descclassname">pnumpy.</code><code class="sig-name descname">atop_isenabled</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#pnumpy.atop_isenabled" title="Permalink to this definition">¶</a></dt>
 <dd><p>returns True if atop enabled, else False</p>
 </dd></dl>
 
 <dl class="py function">
-<dt id="pnumpy.cpustring">
-<code class="sig-prename descclassname">pnumpy.</code><code class="sig-name descname">cpustring</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#pnumpy.cpustring" title="Permalink to this definition">¶</a></dt>
-<dd><p>Cpu brand string plus features</p>
+<dt id="pnumpy.atop_setworkers">
+<code class="sig-prename descclassname">pnumpy.</code><code class="sig-name descname">atop_setworkers</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#pnumpy.atop_setworkers" title="Permalink to this definition">¶</a></dt>
+<dd><p>set workers for a func</p>
 </dd></dl>
 
 <dl class="py function">
-<dt id="pnumpy.initialize">
-<code class="sig-prename descclassname">pnumpy.</code><code class="sig-name descname">initialize</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#pnumpy.initialize" title="Permalink to this definition">¶</a></dt>
-<dd><p>Initialize the module. Replaces all the ufunc inner loops with a new versionusing <code class="docutils literal notranslate"><span class="pre">PyUFunc_ReplaceLoopBySignature</span></code>. If none of the other options areenabled, the original inner loop function will be called. Will also call``numpy.setbufsize(8192 * 1024)`` to work around numpy issue 17649.</p>
+<dt id="pnumpy.cpustring">
+<code class="sig-prename descclassname">pnumpy.</code><code class="sig-name descname">cpustring</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#pnumpy.cpustring" title="Permalink to this definition">¶</a></dt>
+<dd><p>Cpu brand string plus features</p>
 </dd></dl>
 
 <dl class="py function">
