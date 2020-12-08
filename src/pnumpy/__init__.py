@@ -137,6 +137,7 @@ def benchmark(
     print("a==5 ", debug_benchmark(np.equal, ctypes=ctypes, scalar=True, unary=False, recycle=recycle, atop=atop, thread=thread, outdtype='?', sizes=sizes))
     print("a + b", debug_benchmark(np.add, ctypes=ctypes, scalar=False, unary=False,recycle=recycle, atop=atop, thread=thread, sizes=sizes))
     print("a + 5", debug_benchmark(np.add, ctypes=ctypes, scalar=True, unary=False,recycle=recycle, atop=atop, thread=thread, sizes=sizes))
+    print("a // 5", debug_benchmark(np.true_divide, ctypes=ctypes, scalar=True, unary=False,recycle=recycle, atop=atop, thread=thread, sizes=sizes))
     print("abs  ", debug_benchmark(np.abs, ctypes=ctypes, scalar=False, unary=True,recycle=recycle, atop=atop, thread=thread, sizes=sizes))
     print("isnan", debug_benchmark(np.isnan, ctypes=ctypes, scalar=False, unary=True,recycle=recycle, atop=atop, thread=thread, sizes=sizes))
     print("sin",   debug_benchmark(np.sin, ctypes=ctypes, scalar=False, unary=True,recycle=recycle, atop=atop, thread=thread, sizes=sizes))

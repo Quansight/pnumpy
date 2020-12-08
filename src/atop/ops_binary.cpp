@@ -92,10 +92,10 @@ template<typename T> static const inline __m256d HYPOT_OP_256(__m256d x, __m256d
 //=========================================================================================
 static const inline __m256  ADD_OP_256f32(__m256 x, __m256 y) {
     // NOTE: on MSVC compiler mm256_add emits another function, trying to shift and add
-    __m128 m0=_mm_add_ps(_mm256_extractf128_ps(x, 0), _mm256_extractf128_ps(y, 0));
-    __m128 m1 = _mm_add_ps(_mm256_extractf128_ps(x, 1), _mm256_extractf128_ps(y, 1));
-    return _mm256_set_m128(m1, m0);
-    //return _mm256_add_ps(x, y);
+    //__m128 m0=_mm_add_ps(_mm256_extractf128_ps(x, 0), _mm256_extractf128_ps(y, 0));
+    //__m128 m1 = _mm_add_ps(_mm256_extractf128_ps(x, 1), _mm256_extractf128_ps(y, 1));
+    //return _mm256_set_m128(m1, m0);
+    return _mm256_add_ps(x, y);
 }
 
 static const inline __m256d ADD_OP_256f64(__m256d x, __m256d y) { return _mm256_add_pd(x, y); }
