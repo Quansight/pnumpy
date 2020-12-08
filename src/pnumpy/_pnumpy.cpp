@@ -970,12 +970,15 @@ void AddToDict(const char* ufunc_name, int dtype, void* pstUFunc) {
     PyDict_SetItem(gpUnaryDict, pTuple, PyLong_FromLongLong((long long)pstUFunc));
 }
 
+// return NULL or pointer to stUFunc
 stUFunc* GetFromDict(const char* ufunc_name, int dtype) {
     // Create a tuple pair of ufuncname/dtype
     if (gpUnaryDict) {
         PyObject* pTuple = PyTuple_New(2);
         PyTuple_SetItem(pTuple, 0, PyUnicode_FromString(ufunc_name));
         PyTuple_SetItem(pTuple, 1, PyLong_FromLong(dtype));
+
+        // borrows a reference
         PyObject* pAnswer=PyDict_GetItem(gpUnaryDict, pTuple);
         Py_DecRef(pTuple);
         if (pAnswer) {
@@ -1245,6 +1248,7 @@ extern "C"
 // Takes 0 params
 // or takes 2 params: string func name, dtype num
 // example: atop_info('add',11)
+// or no params to return dict
 PyObject * atop_info(PyObject * self, PyObject * args) {
     if (g_Settings.AtopEnabled) {
 
@@ -1287,17 +1291,12 @@ PyObject * atop_setworkers(PyObject * self, PyObject * args) {
         int dtype = 0;
         int workers = 0;
 
-        // If no params passed, just return the dict
-        if (PyTuple_Size(args) == 0) {
-            Py_IncRef(gpUnaryDict);
-            return gpUnaryDict;
-        }
         if (!PyArg_ParseTuple(args, "sii:atop_setworkers", &uname, &dtype, &workers)) {
             return NULL;
         }
         stUFunc* pstUFunc = GetFromDict(uname, dtype);
         if (pstUFunc) {
-            if (workers > 0 && workers < 64) {
+            if (workers >= 0 && workers < 64) {
                 int32_t prevVal = pstUFunc->MaxThreads;
                 pstUFunc->MaxThreads = workers;
                 return PyLong_FromLong(prevVal);

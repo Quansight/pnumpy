@@ -496,10 +496,10 @@ static inline void UnaryNanFastDouble(MathFunctionPtr MATH_OP, void* pDataIn, vo
     if (sizeof(bool) == strideOut && sizeof(T) == strideIn && len >= chunkSize) {
 
         const __m128d* pSrc1Fast = (const __m128d*)pDataIn;
-        INT64* pDestFast = (INT64*)pDataOut;
+        int64_t* pDestFast = (int64_t*)pDataOut;
         int8_t* pEnd = (int8_t*)pDataOut + len;
 
-        INT64* pDestFastEnd = &pDestFast[len / 8];
+        int64_t* pDestFastEnd = &pDestFast[len / 8];
         while (pDestFast != pDestFastEnd) {
             // the shuffle will move all 8 comparisons together
             __m128d m0 = _mm_loadu_pd((const double*)(pSrc1Fast + 0));
