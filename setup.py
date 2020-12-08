@@ -29,7 +29,7 @@ else:
     LFLAGS = ''
 
 if platform.system() == 'Windows':
-    CFLAGS += ' /Ox /Ob2 /Oi /Ot /d2FH4-'
+    CFLAGS += ' /Ox /Ob2 /Oi /Ot /d2FH4- /GS- /arch:AVX2'
 else:
     CFLAGS += ' -mavx2 -fpermissive -Wno-unused-variable -Wno-unused-function -std=c++11 -pthread -falign-functions=32'
 
