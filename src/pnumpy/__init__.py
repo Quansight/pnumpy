@@ -49,6 +49,7 @@ def debug_timeit(
     ctypes=[np.bool, np.int8, np.int16, np.int32, np.int64, np.float32, np.float64],
     scalar=False,
     unary = False,
+    reduct = False,
     outdtype=None,
     recycle=True,
     sizes=[1_000_000]):
@@ -61,9 +62,9 @@ def debug_timeit(
         mtimedelta = np.zeros(loop_size, np.int64)
         for c in ctypes:
             if c is np.bool:
-               a=np.arange(s, dtype=np.int8).astype(c)
+               a=np.arange(s, dtype=np.int8).astype(c) + 1
             else:
-               a=np.arange(s, dtype=c)
+               a=np.arange(s, dtype=c) + 1
             if scalar is True:
                 b=a[len(a)//2]
             else:
@@ -72,9 +73,9 @@ def debug_timeit(
             c = None
             if recycle:
                 if outdtype is None:
-                    c=np.zeros(s, dtype=c)
+                    c=np.ones(s, dtype=c)
                 else:
-                    c=np.zeros(s, dtype=outdtype)
+                    c=np.ones(s, dtype=outdtype)
 
             for loop in range(loop_size):
                 if unary is False:
@@ -82,11 +83,19 @@ def debug_timeit(
                     func(a,b,out=c)
                     delta= timer_gettsc() - starttime
                 else:
-                    starttime = timer_gettsc()
-                    func(a,out=c)
-                    delta= timer_gettsc() - starttime
+                    if reduct is True:
+                        starttime = timer_gettsc()
+                        func(a)
+                        delta= timer_gettsc() - starttime
+                    else:
+                        starttime = timer_gettsc()
+                        func(a,out=c)
+                        delta= timer_gettsc() - starttime
+
                 mtimedelta[loop] = delta
-            timedelta[slot] = np.median(mtimedelta)
+            # skip first
+            timedelta[slot] = np.median(mtimedelta[1:])
+            # print("median is ", timedelta[slot], slot)
             slot = slot + 1
     return timedelta
 
@@ -96,21 +105,25 @@ def debug_benchmark(
     ctypes=[np.bool, np.int8, np.int16, np.int32, np.int64, np.float32, np.float64],
     scalar=False,
     unary = False,
+    reduct = False,
     outdtype=None,
     recycle=True,
     atop=True,
     thread=True,
     sizes=[1_000_000]):
 
+    # disable atop and threading
     atop_disable()
     thread_disable()
     # get original time
-    t0=debug_timeit(func=func, ctypes=ctypes, scalar=scalar, unary=unary, outdtype=outdtype, recycle=recycle, sizes=sizes)
+    t0=debug_timeit(func=func, ctypes=ctypes, scalar=scalar, unary=unary, reduct=reduct,  outdtype=outdtype, recycle=recycle, sizes=sizes)
+
+    # now possibly enable atop and threading
     if atop:
         atop_enable()
     if thread:
         thread_enable()
-    t1=debug_timeit(func=func, ctypes=ctypes, scalar=scalar, unary=unary, outdtype=outdtype, recycle=recycle, sizes=sizes)
+    t1=debug_timeit(func=func, ctypes=ctypes, scalar=scalar, unary=unary, reduct=reduct, outdtype=outdtype, recycle=recycle, sizes=sizes)
     return t0/t1
 
 def benchmark(
@@ -125,7 +138,11 @@ def benchmark(
     print("a + b", debug_benchmark(np.add, ctypes=ctypes, scalar=False, unary=False,recycle=recycle, atop=atop, thread=thread, sizes=sizes))
     print("a + 5", debug_benchmark(np.add, ctypes=ctypes, scalar=True, unary=False,recycle=recycle, atop=atop, thread=thread, sizes=sizes))
     print("abs  ", debug_benchmark(np.abs, ctypes=ctypes, scalar=False, unary=True,recycle=recycle, atop=atop, thread=thread, sizes=sizes))
-    print("isnan", debug_benchmark(np.abs, ctypes=ctypes, scalar=False, unary=True,recycle=recycle, atop=atop, thread=thread, sizes=sizes))
+    print("isnan", debug_benchmark(np.isnan, ctypes=ctypes, scalar=False, unary=True,recycle=recycle, atop=atop, thread=thread, sizes=sizes))
+    print("sin",   debug_benchmark(np.sin, ctypes=ctypes, scalar=False, unary=True,recycle=recycle, atop=atop, thread=thread, sizes=sizes))
+    print("log",   debug_benchmark(np.log, ctypes=ctypes, scalar=False, unary=True,recycle=recycle, atop=atop, thread=thread, sizes=sizes))
+    print("sum",   debug_benchmark(np.sum, ctypes=ctypes, scalar=False, reduct=True, unary=True,recycle=recycle, atop=atop, thread=thread, sizes=sizes))
+    print("min",   debug_benchmark(np.min, ctypes=ctypes, scalar=False, reduct=True, unary=True,recycle=recycle, atop=atop, thread=thread, sizes=sizes))
 
 def initialize():
     import platform
