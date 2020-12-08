@@ -66,7 +66,7 @@ def debug_timeit(
             else:
                a=np.arange(s, dtype=c) + 1
             if scalar is True:
-                b=a[len(a)//2]
+                b=a[5]
             else:
                 b=a.copy()
 
