@@ -467,9 +467,9 @@ static void CompareFloat(void* pDataIn, void* pDataIn2, void* pDataOut, int64_t 
                 while (pDestFast != pDestFastEnd) {
                     __m256i m0 = _mm256_castps_si256(_mm256_cmp_ps(m5, LOADU(pSrc2Fast + 0), COMP_OPCODE));
                     __m256i m1 = _mm256_castps_si256(_mm256_cmp_ps(m5, LOADU(pSrc2Fast + 1), COMP_OPCODE));
+                    m0 = _mm256_packs_epi32(m0, m1);
                     __m256i m2 = _mm256_castps_si256(_mm256_cmp_ps(m5, LOADU(pSrc2Fast + 2), COMP_OPCODE));
                     __m256i m3 = _mm256_castps_si256(_mm256_cmp_ps(m5, LOADU(pSrc2Fast + 3), COMP_OPCODE));
-                    m0 = _mm256_packs_epi32(m0, m1);
                     m2 = _mm256_packs_epi32(m2, m3);
                     m0 = _mm256_packs_epi16(m0, m2);
 
@@ -500,9 +500,9 @@ static void CompareFloat(void* pDataIn, void* pDataIn2, void* pDataOut, int64_t 
                 while (pDestFast != pDestFastEnd) {
                     __m256i m0 = _mm256_castps_si256(_mm256_cmp_ps(LOADU(pSrc1Fast + 0), m5, COMP_OPCODE));
                     __m256i m1 = _mm256_castps_si256(_mm256_cmp_ps(LOADU(pSrc1Fast + 1), m5, COMP_OPCODE));
+                    m0 = _mm256_packs_epi32(m0, m1);
                     __m256i m2 = _mm256_castps_si256(_mm256_cmp_ps(LOADU(pSrc1Fast + 2), m5, COMP_OPCODE));
                     __m256i m3 = _mm256_castps_si256(_mm256_cmp_ps(LOADU(pSrc1Fast + 3), m5, COMP_OPCODE));
-                    m0 = _mm256_packs_epi32(m0, m1);
                     m2 = _mm256_packs_epi32(m2, m3);
                     m0 = _mm256_packs_epi16(m0, m2);
 
@@ -535,9 +535,9 @@ static void CompareFloat(void* pDataIn, void* pDataIn2, void* pDataOut, int64_t 
                         // the shuffle will move all 8 comparisons together
                         __m256i m0 = _mm256_castps_si256(_mm256_cmp_ps(LOADU(pSrc1Fast + 0), LOADU(pSrc2Fast + 0), COMP_OPCODE));
                         __m256i m1 = _mm256_castps_si256(_mm256_cmp_ps(LOADU(pSrc1Fast + 1), LOADU(pSrc2Fast + 1), COMP_OPCODE));
+                        m0 = _mm256_packs_epi32(m0, m1);
                         __m256i m2 = _mm256_castps_si256(_mm256_cmp_ps(LOADU(pSrc1Fast + 2), LOADU(pSrc2Fast + 2), COMP_OPCODE));
                         __m256i m3 = _mm256_castps_si256(_mm256_cmp_ps(LOADU(pSrc1Fast + 3), LOADU(pSrc2Fast + 3), COMP_OPCODE));
-                        m0 = _mm256_packs_epi32(m0, m1);
                         m2 = _mm256_packs_epi32(m2, m3);
                         m0 = _mm256_packs_epi16(m0, m2);
                         STOREU(pDestFast, _mm256_and_si256(_mm256_permutevar8x32_epi32(m0, g_permute), g_ones));
@@ -568,11 +568,11 @@ static void CompareFloat(void* pDataIn, void* pDataIn2, void* pDataOut, int64_t 
                         __m256i m10 = _mm256_castps_si256(_mm256_cmp_ps(m0, m0, COMP_OPCODE));
                         __m256 m1 = LOADU(pSrc1Fast + 1);
                         __m256i m11 = _mm256_castps_si256(_mm256_cmp_ps(m1, m1, COMP_OPCODE));
+                        m10 = _mm256_packs_epi32(m10, m11);
                         __m256 m2 = LOADU(pSrc1Fast + 2);
                         __m256i m12 = _mm256_castps_si256(_mm256_cmp_ps(m2, m2, COMP_OPCODE));
                         __m256 m3 = LOADU(pSrc1Fast + 3);
                         __m256i m13 = _mm256_castps_si256(_mm256_cmp_ps(m3, m3, COMP_OPCODE));
-                        m10 = _mm256_packs_epi32(m10, m11);
                         m12 = _mm256_packs_epi32(m12, m13);
                         m10 = _mm256_packs_epi16(m10, m12);
                         STOREU(pDestFast, _mm256_and_si256(_mm256_permutevar8x32_epi32(m10, g_permute), g_ones));

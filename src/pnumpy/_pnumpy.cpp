@@ -1221,7 +1221,11 @@ PyObject* newinit(PyObject* self, PyObject* args, PyObject* kwargs) {
 
         RETURN_NONE;
     }
-    return PyErr_Format(PyExc_ImportError, "atop was either already loaded or failed to load");
+
+    if (g_avx2) {
+        return PyErr_Format(PyExc_ImportError, "atop failed to load and may not be supported on this system.");
+    }
+    RETURN_NONE;
 }
 
 extern "C"

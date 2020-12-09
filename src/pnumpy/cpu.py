@@ -2,6 +2,8 @@ import os
 import sys
 import re
 import glob
+__all__ = [
+    'cpu_count_linux']
 
 # NOTE: code adapted from psinfo
 
