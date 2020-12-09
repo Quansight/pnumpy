@@ -452,11 +452,11 @@ static inline void UnaryNanFastFloat(MathFunctionPtr MATH_OP, void* pDataIn, voi
             __m256i m10 = _mm256_castps_si256(_mm256_cmp_ps(m0, m0, _CMP_NEQ_UQ));
             __m256 m1 = _mm256_loadu_ps((const float*)(pSrc1Fast + 1));
             __m256i m11 = _mm256_castps_si256(_mm256_cmp_ps(m1, m1, _CMP_NEQ_UQ));
+            m10 = _mm256_packs_epi32(m10, m11);
             __m256 m2 = _mm256_loadu_ps((const float*)(pSrc1Fast + 2));
             __m256i m12 = _mm256_castps_si256(_mm256_cmp_ps(m2, m2, _CMP_NEQ_UQ));
             __m256 m3 = _mm256_loadu_ps((const float*)(pSrc1Fast + 3));
             __m256i m13 = _mm256_castps_si256(_mm256_cmp_ps(m3, m3, _CMP_NEQ_UQ));
-            m10 = _mm256_packs_epi32(m10, m11);
             m12 = _mm256_packs_epi32(m12, m13);
             m10 = _mm256_packs_epi16(m10, m12);
             STOREU(pDestFast, _mm256_and_si256(_mm256_permutevar8x32_epi32(m10, g_permute), g_ones));
