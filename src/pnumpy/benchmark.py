@@ -21,17 +21,39 @@ def benchmark_timeit(
     recycle=True,
     sizes=[1_000_000]):
 
+    def time_func(recycle, c):
+        if unary is False:
+            starttime = timer_gettsc()
+            if recycle:
+                result=func(a,b,out=c)
+            else:
+                result=func(a,b)
+            delta= timer_gettsc() - starttime
+
+        else:
+            starttime = timer_gettsc()
+            if reduct is True:
+                result=func(a)
+            else:
+                if recycle:
+                    result=func(a,out=c)
+                else:
+                    result=func(a)
+
+            delta= timer_gettsc() - starttime
+        return delta, result
+
     timedelta = np.zeros(len(ctypes), np.int64)
     
     for s in sizes:
         slot = 0
         loop_size = 100
         mtimedelta = np.zeros(loop_size, np.int64)
-        for c in ctypes:
-            if c is np.bool:
-               a=np.arange(s, dtype=np.int8).astype(c)+1
+        for ctype in ctypes:
+            if ctype is np.bool:
+               a=np.arange(s, dtype=np.int8).astype(ctype)+1
             else:
-               a=np.arange(s, dtype=c)
+               a=np.arange(s, dtype=ctype)
                a=a % 253
                a+=1
 
@@ -40,31 +62,17 @@ def benchmark_timeit(
             else:
                 b=a.copy()
 
-            c = None
-            if recycle:
-                if outdtype is None:
-                    c=np.ones(s, dtype=c)
-                else:
-                    c=np.ones(s, dtype=outdtype)
+            # dry run
+            delta, c=time_func(False, None)
 
+            # main timing loop
             for loop in range(loop_size):
-                if unary is False:
-                    starttime = timer_gettsc()
-                    func(a,b,out=c)
-                    delta= timer_gettsc() - starttime
-                else:
-                    if reduct is True:
-                        starttime = timer_gettsc()
-                        func(a)
-                        delta= timer_gettsc() - starttime
-                    else:
-                        starttime = timer_gettsc()
-                        func(a,out=c)
-                        delta= timer_gettsc() - starttime
+                delta, result = time_func(recycle, c)
+                del result
 
                 mtimedelta[loop] = delta
-            # skip first
-            timedelta[slot] = np.median(mtimedelta[1:])
+            
+            timedelta[slot] = np.median(mtimedelta)
             # print("median is ", timedelta[slot], slot)
             slot = slot + 1
     return timedelta
