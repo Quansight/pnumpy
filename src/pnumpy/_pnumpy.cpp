@@ -1056,8 +1056,8 @@ PyObject* newinit(PyObject* self, PyObject* args, PyObject* kwargs) {
                     //printf("ufunc %s %d  to  %d  atype:%d  dtype:%d\n", ufunc_name, signature[2], out_dtype, atype, dtype);
 
                     // Check for problem with two int32 depending on OS
-                    if (signature[0] >= 5 && signature[0] <= 8) {
-                        if (out_dtype >= 5 && out_dtype <= 8) {
+                    if (signature[0] >= 5 && signature[0] <= 10) {
+                        if (out_dtype >= 5 && out_dtype <= 10) {
                             out_dtype = signature[0];
                         }
                     }
@@ -1112,8 +1112,8 @@ PyObject* newinit(PyObject* self, PyObject* args, PyObject* kwargs) {
                 int out_dtype = convert_atop_to_dtype[signature[2]];
 
                 // Check for problem with two int32 depending on OS
-                if (signature[0] >= 5 && signature[0] <= 8) {
-                    if (out_dtype  >= 5 && out_dtype <= 8) {
+                if (signature[0] >= 5 && signature[0] <= 10) {
+                    if (out_dtype  >= 5 && out_dtype <= 10) {
                         out_dtype = signature[0];
                     }
                 }
@@ -1167,8 +1167,8 @@ PyObject* newinit(PyObject* self, PyObject* args, PyObject* kwargs) {
                     int out_dtype = convert_atop_to_dtype[signature[1]];
 
                     // Check for problem with two int32 depending on OS
-                    if (signature[0] >= 5 && signature[0] <= 8) {
-                        if (out_dtype >=5 && out_dtype <= 8) {
+                    if (signature[0] >= 5 && signature[0] <= 10) {
+                        if (out_dtype >=5 && out_dtype <= 10) {
                             out_dtype = signature[0];
                         }
                     }

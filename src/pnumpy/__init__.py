@@ -33,22 +33,24 @@ __all__ = [
     'ledger_enable', 'ledger_disable', 'ledger_isenabled', 'ledger_info',
     'recycler_enable', 'recycler_disable', 'recycler_isenabled', 'recycler_info',
     'timer_gettsc','timer_getutc']
-
+import pnumpy._pnumpy as _pnumpy
 from pnumpy._pnumpy import atop_enable, atop_disable, atop_isenabled, atop_info, atop_setworkers, cpustring 
 from pnumpy._pnumpy import thread_enable, thread_disable, thread_isenabled, thread_getworkers, thread_setworkers, thread_zigzag
 from pnumpy._pnumpy import timer_gettsc, timer_getutc
 from pnumpy._pnumpy import ledger_enable, ledger_disable, ledger_isenabled, ledger_info
 from pnumpy._pnumpy import recycler_enable, recycler_disable, recycler_isenabled, recycler_info
-from pnumpy._pnumpy import initialize as _initialize
 
 from .benchmark import benchmark, benchmark_func
 
-def initialize():
+def init():
     import platform
     if platform.system() == 'Linux':
         from .cpu import cpu_count_linux
         logical,physical = cpu_count_linux()
-        _initialize()
+        _pnumpy.initialize()
     else:
-        _initialize()
+        _pnumpy.initialize()
+
+def initialize():
+    init()
 

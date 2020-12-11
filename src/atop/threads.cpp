@@ -113,7 +113,7 @@ WorkerThreadFunction(void* lpParam)
             stMATH_WORKER_ITEM* pWorkItem = pWorkerRing->GetExistingWorkItem();
 
             // check if the work was for our thread
-            if (core <= pWorkItem->ThreadWakeup) {
+            if ((int64_t)core <= pWorkItem->ThreadWakeup) {
                 LOGGING("Pos Waking %d %d %lld\n", core, pool, workIndex);
                 didSomeWork = pWorkItem->DoWork(core, pWorkerRing->MainWorkIndex);
             }

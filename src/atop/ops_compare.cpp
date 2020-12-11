@@ -57,12 +57,11 @@ inline __m256d LOADU(const __m256d* x) { return _mm256_loadu_pd((double const*)x
 inline __m256 LOADU(const __m256* x) { return _mm256_loadu_ps((float const*)x); };
 inline __m256i LOADU(const __m256i* x) { return _mm256_loadu_si256((__m256i const*)x); };
 
-inline __m128d LOADU(const __m128d* x) { return _mm_loadu_pd((double const*)x); };
-inline __m128 LOADU(const __m128* x) { return _mm_loadu_ps((float const*)x); };
-inline __m128i LOADU(const __m128i* x) { return _mm_loadu_si128((__m128i const*)x); };
-
 #endif
 
+inline __m128d LOADU128(const __m128d* x) { return _mm_loadu_pd((double const*)x); };
+inline __m128 LOADU128(const __m128* x) { return _mm_loadu_ps((float const*)x); };
+inline __m128i LOADU128(const __m128i* x) { return _mm_loadu_si128((__m128i const*)x); };
 
 // For unsigned... (have not done yet) ---------------------------------------------------------
 #define _mm_cmpge_epu8(a, b) _mm_cmpeq_epi8(_mm_max_epu8(a, b), a)
@@ -625,12 +624,12 @@ static void CompareDouble(void* pDataIn, void* pDataIn2, void* pDataOut, int64_t
                 int64_t* pDestFast = (int64_t*)pDataOut;
                 int64_t* pDestFastEnd = &pDestFast[len / 8];
                 while (pDestFast != pDestFastEnd) {
-                    __m128i m0 = _mm_castpd_si128(_mm_cmp_pd(m5, LOADU(pSrc2Fast + 0), COMP_OPCODE));
-                    __m128i m1 = _mm_castpd_si128(_mm_cmp_pd(m5, LOADU(pSrc2Fast + 1), COMP_OPCODE));
+                    __m128i m0 = _mm_castpd_si128(_mm_cmp_pd(m5, LOADU128(pSrc2Fast + 0), COMP_OPCODE));
+                    __m128i m1 = _mm_castpd_si128(_mm_cmp_pd(m5, LOADU128(pSrc2Fast + 1), COMP_OPCODE));
                     m0 = _mm_packs_epi32(m0, m1);
 
-                    __m128i m2 = _mm_castpd_si128(_mm_cmp_pd(m5, LOADU(pSrc2Fast + 2), COMP_OPCODE));
-                    __m128i m3 = _mm_castpd_si128(_mm_cmp_pd(m5, LOADU(pSrc2Fast + 3), COMP_OPCODE));
+                    __m128i m2 = _mm_castpd_si128(_mm_cmp_pd(m5, LOADU128(pSrc2Fast + 2), COMP_OPCODE));
+                    __m128i m3 = _mm_castpd_si128(_mm_cmp_pd(m5, LOADU128(pSrc2Fast + 3), COMP_OPCODE));
                     m2 = _mm_packs_epi32(m2, m3);
                     m0 = _mm_packs_epi16(m0, m2);
                     m0 = _mm_packs_epi16(m0, m0);
@@ -661,12 +660,12 @@ static void CompareDouble(void* pDataIn, void* pDataIn2, void* pDataOut, int64_t
                     int64_t* pDestFast = (int64_t*)pDataOut;
                     int64_t* pDestFastEnd = &pDestFast[len / 8];
                     while (pDestFast != pDestFastEnd) {
-                        __m128i m0 = _mm_castpd_si128(_mm_cmp_pd(LOADU(pSrc1Fast + 0), m5, COMP_OPCODE));
-                        __m128i m1 = _mm_castpd_si128(_mm_cmp_pd(LOADU(pSrc1Fast + 1), m5, COMP_OPCODE));
+                        __m128i m0 = _mm_castpd_si128(_mm_cmp_pd(LOADU128(pSrc1Fast + 0), m5, COMP_OPCODE));
+                        __m128i m1 = _mm_castpd_si128(_mm_cmp_pd(LOADU128(pSrc1Fast + 1), m5, COMP_OPCODE));
                         m0 = _mm_packs_epi32(m0, m1);
 
-                        __m128i m2 = _mm_castpd_si128(_mm_cmp_pd(LOADU(pSrc1Fast + 2), m5, COMP_OPCODE));
-                        __m128i m3 = _mm_castpd_si128(_mm_cmp_pd(LOADU(pSrc1Fast + 3), m5, COMP_OPCODE));
+                        __m128i m2 = _mm_castpd_si128(_mm_cmp_pd(LOADU128(pSrc1Fast + 2), m5, COMP_OPCODE));
+                        __m128i m3 = _mm_castpd_si128(_mm_cmp_pd(LOADU128(pSrc1Fast + 3), m5, COMP_OPCODE));
                         m2 = _mm_packs_epi32(m2, m3);
                         m0 = _mm_packs_epi16(m0, m2);
                         m0 = _mm_packs_epi16(m0, m0);
@@ -699,11 +698,11 @@ static void CompareDouble(void* pDataIn, void* pDataIn2, void* pDataOut, int64_t
                         int64_t* pDestFastEnd = &pDestFast[len / 8];
                         while (pDestFast != pDestFastEnd) {
                             // the shuffle will move all 8 comparisons together
-                            __m128i m0 = _mm_castpd_si128(_mm_cmp_pd(LOADU(pSrc1Fast + 0), LOADU(pSrc2Fast + 0), COMP_OPCODE));
-                            __m128i m1 = _mm_castpd_si128(_mm_cmp_pd(LOADU(pSrc1Fast + 1), LOADU(pSrc2Fast + 1), COMP_OPCODE));
+                            __m128i m0 = _mm_castpd_si128(_mm_cmp_pd(LOADU128(pSrc1Fast + 0), LOADU128(pSrc2Fast + 0), COMP_OPCODE));
+                            __m128i m1 = _mm_castpd_si128(_mm_cmp_pd(LOADU128(pSrc1Fast + 1), LOADU128(pSrc2Fast + 1), COMP_OPCODE));
                             m0 = _mm_packs_epi32(m0, m1);
-                            __m128i m2 = _mm_castpd_si128(_mm_cmp_pd(LOADU(pSrc1Fast + 2), LOADU(pSrc2Fast + 2), COMP_OPCODE));
-                            __m128i m3 = _mm_castpd_si128(_mm_cmp_pd(LOADU(pSrc1Fast + 3), LOADU(pSrc2Fast + 3), COMP_OPCODE));
+                            __m128i m2 = _mm_castpd_si128(_mm_cmp_pd(LOADU128(pSrc1Fast + 2), LOADU128(pSrc2Fast + 2), COMP_OPCODE));
+                            __m128i m3 = _mm_castpd_si128(_mm_cmp_pd(LOADU128(pSrc1Fast + 3), LOADU128(pSrc2Fast + 3), COMP_OPCODE));
                             m2 = _mm_packs_epi32(m2, m3);
                             m0 = _mm_packs_epi16(m0, m2);
                             m0 = _mm_packs_epi16(m0, m0);
@@ -735,15 +734,15 @@ static void CompareDouble(void* pDataIn, void* pDataIn2, void* pDataOut, int64_t
                         int64_t* pDestFastEnd = &pDestFast[len / 8];
                         while (pDestFast != pDestFastEnd) {
                             // the shuffle will move all 8 comparisons together
-                            __m128d m0 = LOADU(pSrc1Fast + 0);
+                            __m128d m0 = LOADU128(pSrc1Fast + 0);
                             __m128i m10 = _mm_castpd_si128(_mm_cmp_pd(m0, m0, COMP_OPCODE));
-                            __m128d m1 = LOADU(pSrc1Fast + 1);
+                            __m128d m1 = LOADU128(pSrc1Fast + 1);
                             __m128i m11 = _mm_castpd_si128(_mm_cmp_pd(m1, m1, COMP_OPCODE));
                             m10 = _mm_packs_epi32(m10, m11);
 
-                            __m128d m2 = LOADU(pSrc1Fast + 2);
+                            __m128d m2 = LOADU128(pSrc1Fast + 2);
                             __m128i m12 = _mm_castpd_si128(_mm_cmp_pd(m2, m2, COMP_OPCODE));
-                            __m128d m3 = LOADU(pSrc1Fast + 3);
+                            __m128d m3 = LOADU128(pSrc1Fast + 3);
                             __m128i m13 = _mm_castpd_si128(_mm_cmp_pd(m3, m3, COMP_OPCODE));
                             m12 = _mm_packs_epi32(m12, m13);
 
