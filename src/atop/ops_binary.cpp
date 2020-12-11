@@ -63,6 +63,23 @@ template<typename T> static const inline T MinOp(T x, T y) { return x < y? x : y
 template<typename T> static const inline T MaxOp(T x, T y) { return x > y? x : y; }
 template<typename T> static const inline double DivOp(T x, T y) { return (double)x / (double)y; }
 template<typename T> static const inline float DivOp(float x, T y) { return x / y; }
+template<typename T> static const inline long double DivOp(long double x, T y) { return x / y; }
+
+template<typename T> static const inline T FloorDivOp(T x, T y) {
+    if (y != 0) {
+        if ((x < 0) == (y < 0))
+            return x / y;
+
+        T q = x / y;
+        T r = x % y;
+        if (r != 0)  --q;
+        return q;
+    }
+    else return 0;
+}
+template<typename T> static const inline long double FloorDivOp(long double x, long double y) { if (y == y) return floorl(x / y); else return NAN; }
+template<typename T> static const inline double FloorDivOp(double x, double y) { if (y == y) return floor(x / y); else return NAN; }
+template<typename T> static const inline float FloorDivOp(float x, float y) { if (y == y) return floorf(x / y); else return NAN; }
 
 // bitwise operations
 template<typename T> static const inline T AndOp(T x, T y) { return x & y; }
@@ -326,6 +343,54 @@ inline void ReduceMathOpFastUpcast(void* pDataIn1X, void* pDataOutX, void* pStar
     }
 }
 
+
+//=====================================================================================================
+// Not symmetric -- arg1 must be first, arg2 must be second
+template<typename T, const T MATH_OP(T, T)>
+inline void SimpleMathOpSlow(void* pDataIn1X, void* pDataIn2X, void* pDataOutX, int64_t datalen, int64_t strideIn1, int64_t strideIn2, int64_t strideOut) {
+    T* pDataOut = (T*)pDataOutX;
+    T* pDataIn1 = (T*)pDataIn1X;
+    T* pDataIn2 = (T*)pDataIn2X;
+
+    if (strideOut == sizeof(T)) {
+
+        LOGGING("mathopslow datalen %llu  \n", datalen);
+
+        if (strideIn1 != 0 && strideIn2 != 0)
+        {
+            if (strideIn2 == sizeof(T) && strideIn1 == sizeof(T)) {
+                for (int64_t i = 0; i < datalen; i++) {
+                    pDataOut[i] = MATH_OP(pDataIn1[i], pDataIn2[i]);
+                }
+                return;
+            }
+        }
+        else {
+            if (strideIn1 == 0 && strideIn2 == sizeof(T)) {
+                const T arg1 = pDataIn1[0];
+                for (int64_t i = 0; i < datalen; i++) {
+                    pDataOut[i] = MATH_OP(arg1, pDataIn2[i]);
+                }
+                return;
+            }
+            else
+            if (strideIn2 == 0 && strideIn1 == sizeof(T)) {
+                const T arg2 = pDataIn2[0];
+                for (int64_t i = 0; i < datalen; i++) {
+                    pDataOut[i] = MATH_OP(pDataIn1[i], arg2);
+                }
+                return;
+            }
+        }
+    }
+    // generic rare case
+    for (int64_t i = 0; i < datalen; i++) {
+        *pDataOut = MATH_OP(*pDataIn1, *pDataIn2);
+        pDataIn1 = STRIDE_NEXT(T, pDataIn1, strideIn1);
+        pDataIn2 = STRIDE_NEXT(T, pDataIn2, strideIn2);
+        pDataOut = STRIDE_NEXT(T, pDataOut, strideOut);
+    }
+}
 
 
 //=====================================================================================================
@@ -849,12 +914,26 @@ ANY_TWO_FUNC GetSimpleMathOpFast(int func, int atopInType1, int atopInType2, int
         // numpy does not divide bools
         if (atopInType1 > ATOP_UINT64) {
             *wantedOutType = ATOP_DOUBLE;
-            if (atopInType1 == ATOP_FLOAT || atopInType1 <= ATOP_UINT16) *wantedOutType = ATOP_FLOAT;
+            if (atopInType1 == ATOP_FLOAT) *wantedOutType = ATOP_FLOAT;
             if (atopInType1 == ATOP_LONGDOUBLE) *wantedOutType = ATOP_LONGDOUBLE;
             switch (atopInType1) {
             case ATOP_FLOAT:  return SimpleMathOpFast<float, __m256, DivOp<float>, DIV_OP_256f32>;
             case ATOP_DOUBLE: return SimpleMathOpFast<double, __m256d, DivOp<double>, DIV_OP_256f64>;
-                //case ATOP_INT32:  return SimpleMathOpFastDivDouble<int32_t, __m128i, __m256d>;
+            case ATOP_LONGDOUBLE: return SimpleMathOpSlow<long double, DivOp<long double>>;
+            }
+        }
+        return NULL;
+
+    case BINARY_OPERATION::FLOORDIV:
+        // numpy does not divide bools
+        if (atopInType1 > ATOP_UINT64) {
+            *wantedOutType = ATOP_DOUBLE;
+            if (atopInType1 == ATOP_FLOAT) *wantedOutType = ATOP_FLOAT;
+            if (atopInType1 == ATOP_LONGDOUBLE) *wantedOutType = ATOP_LONGDOUBLE;
+            switch (atopInType1) {
+            case ATOP_FLOAT:  return SimpleMathOpSlow<float, FloorDivOp<float>>;
+            case ATOP_DOUBLE: return SimpleMathOpSlow<double, FloorDivOp<double>>;
+            case ATOP_LONGDOUBLE: return SimpleMathOpSlow<long double, FloorDivOp<long double>>;
             }
         }
         return NULL;

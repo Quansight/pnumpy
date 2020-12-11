@@ -991,7 +991,9 @@ stUFunc* GetFromDict(const char* ufunc_name, int dtype) {
 
 extern "C"
 PyObject* newinit(PyObject* self, PyObject* args, PyObject* kwargs) {
-    int dtypes[] = { NPY_BOOL, NPY_INT8, NPY_UINT8,  NPY_INT16, NPY_UINT16,  NPY_INT32, NPY_UINT32,  NPY_INT64, NPY_UINT64, NPY_FLOAT32, NPY_FLOAT64 };
+    int dtypes[] = { NPY_BOOL, NPY_INT8, NPY_UINT8,  NPY_INT16, NPY_UINT16,  5, 6, 7, 8, 9, 10, 11, 12 }; // NPY_INT64, NPY_UINT64, NPY_FLOAT32, NPY_FLOAT64
+    //int dtypes[] = { NPY_BOOL, NPY_INT8, NPY_UINT8,  NPY_INT16, NPY_UINT16, NPY_INT32, NPY_UINT32, NPY_INT64, NPY_UINT64, NPY_FLOAT32, NPY_FLOAT64 };
+
     //int dtypes[] = {  NPY_INT32,  NPY_INT64};
 
     // Init atop: array threading operations
@@ -1035,7 +1037,7 @@ PyObject* newinit(PyObject* self, PyObject* args, PyObject* kwargs) {
             }
 
             //printf("taking over func %s\n", ufunc_name);
-
+            // true_divide, floor_divide, power, remainder  need work
             // Loop over all dtypes we support for the ufunc
             int64_t num_dtypes = sizeof(dtypes) / sizeof(int);
             for (int64_t j = 0; j < num_dtypes; j++) {
@@ -1050,7 +1052,16 @@ PyObject* newinit(PyObject* self, PyObject* args, PyObject* kwargs) {
                 REDUCE_FUNC  pReduceFunc = GetReduceMathOpFast(atop, atype);
 
                 if (signature[2] != -1) {
-                    signature[2] = convert_atop_to_dtype[signature[2]];
+                    int out_dtype = convert_atop_to_dtype[signature[2]];
+                    //printf("ufunc %s %d  to  %d  atype:%d  dtype:%d\n", ufunc_name, signature[2], out_dtype, atype, dtype);
+
+                    // Check for problem with two int32 depending on OS
+                    if (signature[0] >= 5 && signature[0] <= 8) {
+                        if (out_dtype >= 5 && out_dtype <= 8) {
+                            out_dtype = signature[0];
+                        }
+                    }
+                    signature[2] = out_dtype;
 
                     int ret = PyUFunc_ReplaceLoopBySignature((PyUFuncObject*)ufunc, g_UFuncGenericLUT[atop][atype], signature, &oldFunc);
 
@@ -1065,6 +1076,9 @@ PyObject* newinit(PyObject* self, PyObject* args, PyObject* kwargs) {
                     pstUFunc->pReduceFunc = pReduceFunc;
                     pstUFunc->MaxThreads = 3;
                     AddToDict(ufunc_name, dtype, pstUFunc);
+                }
+                else {
+                    LOGGING("rejected ufunc_name:%s  dtype:%d\n", ufunc_name, signature[0]);
                 }
             }
         }
@@ -1094,7 +1108,16 @@ PyObject* newinit(PyObject* self, PyObject* args, PyObject* kwargs) {
                 int atype = convert_dtype_to_atop[dtype];
 
                 ANY_TWO_FUNC pBinaryFunc = GetComparisonOpFast(atop, atype, atype, &signature[2]);
-                signature[2] = convert_atop_to_dtype[signature[2]];
+
+                int out_dtype = convert_atop_to_dtype[signature[2]];
+
+                // Check for problem with two int32 depending on OS
+                if (signature[0] >= 5 && signature[0] <= 8) {
+                    if (out_dtype  >= 5 && out_dtype <= 8) {
+                        out_dtype = signature[0];
+                    }
+                }
+                signature[2] = out_dtype;
 
                 int ret = PyUFunc_ReplaceLoopBySignature((PyUFuncObject*)ufunc, g_UFuncCompareLUT[atop][atype], signature, &oldFunc);
 
@@ -1141,7 +1164,15 @@ PyObject* newinit(PyObject* self, PyObject* args, PyObject* kwargs) {
                 UNARY_FUNC pUnaryFunc = GetUnaryOpFast(atop, atype, &signature[1]);
 
                 if (signature[1] != -1) {
-                    signature[1] = convert_atop_to_dtype[signature[1]];
+                    int out_dtype = convert_atop_to_dtype[signature[1]];
+
+                    // Check for problem with two int32 depending on OS
+                    if (signature[0] >= 5 && signature[0] <= 8) {
+                        if (out_dtype >=5 && out_dtype <= 8) {
+                            out_dtype = signature[0];
+                        }
+                    }
+                    signature[1] = out_dtype;
 
                     int ret = PyUFunc_ReplaceLoopBySignature((PyUFuncObject*)ufunc, g_UFuncUnaryLUT[atop][atype], signature, &oldFunc);
 
@@ -1222,7 +1253,7 @@ PyObject* newinit(PyObject* self, PyObject* args, PyObject* kwargs) {
         RETURN_NONE;
     }
 
-    if (g_avx2) {
+    if (!g_avx2) {
         return PyErr_Format(PyExc_ImportError, "atop failed to load and may not be supported on this system.");
     }
     RETURN_NONE;
