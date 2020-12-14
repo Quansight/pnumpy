@@ -427,3 +427,18 @@ void FmFree(void* _Block);
 #define POSSIBLY_STACK_ALLOC(_alloc_size_) _alloc_size_ > MAX_STACK_ALLOC ? (char*)WORKSPACE_ALLOC(_alloc_size_) : (char*)alloca(_alloc_size_);
 #endif
 #define POSSIBLY_STACK_FREE(_alloc_size_, _mem_ptr_) if (_alloc_size_ > MAX_STACK_ALLOC) WORKSPACE_FREE(_mem_ptr_);
+
+//=======================================================================
+// Conversions
+struct stRecarrayOffsets {
+    char* pData;
+    int64_t    readoffset;
+    int64_t    itemsize;
+};
+
+extern "C" void RecArrayToColMajor(
+    stRecarrayOffsets* pstOffset,
+    char* pStartOffset,
+    int64_t totalRows,
+    int64_t numArrays,
+    int64_t itemSize);

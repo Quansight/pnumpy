@@ -41,6 +41,8 @@ from pnumpy._pnumpy import ledger_enable, ledger_disable, ledger_isenabled, ledg
 from pnumpy._pnumpy import recycler_enable, recycler_disable, recycler_isenabled, recycler_info
 
 from .benchmark import benchmark, benchmark_func
+from .recarray import recarray_to_colmajor
+
 
 def init():
     import platform

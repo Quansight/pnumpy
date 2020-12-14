@@ -20,19 +20,26 @@ extern "C" PyObject* thread_disable(PyObject * self, PyObject * args);
 extern "C" PyObject* thread_isenabled(PyObject * self, PyObject * args);
 extern "C" PyObject* thread_getworkers(PyObject * self, PyObject * args);
 extern "C" PyObject* thread_setworkers(PyObject * self, PyObject * args);
+extern "C" PyObject* thread_zigzag(PyObject * self, PyObject * args);
+
+// ledger.cpp
 extern "C" PyObject* ledger_enable(PyObject * self, PyObject * args);
 extern "C" PyObject* ledger_disable(PyObject * self, PyObject * args);
 extern "C" PyObject* ledger_isenabled(PyObject * self, PyObject * args);
 extern "C" PyObject* ledger_info(PyObject * self, PyObject * args);
+
+// recycler.cpp
 extern "C" PyObject* recycler_enable(PyObject * self, PyObject * args);
 extern "C" PyObject* recycler_disable(PyObject * self, PyObject * args);
 extern "C" PyObject* recycler_isenabled(PyObject * self, PyObject * args);
 extern "C" PyObject* recycler_info(PyObject * self, PyObject * args);
-extern "C" PyObject* thread_zigzag(PyObject * self, PyObject * args);
 
 extern "C" PyObject* timer_gettsc(PyObject * self, PyObject * args);
 extern "C" PyObject* timer_getutc(PyObject * self, PyObject * args);
 extern "C" PyObject* cpustring(PyObject * self, PyObject * args);
+
+// conversions.cpp
+extern "C" PyObject* recarray_to_colmajor(PyObject* self, PyObject* args);
 
 static char m_doc[] = "Provide methods to override NumPy ufuncs";
 
@@ -60,6 +67,7 @@ static PyMethodDef module_functions[] = {
     {"ledger_disable",   (PyCFunction)ledger_disable,  METH_VARARGS, LEDGER_DISABLE_DOC},
     {"ledger_isenabled", (PyCFunction)ledger_isenabled,  METH_VARARGS, LEDGER_ISENABLED_DOC},
     {"ledger_info",      (PyCFunction)ledger_info,  METH_VARARGS, LEDGER_INFO_DOC},
+    {"recarray_to_colmajor",    (PyCFunction)recarray_to_colmajor,  METH_VARARGS, "convert record array to col major"},
     {"recycler_enable",    (PyCFunction)recycler_enable,  METH_VARARGS, RECYCLER_ENABLE_DOC},
     {"recycler_disable",   (PyCFunction)recycler_disable,  METH_VARARGS, RECYCLER_DISABLE_DOC},
     {"recycler_isenabled", (PyCFunction)recycler_isenabled,  METH_VARARGS, RECYCLER_ISENABLED_DOC},
