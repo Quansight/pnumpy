@@ -59,7 +59,7 @@ setup(
     long_description_content_type="text/markdown",
     author='Quansight',
     author_email='info@quansight.com',
-    url='https://github.com/Quansight/numpy-threading-extensions',
+    url='https://quansight.github.io/numpy-threading-extensions/stable/index.html',
     packages=find_packages('src'),
     package_dir={'': 'src'},
     py_modules=[splitext(basename(path))[0] for path in glob('src/*.py')],
