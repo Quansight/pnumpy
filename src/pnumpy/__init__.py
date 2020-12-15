@@ -46,6 +46,10 @@ from .recarray import recarray_to_colmajor
 
 def init():
     import platform
+    from numpy.core._multiarray_umath import __cpu_features__ as cpu
+    if not cpu['AVX2']:
+        # TODO: adjust for ARM64
+        raise RuntimeError('pnumpy requires a machine with an AVX2 CPU')
     if platform.system() == 'Linux':
         from .cpu import cpu_count_linux
         logical,physical = cpu_count_linux()
