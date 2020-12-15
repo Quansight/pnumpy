@@ -47,7 +47,7 @@ jobs:
     - name: Test
       run: |
         python -m pip install -r test_requirements.txt
-        python -m pytest tests
+        python -m pytest tests -vv --durations 10 
 
   update_docs:
     runs-on: ubuntu-latest
