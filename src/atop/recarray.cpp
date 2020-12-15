@@ -29,7 +29,7 @@ static const int64_t CHUNKSIZE = 16384;
 // This is used to multiply the strides
 const union
 {
-    INT32 i[8];
+    int32_t i[8];
     __m256i m;
     //} __vindex8_strides = { 7, 6, 5, 4, 3, 2, 1, 0 };
 } __vindex8_strides = { 0, 1, 2, 3, 4, 5, 6, 7 };
@@ -45,7 +45,7 @@ void ConvertRecArray(char* pStartOffset, int64_t startRow, int64_t totalRows, st
         CHUNKROWS = 1;
     }
 
-    __m256i vindex = _mm256_mullo_epi32(_mm256_set1_epi32((INT32)itemSize), _mm256_loadu_si256(&__vindex8_strides.m));
+    __m256i vindex = _mm256_mullo_epi32(_mm256_set1_epi32((int32_t)itemSize), _mm256_loadu_si256(&__vindex8_strides.m));
     __m128i vindex128 = _mm256_extracti128_si256(vindex, 0);
 
     while (startRow < totalRows) {
@@ -74,15 +74,15 @@ void ConvertRecArray(char* pStartOffset, int64_t startRow, int64_t totalRows, st
             switch (pstOffset[i].itemsize) {
             case 1:
                 while (startRow < endRow) {
-                    INT8 data = *(INT8*)(pRead + (startRow * itemSize));
-                    *(INT8*)(pWrite + startRow) = data;
+                    int8_t data = *(int8_t*)(pRead + (startRow * itemSize));
+                    *(int8_t*)(pWrite + startRow) = data;
                     startRow++;
                 }
                 break;
             case 2:
                 while (startRow < endRow) {
-                    INT16 data = *(INT16*)(pRead + (startRow * itemSize));
-                    *(INT16*)(pWrite + startRow * arrItemSize) = data;
+                    int16_t data = *(int16_t*)(pRead + (startRow * itemSize));
+                    *(int16_t*)(pWrite + startRow * arrItemSize) = data;
                     startRow++;
                 }
                 break;
@@ -91,13 +91,13 @@ void ConvertRecArray(char* pStartOffset, int64_t startRow, int64_t totalRows, st
             {
                 int64_t endSubRow = endRow - 8;
                 while (startRow < endSubRow) {
-                    __m256i m0 = _mm256_i32gather_epi32((INT32*)(pRead + (startRow * itemSize)), vindex, 1);
+                    __m256i m0 = _mm256_i32gather_epi32((int32_t*)(pRead + (startRow * itemSize)), vindex, 1);
                     _mm256_storeu_si256((__m256i*)(pWrite + (startRow * arrItemSize)), m0);
                     startRow += 8;
                 }
                 while (startRow < endRow) {
-                    INT32 data = *(INT32*)(pRead + (startRow * itemSize));
-                    *(INT32*)(pWrite + startRow * arrItemSize) = data;
+                    int32_t data = *(int32_t*)(pRead + (startRow * itemSize));
+                    *(int32_t*)(pWrite + startRow * arrItemSize) = data;
                     startRow++;
                 }
             }
