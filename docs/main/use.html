@@ -45,7 +45,7 @@ than 50,000. It will break the operation into chunks. Each chunk will be
 executed in its own thread.</p>
 </li>
 <li><p>ledger</p>
-<p>The ledger (disabled in version 0.1) records data on each loop execution to
+<p>The ledger records data on each loop execution to
 enable more accurate heuristics on memory allocation, threading behavior
 and reporting for logging and benchmarking.</p>
 </li>
@@ -54,10 +54,7 @@ and reporting for logging and benchmarking.</p>
 data from the ledger to create more performant memory caches.</p>
 </li>
 <li><p>atop</p>
-<p>NumPy is making progress with faster inner loops, but an outside package
-can iterate faster to provide even faster ones. Since the Universal SIMD
-loops are in a state of flux at this time, this is disabled for version
-0.1.</p>
+<p>Provide faster implementations of NumPy inner loops.</p>
 </li>
 </ul>
 </div></blockquote>

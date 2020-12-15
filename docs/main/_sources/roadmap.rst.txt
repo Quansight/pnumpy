@@ -1,7 +1,7 @@
 Roadmap
 =======
 
-Version 0.1 of the package exposes the first optimization: multithreaded ufunc
+Version 2.0 of the package exposes the first optimization: multithreaded ufunc
 loops. 
 
 Future versions of the package will extend these capabilites to cover more of 

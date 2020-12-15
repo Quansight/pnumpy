@@ -11,4 +11,3 @@ To use the package one it is installed::
     >>> import accelerated_numpy
     >>> accelerated_numpy.initialize()
 
-
