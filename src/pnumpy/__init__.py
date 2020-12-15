@@ -39,6 +39,7 @@ from pnumpy._pnumpy import thread_enable, thread_disable, thread_isenabled, thre
 from pnumpy._pnumpy import timer_gettsc, timer_getutc
 from pnumpy._pnumpy import ledger_enable, ledger_disable, ledger_isenabled, ledger_info
 from pnumpy._pnumpy import recycler_enable, recycler_disable, recycler_isenabled, recycler_info
+from pnumpy._pnumpy import getitem
 
 from .benchmark import benchmark, benchmark_func
 from .recarray import recarray_to_colmajor

@@ -1,4 +1,5 @@
 #pragma once
+#include "common_inc.h"
 
 // For when integers have an invalid predefined
 static const int8_t  GetInvalid(int8_t x) { return (int8_t)(0x80); };
@@ -16,3 +17,4 @@ static const double GetInvalid(double x) { return std::numeric_limits<double>::q
 static const long double GetInvalid(long double x) { return std::numeric_limits<long double>::quiet_NaN(); };
 
 
+//-------------------------------------------------------------------------
