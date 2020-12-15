@@ -19,6 +19,8 @@ def get_ufuncs_and_types():
     supported type signatures
     """
     ufuncs = [x for x in dir(np) if isinstance(getattr(np, x), np.ufunc)]
+    if 'matmul' in ufuncs:
+        ufuncs.remove('matmul')
     # Maybe use a collections.defaultdict instead?
     ret = dict([[x, []] for x in ufuncs])
     for s in ret:
