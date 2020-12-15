@@ -5,7 +5,6 @@ graft tests
 
 include .bumpversion.cfg
 include .coveragerc
-include .cookiecutterrc
 include .editorconfig
 
 include AUTHORS.rst
@@ -13,7 +12,5 @@ include CHANGELOG.rst
 include CONTRIBUTING.md
 include LICENSE
 include README.md
-
-include tox.ini .travis.yml .appveyor.yml
 
 global-exclude *.py[cod] __pycache__/* *.so *.dylib

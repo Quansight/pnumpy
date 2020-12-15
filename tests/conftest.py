@@ -5,8 +5,12 @@ import pnumpy
 
 old_numpy = Version(np.__version__) < Version('1.18')
 
+
 @pytest.fixture(scope='session')
 def initialize_pnumpy():
+    from numpy.core._multiarray_umath import __cpu_features__ as cpu
+    if not cpu['AVX2']:
+        pytest.skip('pnumpy.initialize requires AVX2')
     pnumpy.initialize()
 
 @pytest.fixture(scope='function')

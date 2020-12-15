@@ -53,7 +53,6 @@ pip-log.txt
 
 # Unit test / coverage reports
 .coverage
-.tox
 .coverage.*
 .pytest_cache/
 nosetests.xml
@@ -72,3 +71,6 @@ docs/_build
 
 # Mypy Cache
 .mypy_cache/
+
+# Editor tmp files
+.*.swp

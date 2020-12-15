@@ -4,7 +4,7 @@
     "version": 1,
 
     // The name of the project being benchmarked
-    "project": "fast_numpy_loops",
+    "project": "pnumpy",
 
     // The project's homepage
     "project_url": "https://quansight.github.io/numpy-threading-extensions/stable/index.html",

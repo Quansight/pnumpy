@@ -34,13 +34,6 @@ To use the project:
 To run all the tests run::
 
 ```
-    tox
+    python -m pip install pytest
+    python -m pytest tests
 ```
-
-Note, to combine the coverage data from all the tox environments run:
-
- OS | Command
-----|----
-Windows | `set PYTEST_ADDOPTS=--cov-append`
-|        | `tox`
-Other   | `PYTEST_ADDOPTS=--cov-append tox`

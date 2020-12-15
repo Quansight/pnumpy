@@ -46,9 +46,11 @@ To set up `numpy-threading-extensions` for local development:
 
    Now you can make your changes locally.
 
-4. When you're done making changes run all the checks and docs builder with [tox](https://tox.readthedocs.io/en/latest/install.html) one command:
+4. When you're done making changes run all the tests with 
    ```
-   tox
+   python setup.py build_ext --inplace
+   python -m pip install pytest
+   python -m pytest tests
    ```
 
 5. Commit your changes and push your branch to GitHub::
@@ -66,13 +68,12 @@ If you need some code review or feedback while you're developing the code just m
 
 For merging, you should:
 
-1. Include passing tests (run `tox`)<sup>1</sup>.
-2. Update documentation when there's new API, functionality etc.
-3. Add a note to `CHANGELOG.rst` about the changes.
-4. Add yourself to `AUTHORS.rst`.
+1. Update documentation when there's new API, functionality etc.
+2. Add a note to `CHANGELOG.rst` about the changes.
+3. Add yourself to `AUTHORS.rst`.
 
 <sup>1</sup>If you don't have all the necessary python versions available
-locally you can rely on Travis - it will [run the
+locally you can rely on CI - it will [run the
 tests](https://travis-ci.org/Quansight/numpy-threading-extensions/pull_requests)
 for each change you add in the pull request.
 
@@ -82,10 +83,7 @@ It will be slower though ...
 
 To run a subset of tests::
 ```
-tox -e envname -- pytest -k test_myfeature
+python -m pytest -k test_myfeature
 ```
 
-To run all the test environments in *parallel*::
-```
-tox -p auto
-```
+
