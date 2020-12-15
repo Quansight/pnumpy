@@ -1,7 +1,16 @@
-#define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
+// If this is not included, calling PY_ARRAY functions will have a null value
+#define PY_ARRAY_UNIQUE_SYMBOL sharedata_ARRAY_API
+#define NO_IMPORT_ARRAY
+
 #include "common.h"
 #include "../atop/atop.h"
 #include "../atop/threads.h"
+
+//#if defined(_WIN32) && !defined(__GNUC__)
+//#include <../Lib/site-packages/numpy/core/include/numpy/arrayobject.h>
+//#else
+//#include <numpy/arrayobject.h>
+//#endif
 
 //#include "Python.h"
 //#define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
@@ -152,7 +161,7 @@ PyArrayObject* AllocateNumpyArray(int ndim, npy_intp* dims, int32_t numpyType, i
         dims = (npy_intp*)dimensions;
     }
 
-    PyTypeObject* const allocType =  &PyArray_Type;
+    PyTypeObject* const allocType =  pPyArray_Type;
 
     // probably runt object from matlab -- have to fix this up or it will fail
     // comes from empty strings in matlab - might need to
@@ -1211,8 +1220,8 @@ getitem(PyObject* self, PyObject* args)
     if (PyTuple_Size(args) == 2) {
         if (!PyArg_ParseTuple(
             args, "O!O!:getitem",
-            &PyArray_Type, &aValues,
-            &PyArray_Type, &aIndex
+            pPyArray_Type, &aValues,
+            pPyArray_Type, &aIndex
         )) {
 
             return NULL;
@@ -1223,8 +1232,8 @@ getitem(PyObject* self, PyObject* args)
     else
         if (!PyArg_ParseTuple(
             args, "O!O!O:getitem",
-            &PyArray_Type, &aValues,
-            &PyArray_Type, &aIndex,
+            pPyArray_Type, &aValues,
+            pPyArray_Type, &aIndex,
             &defaultValue)) {
 
             return NULL;

@@ -1,5 +1,8 @@
-#include "Python.h"
+#define SHAREDATA_MAIN_C_FILE
+#include "common.h"
 #include "PNUMPY.h"
+//extern "C" void** PyArray_API;
+PyTypeObject* pPyArray_Type = NULL;
 
 /*
  * Some C++ compilers do not like mixin non-designated-initializers
@@ -99,5 +102,8 @@ extern "C" PyMODINIT_FUNC PyInit__pnumpy(void) {
     if (module == NULL)
         return NULL;
 
+    // Load numpy for PyArray_Type
+    import_array();
+    pPyArray_Type = &PyArray_Type;
     return module;
 }
