@@ -929,7 +929,6 @@ PyObject* oldinit(PyObject *self, PyObject *args, PyObject *kwargs) {
     }
 
     // Initialize numpy's C-API.
-    import_array();
     import_umath();
 
     PyObject *numpy_module = PyImport_ImportModule("numpy");
@@ -1001,7 +1000,6 @@ PyObject* newinit(PyObject* self, PyObject* args, PyObject* kwargs) {
         memset(g_UFuncLUT, 0, sizeof(g_UFuncLUT));
 
         // Initialize numpy's C-API.
-        import_array();
         import_umath();
         PyObject* numpy_module = PyImport_ImportModule("numpy");
         if (numpy_module == NULL) {

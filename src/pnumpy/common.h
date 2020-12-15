@@ -1,8 +1,16 @@
 #pragma once
 #include "Python.h"
+#define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
+// NOTE: See PY_ARRAY_UNIQUE_SYMBOL
+// If this is not included, calling PY_ARRAY functions will have a null value
+#define PY_ARRAY_UNIQUE_SYMBOL sharedata_ARRAY_API
+
+#ifndef SHAREDATA_MAIN_C_FILE
+#define NO_IMPORT_ARRAY
+#endif
+
 #include "numpy/ndarrayobject.h"
 #include "numpy/ufuncobject.h"
-#define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
 #include <stdint.h>
 #include <stdio.h>
 #include "../atop/atop.h"
@@ -54,3 +62,4 @@ extern void LedgerInit();
         && (steps[0] == steps[2])\
         && (steps[0] == 0))
 
+extern PyTypeObject* pPyArray_Type;

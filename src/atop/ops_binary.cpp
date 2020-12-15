@@ -961,9 +961,9 @@ ANY_TWO_FUNC GetSimpleMathOpFast(int func, int atopInType1, int atopInType2, int
         return NULL;
 
     case BINARY_OPERATION::LOGICAL_AND:
-        *wantedOutType = ATOP_BOOL;
+        
         switch (atopInType1) {
-        case ATOP_BOOL:   return SimpleMathOpFastSymmetric<int8_t, __m256i, AndOp<int8_t>, AND_OP_256>;
+        case ATOP_BOOL:   *wantedOutType = ATOP_BOOL; return SimpleMathOpFastSymmetric<int8_t, __m256i, AndOp<int8_t>, AND_OP_256>;
         }
         return NULL;
 
@@ -986,9 +986,9 @@ ANY_TWO_FUNC GetSimpleMathOpFast(int func, int atopInType1, int atopInType2, int
         return NULL;
 
     case BINARY_OPERATION::LOGICAL_OR:
-        *wantedOutType = ATOP_BOOL;
+        
         switch (atopInType1) {
-        case ATOP_BOOL:   return SimpleMathOpFastSymmetric<int8_t, __m256i, OrOp<int8_t>, OR_OP_256>;
+        case ATOP_BOOL:   *wantedOutType = ATOP_BOOL; return SimpleMathOpFastSymmetric<int8_t, __m256i, OrOp<int8_t>, OR_OP_256>;
         }
         return NULL;
 
