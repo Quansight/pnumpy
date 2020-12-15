@@ -50,7 +50,7 @@ To set up `numpy-threading-extensions` for local development:
    ```
    python setup.py build_ext --inplace
    python -m pip install pytest
-   python -m pytest .
+   python -m pytest tests
    ```
 
 5. Commit your changes and push your branch to GitHub::

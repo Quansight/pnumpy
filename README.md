@@ -39,5 +39,5 @@ To run all the tests run::
 
 ```
     python -m pip install pytest
-    python -m pytest .
+    python -m pytest tests
 ```

@@ -47,7 +47,7 @@ jobs:
     - name: Test
       run: |
         python -m pip install pytest
-        python -mpytest .
+        python -mpytest tests
 
   update_docs:
     runs-on: ubuntu-latest
