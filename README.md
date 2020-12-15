@@ -1,4 +1,4 @@
-# accelerated_loops
+# PNUMPY
 Faster loops for NumPy using multithreading and other tricks. The first release
 will target NumPy binary and unary ufuncs. Eventually we will enable overriding
 other NumPy functions, and provide an C-based (non-Python) API for extending

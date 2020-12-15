@@ -10,7 +10,7 @@ enable/disable any of the subsystems:
     executed in its own thread.
   - ledger
 
-    The ledger (disabled in version 0.1) records data on each loop execution to
+    The ledger records data on each loop execution to
     enable more accurate heuristics on memory allocation, threading behavior
     and reporting for logging and benchmarking.
   - recycler
@@ -19,14 +19,9 @@ enable/disable any of the subsystems:
     data from the ledger to create more performant memory caches.
   - atop
 
-    NumPy is making progress with faster inner loops, but an outside package
-    can iterate faster to provide even faster ones. Since the Universal SIMD
-    loops are in a state of flux at this time, this is disabled for version
-    0.1.
-
-
+    Provide faster implementations of NumPy inner loops.
 """
-__version__ = '0.0.0'
+__version__ = '2.0.0'
 __all__ = [
     'initialize', 'atop_enable', 'atop_disable', 'atop_isenabled', 'atop_info', 'atop_setworkers','cpustring',
     'thread_enable', 'thread_disable', 'thread_isenabled', 'thread_getworkers', 'thread_setworkers', 'thread_zigzag',
