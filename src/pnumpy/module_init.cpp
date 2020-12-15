@@ -37,6 +37,7 @@ extern "C" PyObject* recycler_info(PyObject * self, PyObject * args);
 extern "C" PyObject* timer_gettsc(PyObject * self, PyObject * args);
 extern "C" PyObject* timer_getutc(PyObject * self, PyObject * args);
 extern "C" PyObject* cpustring(PyObject * self, PyObject * args);
+extern "C" PyObject * getitem(PyObject * self, PyObject * args);
 
 // conversions.cpp
 extern "C" PyObject* recarray_to_colmajor(PyObject* self, PyObject* args);
@@ -59,20 +60,21 @@ static PyMethodDef module_functions[] = {
     {"thread_isenabled", (PyCFunction)thread_isenabled, METH_VARARGS, THREAD_ISENABLED_DOC},
     {"thread_getworkers",(PyCFunction)thread_getworkers, METH_VARARGS, THREAD_GETWORKERS_DOC},
     {"thread_setworkers",(PyCFunction)thread_setworkers, METH_VARARGS, THREAD_SETWORKERS_DOC},
+    {"thread_zigzag",      (PyCFunction)thread_zigzag,  METH_VARARGS, "toggle zigzag mode"},
     {"timer_gettsc",     (PyCFunction)timer_gettsc, METH_VARARGS, TIMER_GETTSC_DOC},
     {"timer_getutc",     (PyCFunction)timer_getutc, METH_VARARGS, TIMER_GETUTC_DOC},
-    {"cpustring",        (PyCFunction)cpustring, METH_VARARGS, CPUSTRING_DOC},
-    {"oldinit",          (PyCFunction)oldinit, METH_VARARGS | METH_KEYWORDS, OLDINIT_DOC},
     {"ledger_enable",    (PyCFunction)ledger_enable,  METH_VARARGS, LEDGER_ENABLE_DOC},
     {"ledger_disable",   (PyCFunction)ledger_disable,  METH_VARARGS, LEDGER_DISABLE_DOC},
     {"ledger_isenabled", (PyCFunction)ledger_isenabled,  METH_VARARGS, LEDGER_ISENABLED_DOC},
     {"ledger_info",      (PyCFunction)ledger_info,  METH_VARARGS, LEDGER_INFO_DOC},
-    {"recarray_to_colmajor",    (PyCFunction)recarray_to_colmajor,  METH_VARARGS, "convert record array to col major"},
     {"recycler_enable",    (PyCFunction)recycler_enable,  METH_VARARGS, RECYCLER_ENABLE_DOC},
     {"recycler_disable",   (PyCFunction)recycler_disable,  METH_VARARGS, RECYCLER_DISABLE_DOC},
     {"recycler_isenabled", (PyCFunction)recycler_isenabled,  METH_VARARGS, RECYCLER_ISENABLED_DOC},
     {"recycler_info",      (PyCFunction)recycler_info,  METH_VARARGS, RECYCLER_INFO_DOC},
-    {"thread_zigzag",      (PyCFunction)thread_zigzag,  METH_VARARGS, "toggle zigzag mode"},
+    {"cpustring",        (PyCFunction)cpustring, METH_VARARGS, CPUSTRING_DOC},
+    {"oldinit",          (PyCFunction)oldinit, METH_VARARGS | METH_KEYWORDS, OLDINIT_DOC},
+    {"recarray_to_colmajor",    (PyCFunction)recarray_to_colmajor,  METH_VARARGS, "convert record array to col major"},
+    {"getitem",          (PyCFunction)getitem, METH_VARARGS | METH_KEYWORDS, "alternative to fancy index or boolean index"},
     {NULL, NULL, 0,  NULL}
 };
 
