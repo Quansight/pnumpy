@@ -1,7 +1,7 @@
 import numpy as np
-import fast_numpy_loops
+import pnumpy
 import pytest
-fast_numpy_loops.initialize()
+pnumpy.initialize()
 
 
 rng = np.random.default_rng(123456)
@@ -70,10 +70,10 @@ def test_threads(name, types):
         if len(out_data) == 1:
             out_data = out_data[0]
         out1 = ufunc(*in_data, out=out_data)
-        fast_numpy_loops.thread_enable()
-        assert fast_numpy_loops.thread_isenabled()
+        pnumpy.thread_enable()
+        assert pnumpy.thread_isenabled()
         out2 = ufunc(*in_data, out=out_data)
-        fast_numpy_loops.thread_disable()
+        pnumpy.thread_disable()
         # may not work on datetime
         if not any([o == 'datetime64' for o in out_dtypes]):
             np.testing.assert_allclose(out1, out2, equal_nan=True)
