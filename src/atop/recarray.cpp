@@ -164,7 +164,7 @@ extern "C" void RecArrayToColMajor(
 
     int64_t startRow = 0;
 
-    if (totalRows > 16384) {
+    if (THREADER && totalRows > 16384) {
         // Prepare for multithreading
         struct stConvertRec {
             char* pStartOffset;

@@ -1162,7 +1162,9 @@ PyObject* newinit(PyObject* self, PyObject* args, PyObject* kwargs) {
                 // For unary it only has a signature of 2
                 signature[1] = -1;
                 UNARY_FUNC pUnaryFunc = GetUnaryOpFast(atop, atype, &signature[1]);
-
+                if (!pUnaryFunc) {
+                    pUnaryFunc = GetUnaryOpSlow(atop, atype, &signature[1]);
+                }
                 if (signature[1] != -1) {
                     int out_dtype = convert_atop_to_dtype[signature[1]];
 
@@ -1285,8 +1287,7 @@ extern "C"
 // example: atop_info('add',11)
 // or no params to return dict
 PyObject * atop_info(PyObject * self, PyObject * args) {
-    if (g_Settings.AtopEnabled) {
-
+    if (THREADER) {
         const char* uname = NULL;
         int dtype = 0;
 

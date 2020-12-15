@@ -20,6 +20,10 @@ def benchmark_timeit(
     outdtype=None,
     recycle=True,
     sizes=[1_000_000]):
+    '''
+    Internal routine to benchmark a function.
+
+    '''
 
     def time_func(recycle, c):
         if unary is False:
@@ -89,7 +93,15 @@ def benchmark_func(
     atop=True,
     thread=True,
     sizes=[1_000_000]):
+    '''
+    Benchmark one function.
 
+    Examples
+    --------
+    benchmark_func(np.add)
+    benchmark_func(np.add, sizes=[2**16])
+    benchmark_func(np.sqrt, unary=True)
+    '''
     # disable atop and threading
     atop_disable()
     thread_disable()
@@ -111,14 +123,23 @@ def benchmark(
     thread=True,
     sizes=[1_000_000]):
     '''
+    Performs a simple benchmark of the ratio of normal numpy (no threading) vs parallel numpy (threaded).
+    The output is formatted to be copied and pasted in a csv file.
+    A result above 1.0 indicates an improvement, below 1.0 indicates worse peformance.
+
     Inputs
     ------
 
     Returns
     -------
+    output text formatted for a .csv file
 
     Examples
     --------
+    pn.benchmark()
+    pn.benchmark(thread=False)
+    pn.benchmark(sizes=[2**16])
+    pn.benchmark(ctypes=[np.float32, np.float64])
     '''
 
     def ctype_string(ct):

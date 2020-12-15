@@ -1124,7 +1124,8 @@ template<typename T, typename U256> static inline void UnaryOpFast_NOTFINITEF64(
     return UnaryNotFiniteFastDouble<T, U256, const bool(*)(T)>(ISNOTFINITE_OP<T>, pDataIn1, pDataOut, len, strideIn, strideOut);
 }
 
-UNARY_FUNC GetUnaryOpSlow(int func, int numpyInType1, int numpyOutType, int* wantedOutType) {
+extern "C"
+UNARY_FUNC GetUnaryOpSlow(int func, int atopInType1, int* wantedOutType) {
     LOGGING("Looking for func slow %d  type %d  outtype: %d\n", func, numpyInType1, numpyOutType);
 
     switch (func) {
@@ -1140,8 +1141,8 @@ UNARY_FUNC GetUnaryOpSlow(int func, int numpyInType1, int numpyOutType, int* wan
         break;
 
     case UNARY_OPERATION::ABS:
-        *wantedOutType = numpyInType1;
-        switch (numpyInType1) {
+        *wantedOutType = atopInType1;
+        switch (atopInType1) {
         case ATOP_FLOAT:  return UnaryOpSlow_ABS<float>;
         case ATOP_DOUBLE: return UnaryOpSlow_ABS<double>;
         case ATOP_LONGDOUBLE: return UnaryOpSlow_ABS<long double>;
@@ -1154,29 +1155,29 @@ UNARY_FUNC GetUnaryOpSlow(int func, int numpyInType1, int numpyOutType, int* wan
         break;
 
     case UNARY_OPERATION::SIGN:
-        *wantedOutType = numpyInType1;
-        switch (numpyInType1) {
-        case ATOP_FLOAT:  return UnaryOpSlow_FLOATSIGN<float>;
-        case ATOP_DOUBLE: return UnaryOpSlow_FLOATSIGN<double>;
-        case ATOP_LONGDOUBLE: return UnaryOpSlow_FLOATSIGN<long double>;
-        case ATOP_INT32:  return UnaryOpSlow_SIGN<int32_t>;
-        case ATOP_INT64:  return UnaryOpSlow_SIGN<int64_t>;
-        case ATOP_INT8:   return UnaryOpSlow_SIGN<int8_t>;
-        case ATOP_INT16:  return UnaryOpSlow_SIGN<int16_t>;
+        
+        switch (atopInType1) {
+        case ATOP_FLOAT:  *wantedOutType = atopInType1; return UnaryOpSlow_FLOATSIGN<float>;
+        case ATOP_DOUBLE: *wantedOutType = atopInType1; return UnaryOpSlow_FLOATSIGN<double>;
+        case ATOP_LONGDOUBLE: *wantedOutType = atopInType1; return UnaryOpSlow_FLOATSIGN<long double>;
+        case ATOP_INT32:  *wantedOutType = atopInType1; return UnaryOpSlow_SIGN<int32_t>;
+        case ATOP_INT64:  *wantedOutType = atopInType1; return UnaryOpSlow_SIGN<int64_t>;
+        case ATOP_INT8:   *wantedOutType = atopInType1; return UnaryOpSlow_SIGN<int8_t>;
+        case ATOP_INT16:  *wantedOutType = atopInType1; return UnaryOpSlow_SIGN<int16_t>;
 
         }
         break;
 
     case UNARY_OPERATION::NEGATIVE:
-        *wantedOutType = numpyInType1;
-        switch (numpyInType1) {
-        case ATOP_FLOAT:  return UnaryOpSlow_NEG<float>;
-        case ATOP_DOUBLE: return UnaryOpSlow_NEG<double>;
-        case ATOP_LONGDOUBLE: return UnaryOpSlow_NEG<long double>;
-        case ATOP_INT32:  return UnaryOpSlow_NEG<int32_t>;
-        case ATOP_INT64:  return UnaryOpSlow_NEG<int64_t>;
-        case ATOP_INT8:   return UnaryOpSlow_NEG<int8_t>;
-        case ATOP_INT16:  return UnaryOpSlow_NEG<int16_t>;
+        
+        switch (atopInType1) {
+        case ATOP_FLOAT:  *wantedOutType = atopInType1; return UnaryOpSlow_NEG<float>;
+        case ATOP_DOUBLE: *wantedOutType = atopInType1; return UnaryOpSlow_NEG<double>;
+        case ATOP_LONGDOUBLE: *wantedOutType = atopInType1; return UnaryOpSlow_NEG<long double>;
+        case ATOP_INT32:  *wantedOutType = atopInType1; return UnaryOpSlow_NEG<int32_t>;
+        case ATOP_INT64:  *wantedOutType = atopInType1; return UnaryOpSlow_NEG<int64_t>;
+        case ATOP_INT8:   *wantedOutType = atopInType1; return UnaryOpSlow_NEG<int8_t>;
+        case ATOP_INT16:  *wantedOutType = atopInType1; return UnaryOpSlow_NEG<int16_t>;
 
         }
         break;
@@ -1185,30 +1186,28 @@ UNARY_FUNC GetUnaryOpSlow(int func, int numpyInType1, int numpyOutType, int* wan
         *wantedOutType = ATOP_BOOL;
         // TJD: Not sure why bool works and others do not
         // Can only handle when output type is bool or not defined
-        if (numpyOutType == 0 || numpyOutType == -1) {
-            switch (numpyInType1) {
-            case ATOP_UINT8:
-            case ATOP_INT8:
-            case ATOP_BOOL:   return UnaryOpSlow_NOT<int8_t>;
-            case ATOP_INT16:
-            case ATOP_UINT16:   return UnaryOpSlow_NOT<int16_t>;
-            case ATOP_INT32:
-            case ATOP_UINT32:   return UnaryOpSlow_NOT<int32_t>;
-            case ATOP_INT64:
-            case ATOP_UINT64:   return UnaryOpSlow_NOT<int64_t>;
-            case ATOP_FLOAT:  return UnaryOpSlow_NOT<float>;
-            case ATOP_DOUBLE: return UnaryOpSlow_NOT<double>;
-            case ATOP_LONGDOUBLE: return UnaryOpSlow_NOT<long double>;
-            }
+        switch (atopInType1) {
+        case ATOP_UINT8:
+        case ATOP_INT8:
+        case ATOP_BOOL:   return UnaryOpSlow_NOT<int8_t>;
+        case ATOP_INT16:
+        case ATOP_UINT16:   return UnaryOpSlow_NOT<int16_t>;
+        case ATOP_INT32:
+        case ATOP_UINT32:   return UnaryOpSlow_NOT<int32_t>;
+        case ATOP_INT64:
+        case ATOP_UINT64:   return UnaryOpSlow_NOT<int64_t>;
+        case ATOP_FLOAT:  return UnaryOpSlow_NOT<float>;
+        case ATOP_DOUBLE: return UnaryOpSlow_NOT<double>;
+        case ATOP_LONGDOUBLE: return UnaryOpSlow_NOT<long double>;
         }
         break;
 
     case UNARY_OPERATION::BITWISE_NOT:
     case UNARY_OPERATION::INVERT:
         // bitwise on floats not allowed
-        if (numpyInType1 <= ATOP_UINT64) {
-            *wantedOutType = numpyInType1;
-            switch (numpyInType1) {
+        if (atopInType1 <= ATOP_UINT64) {
+            *wantedOutType = atopInType1;
+            switch (atopInType1) {
             case ATOP_INT32:   return UnaryOpSlow_INVERT<int32_t>;
             case ATOP_UINT32:  return UnaryOpSlow_INVERT<uint32_t>;
             case ATOP_INT64:   return UnaryOpSlow_INVERT<int64_t>;
@@ -1225,22 +1224,21 @@ UNARY_FUNC GetUnaryOpSlow(int func, int numpyInType1, int numpyOutType, int* wan
     case UNARY_OPERATION::ISFINITE:
         *wantedOutType = ATOP_BOOL;
         // Can only handle when output type is bool or not defined
-        if (numpyOutType == 0 || numpyOutType == -1) {
-            switch (numpyInType1) {
-            case ATOP_FLOAT:  return UnaryOpSlow_ISFINITE<float>;
-            case ATOP_DOUBLE: return UnaryOpSlow_ISFINITE<double>;
-            case ATOP_LONGDOUBLE: return UnaryOpSlow_ISFINITE<long double>;
-            case ATOP_INT32:      return UnaryOpSlow_ISNOTINVALID<int32_t>;
-            case ATOP_UINT32:     return UnaryOpSlow_ISNOTINVALID<uint32_t>;
-            case ATOP_INT64:      return UnaryOpSlow_ISNOTINVALID<int64_t>;
-            case ATOP_UINT64:     return UnaryOpSlow_ISNOTINVALID<uint64_t>;
-            case ATOP_BOOL:
-            case ATOP_INT8:       return UnaryOpSlow_ISNOTINVALID<int8_t>;
-            case ATOP_UINT8:      return UnaryOpSlow_ISNOTINVALID<uint8_t>;
-            case ATOP_INT16:      return UnaryOpSlow_ISNOTINVALID<int16_t>;
-            case ATOP_UINT16:     return UnaryOpSlow_ISNOTINVALID<uint16_t>;
-            default: return UnaryOpSlow_FillTrue;
-            }
+        switch (atopInType1) {
+        case ATOP_FLOAT:  return UnaryOpSlow_ISFINITE<float>;
+        case ATOP_DOUBLE: return UnaryOpSlow_ISFINITE<double>;
+        case ATOP_LONGDOUBLE: return UnaryOpSlow_ISFINITE<long double>;
+            // For when we have invalid ints
+        //case ATOP_INT32:      return UnaryOpSlow_ISNOTINVALID<int32_t>;
+        //case ATOP_UINT32:     return UnaryOpSlow_ISNOTINVALID<uint32_t>;
+        //case ATOP_INT64:      return UnaryOpSlow_ISNOTINVALID<int64_t>;
+        //case ATOP_UINT64:     return UnaryOpSlow_ISNOTINVALID<uint64_t>;
+        //case ATOP_BOOL:
+        //case ATOP_INT8:       return UnaryOpSlow_ISNOTINVALID<int8_t>;
+        //case ATOP_UINT8:      return UnaryOpSlow_ISNOTINVALID<uint8_t>;
+        //case ATOP_INT16:      return UnaryOpSlow_ISNOTINVALID<int16_t>;
+        //case ATOP_UINT16:     return UnaryOpSlow_ISNOTINVALID<uint16_t>;
+        default: return UnaryOpSlow_FillTrue;
         }
         break;
 
@@ -1248,22 +1246,20 @@ UNARY_FUNC GetUnaryOpSlow(int func, int numpyInType1, int numpyOutType, int* wan
         *wantedOutType = ATOP_BOOL;
 
         // Can only handle when output type is bool or not defined
-        if (numpyOutType == 0 || numpyOutType == -1) {
-            switch (numpyInType1) {
-            case ATOP_FLOAT:  return UnaryOpSlow_ISNOTFINITE<float>;
-            case ATOP_DOUBLE: return UnaryOpSlow_ISNOTFINITE<double>;
-            case ATOP_LONGDOUBLE: return UnaryOpSlow_ISNOTFINITE<long double>;
-            case ATOP_INT32:      return UnaryOpSlow_ISINVALID<int32_t>;
-            case ATOP_UINT32:     return UnaryOpSlow_ISINVALID<uint32_t>;
-            case ATOP_INT64:      return UnaryOpSlow_ISINVALID<int64_t>;
-            case ATOP_UINT64:     return UnaryOpSlow_ISINVALID<uint64_t>;
-            case ATOP_BOOL:
-            case ATOP_INT8:       return UnaryOpSlow_ISINVALID<int8_t>;
-            case ATOP_UINT8:      return UnaryOpSlow_ISINVALID<uint8_t>;
-            case ATOP_INT16:      return UnaryOpSlow_ISINVALID<int16_t>;
-            case ATOP_UINT16:     return UnaryOpSlow_ISINVALID<uint16_t>;
-            default: return UnaryOpSlow_FillTrue;
-            }
+        switch (atopInType1) {
+        case ATOP_FLOAT:  return UnaryOpSlow_ISNOTFINITE<float>;
+        case ATOP_DOUBLE: return UnaryOpSlow_ISNOTFINITE<double>;
+        case ATOP_LONGDOUBLE: return UnaryOpSlow_ISNOTFINITE<long double>;
+        case ATOP_INT32:      return UnaryOpSlow_ISINVALID<int32_t>;
+        case ATOP_UINT32:     return UnaryOpSlow_ISINVALID<uint32_t>;
+        case ATOP_INT64:      return UnaryOpSlow_ISINVALID<int64_t>;
+        case ATOP_UINT64:     return UnaryOpSlow_ISINVALID<uint64_t>;
+        case ATOP_BOOL:
+        case ATOP_INT8:       return UnaryOpSlow_ISINVALID<int8_t>;
+        case ATOP_UINT8:      return UnaryOpSlow_ISINVALID<uint8_t>;
+        case ATOP_INT16:      return UnaryOpSlow_ISINVALID<int16_t>;
+        case ATOP_UINT16:     return UnaryOpSlow_ISINVALID<uint16_t>;
+        default: return UnaryOpSlow_FillTrue;
         }
         break;
 
@@ -1271,23 +1267,30 @@ UNARY_FUNC GetUnaryOpSlow(int func, int numpyInType1, int numpyOutType, int* wan
         *wantedOutType = ATOP_BOOL;
 
         // Can only handle when output type is bool or not defined
-        if (numpyOutType == 0 || numpyOutType == -1) {
-            switch (numpyInType1) {
-            case ATOP_FLOAT:  return UnaryOpSlow_ISNAN<float>;
-            case ATOP_DOUBLE: return UnaryOpSlow_ISNAN<double>;
-            case ATOP_LONGDOUBLE: return UnaryOpSlow_ISNAN<long double>;
-            case ATOP_INT32:      return UnaryOpSlow_ISINVALID<int32_t>;
-            case ATOP_UINT32:     return UnaryOpSlow_ISINVALID<uint32_t>;
-            case ATOP_INT64:      return UnaryOpSlow_ISINVALID<int64_t>;
-            case ATOP_UINT64:     return UnaryOpSlow_ISINVALID<uint64_t>;
-            case ATOP_BOOL:
-            case ATOP_INT8:       return UnaryOpSlow_ISINVALID<int8_t>;
-            case ATOP_UINT8:      return UnaryOpSlow_ISINVALID<uint8_t>;
-            case ATOP_INT16:      return UnaryOpSlow_ISINVALID<int16_t>;
-            case ATOP_UINT16:     return UnaryOpSlow_ISINVALID<uint16_t>;
-
-            default: return UnaryOpSlow_FillFalse;
-            }
+        switch (atopInType1) {
+        case ATOP_FLOAT:  return UnaryOpSlow_ISNAN<float>;
+        case ATOP_DOUBLE: return UnaryOpSlow_ISNAN<double>;
+        case ATOP_LONGDOUBLE: return UnaryOpSlow_ISNAN<long double>;
+        case ATOP_INT32:      return UnaryOpSlow_ISINVALID<int32_t>;
+        case ATOP_UINT32:     return UnaryOpSlow_ISINVALID<uint32_t>;
+        case ATOP_INT64:      return UnaryOpSlow_ISINVALID<int64_t>;
+        case ATOP_UINT64:     return UnaryOpSlow_ISINVALID<uint64_t>;
+        case ATOP_BOOL:
+        case ATOP_INT8:       return UnaryOpSlow_ISINVALID<int8_t>;
+        case ATOP_UINT8:      return UnaryOpSlow_ISINVALID<uint8_t>;
+        case ATOP_INT16:      return UnaryOpSlow_ISINVALID<int16_t>;
+        case ATOP_UINT16:     return UnaryOpSlow_ISINVALID<uint16_t>;
+        // For when we have an invalid integer
+        //case ATOP_INT32:      return UnaryOpSlow_ISINVALID<int32_t>;
+        //case ATOP_UINT32:     return UnaryOpSlow_ISINVALID<uint32_t>;
+        //case ATOP_INT64:      return UnaryOpSlow_ISINVALID<int64_t>;
+        //case ATOP_UINT64:     return UnaryOpSlow_ISINVALID<uint64_t>;
+        //case ATOP_BOOL:
+        //case ATOP_INT8:       return UnaryOpSlow_ISINVALID<int8_t>;
+        //case ATOP_UINT8:      return UnaryOpSlow_ISINVALID<uint8_t>;
+        //case ATOP_INT16:      return UnaryOpSlow_ISINVALID<int16_t>;
+        //case ATOP_UINT16:     return UnaryOpSlow_ISINVALID<uint16_t>;
+        default: return UnaryOpSlow_FillFalse;
         }
         break;
 
@@ -1295,148 +1298,138 @@ UNARY_FUNC GetUnaryOpSlow(int func, int numpyInType1, int numpyOutType, int* wan
         *wantedOutType = ATOP_BOOL;
 
         // Can only handle when output type is bool or not defined
-        if (numpyOutType == 0 || numpyOutType == -1) {
-            switch (numpyInType1) {
-            case ATOP_FLOAT:  return UnaryOpSlow_ISNANORZERO<float>;
-            case ATOP_DOUBLE: return UnaryOpSlow_ISNANORZERO<double>;
-            case ATOP_LONGDOUBLE: return UnaryOpSlow_ISNANORZERO<long double>;
-            case ATOP_INT32:      return UnaryOpSlow_ISINVALIDORZERO<int32_t>;
-            case ATOP_UINT32:     return UnaryOpSlow_ISINVALIDORZERO<uint32_t>;
-            case ATOP_INT64:      return UnaryOpSlow_ISINVALIDORZERO<int64_t>;
-            case ATOP_UINT64:     return UnaryOpSlow_ISINVALIDORZERO<uint64_t>;
-            case ATOP_BOOL:
-            case ATOP_INT8:       return UnaryOpSlow_ISINVALIDORZERO<int8_t>;
-            case ATOP_UINT8:      return UnaryOpSlow_ISINVALIDORZERO<uint8_t>;
-            case ATOP_INT16:      return UnaryOpSlow_ISINVALIDORZERO<int16_t>;
-            case ATOP_UINT16:     return UnaryOpSlow_ISINVALIDORZERO<uint16_t>;
+        switch (atopInType1) {
+        case ATOP_FLOAT:  return UnaryOpSlow_ISNANORZERO<float>;
+        case ATOP_DOUBLE: return UnaryOpSlow_ISNANORZERO<double>;
+        case ATOP_LONGDOUBLE: return UnaryOpSlow_ISNANORZERO<long double>;
+        case ATOP_INT32:      return UnaryOpSlow_ISINVALIDORZERO<int32_t>;
+        case ATOP_UINT32:     return UnaryOpSlow_ISINVALIDORZERO<uint32_t>;
+        case ATOP_INT64:      return UnaryOpSlow_ISINVALIDORZERO<int64_t>;
+        case ATOP_UINT64:     return UnaryOpSlow_ISINVALIDORZERO<uint64_t>;
+        case ATOP_BOOL:
+        case ATOP_INT8:       return UnaryOpSlow_ISINVALIDORZERO<int8_t>;
+        case ATOP_UINT8:      return UnaryOpSlow_ISINVALIDORZERO<uint8_t>;
+        case ATOP_INT16:      return UnaryOpSlow_ISINVALIDORZERO<int16_t>;
+        case ATOP_UINT16:     return UnaryOpSlow_ISINVALIDORZERO<uint16_t>;
 
-            default: return UnaryOpSlow_FillFalse;
-            }
+        default: return UnaryOpSlow_FillFalse;
         }
         break;
 
     case UNARY_OPERATION::ISNOTNAN:
         *wantedOutType = ATOP_BOOL;
         // Can only handle when output type is bool or not defined
-        if (numpyOutType == 0 || numpyOutType == -1) {
-            switch (numpyInType1) {
-            case ATOP_FLOAT:  return UnaryOpSlow_ISNOTNAN<float>;
-            case ATOP_DOUBLE: return UnaryOpSlow_ISNOTNAN<double>;
-            case ATOP_LONGDOUBLE: return UnaryOpSlow_ISNOTNAN<long double>;
-            case ATOP_INT32:      return UnaryOpSlow_ISNOTINVALID<int32_t>;
-            case ATOP_UINT32:     return UnaryOpSlow_ISNOTINVALID<uint32_t>;
-            case ATOP_INT64:      return UnaryOpSlow_ISNOTINVALID<int64_t>;
-            case ATOP_UINT64:     return UnaryOpSlow_ISNOTINVALID<uint64_t>;
-            case ATOP_BOOL:
-            case ATOP_INT8:       return UnaryOpSlow_ISNOTINVALID<int8_t>;
-            case ATOP_UINT8:      return UnaryOpSlow_ISNOTINVALID<uint8_t>;
-            case ATOP_INT16:      return UnaryOpSlow_ISNOTINVALID<int16_t>;
-            case ATOP_UINT16:     return UnaryOpSlow_ISNOTINVALID<uint16_t>;
-            default: return UnaryOpSlow_FillTrue;
-            }
+        switch (atopInType1) {
+        case ATOP_FLOAT:  return UnaryOpSlow_ISNOTNAN<float>;
+        case ATOP_DOUBLE: return UnaryOpSlow_ISNOTNAN<double>;
+        case ATOP_LONGDOUBLE: return UnaryOpSlow_ISNOTNAN<long double>;
+        case ATOP_INT32:      return UnaryOpSlow_ISNOTINVALID<int32_t>;
+        case ATOP_UINT32:     return UnaryOpSlow_ISNOTINVALID<uint32_t>;
+        case ATOP_INT64:      return UnaryOpSlow_ISNOTINVALID<int64_t>;
+        case ATOP_UINT64:     return UnaryOpSlow_ISNOTINVALID<uint64_t>;
+        case ATOP_BOOL:
+        case ATOP_INT8:       return UnaryOpSlow_ISNOTINVALID<int8_t>;
+        case ATOP_UINT8:      return UnaryOpSlow_ISNOTINVALID<uint8_t>;
+        case ATOP_INT16:      return UnaryOpSlow_ISNOTINVALID<int16_t>;
+        case ATOP_UINT16:     return UnaryOpSlow_ISNOTINVALID<uint16_t>;
+        default: return UnaryOpSlow_FillTrue;
         }
         break;
     case UNARY_OPERATION::ISINF:
         *wantedOutType = ATOP_BOOL;
         // Can only handle when output type is bool or not defined
-        if (numpyOutType == 0 || numpyOutType == -1) {
-            switch (numpyInType1) {
-            case ATOP_FLOAT:  return UnaryOpSlow_ISINF<float>;
-            case ATOP_DOUBLE: return UnaryOpSlow_ISINF<double>;
-            case ATOP_LONGDOUBLE: return UnaryOpSlow_ISINF<long double>;
-            default: return UnaryOpSlow_FillFalse;
-            }
+        switch (atopInType1) {
+        case ATOP_FLOAT:  return UnaryOpSlow_ISINF<float>;
+        case ATOP_DOUBLE: return UnaryOpSlow_ISINF<double>;
+        case ATOP_LONGDOUBLE: return UnaryOpSlow_ISINF<long double>;
+        default: return UnaryOpSlow_FillFalse;
         }
         break;
     case UNARY_OPERATION::ISNOTINF:
         *wantedOutType = ATOP_BOOL;
         // Can only handle when output type is bool or not defined
-        if (numpyOutType == 0 || numpyOutType == -1) {
-            switch (numpyInType1) {
-            case ATOP_FLOAT:  return UnaryOpSlow_ISNOTINF<float>;
-            case ATOP_DOUBLE: return UnaryOpSlow_ISNOTINF<double>;
-            case ATOP_LONGDOUBLE: return UnaryOpSlow_ISNOTINF<long double>;
-            default: return UnaryOpSlow_FillTrue;
-            }
+        switch (atopInType1) {
+        case ATOP_FLOAT:  return UnaryOpSlow_ISNOTINF<float>;
+        case ATOP_DOUBLE: return UnaryOpSlow_ISNOTINF<double>;
+        case ATOP_LONGDOUBLE: return UnaryOpSlow_ISNOTINF<long double>;
+        default: return UnaryOpSlow_FillTrue;
         }
         break;
     case UNARY_OPERATION::ISNORMAL:
         *wantedOutType = ATOP_BOOL;
         // Can only handle when output type is bool or not defined
-        if (numpyOutType == 0 || numpyOutType == -1) {
-            switch (numpyInType1) {
-            case ATOP_FLOAT:  return UnaryOpSlow_ISNORMAL<float>;
-            case ATOP_DOUBLE: return UnaryOpSlow_ISNORMAL<double>;
-            case ATOP_LONGDOUBLE: return UnaryOpSlow_ISNORMAL<long double>;
-            default: return UnaryOpSlow_FillTrue;
-            }
+        switch (atopInType1) {
+        case ATOP_FLOAT:  return UnaryOpSlow_ISNORMAL<float>;
+        case ATOP_DOUBLE: return UnaryOpSlow_ISNORMAL<double>;
+        case ATOP_LONGDOUBLE: return UnaryOpSlow_ISNORMAL<long double>;
+        default: return UnaryOpSlow_FillTrue;
         }
         break;
     case UNARY_OPERATION::ISNOTNORMAL:
         *wantedOutType = ATOP_BOOL;
         // Can only handle when output type is bool or not defined
-        if (numpyOutType == 0 || numpyOutType == -1) {
-            switch (numpyInType1) {
-            case ATOP_FLOAT:  return UnaryOpSlow_ISNOTNORMAL<float>;
-            case ATOP_DOUBLE: return UnaryOpSlow_ISNOTNORMAL<double>;
-            case ATOP_LONGDOUBLE: return UnaryOpSlow_ISNOTNORMAL<long double>;
-            default: return UnaryOpSlow_FillFalse;
-            }
+        switch (atopInType1) {
+        case ATOP_FLOAT:  return UnaryOpSlow_ISNOTNORMAL<float>;
+        case ATOP_DOUBLE: return UnaryOpSlow_ISNOTNORMAL<double>;
+        case ATOP_LONGDOUBLE: return UnaryOpSlow_ISNOTNORMAL<long double>;
+        default: return UnaryOpSlow_FillFalse;
         }
         break;
 
     case UNARY_OPERATION::FLOOR:
-        *wantedOutType = numpyInType1;
-        switch (numpyInType1) {
-        case ATOP_DOUBLE: return UnaryOpSlow_FLOOR<double>;
-        case ATOP_LONGDOUBLE: return UnaryOpSlow_FLOOR<long double>;
+        
+        switch (atopInType1) {
+        case ATOP_DOUBLE: *wantedOutType = atopInType1; return UnaryOpSlow_FLOOR<double>;
+        case ATOP_LONGDOUBLE: *wantedOutType = atopInType1; return UnaryOpSlow_FLOOR<long double>;
         }
         break;
     case UNARY_OPERATION::CEIL:
-        *wantedOutType = numpyInType1;
-        switch (numpyInType1) {
-        case ATOP_DOUBLE: return UnaryOpSlow_CEIL<double>;
-        case ATOP_LONGDOUBLE: return UnaryOpSlow_CEIL<long double>;
+        
+        switch (atopInType1) {
+        case ATOP_DOUBLE: *wantedOutType = atopInType1; return UnaryOpSlow_CEIL<double>;
+        case ATOP_LONGDOUBLE: *wantedOutType = atopInType1; return UnaryOpSlow_CEIL<long double>;
         }
         break;
     case UNARY_OPERATION::TRUNC:
-        *wantedOutType = numpyInType1;
-        switch (numpyInType1) {
-        case ATOP_DOUBLE: return UnaryOpSlow_TRUNC<double>;
-        case ATOP_LONGDOUBLE: return UnaryOpSlow_TRUNC<long double>;
+        
+        switch (atopInType1) {
+        case ATOP_DOUBLE: *wantedOutType = atopInType1; return UnaryOpSlow_TRUNC<double>;
+        case ATOP_LONGDOUBLE: *wantedOutType = atopInType1; return UnaryOpSlow_TRUNC<long double>;
         }
         break;
     case UNARY_OPERATION::ROUND:
-        *wantedOutType = numpyInType1;
-        switch (numpyInType1) {
-        case ATOP_DOUBLE: return UnaryOpSlow_ROUND<double>;
-        case ATOP_LONGDOUBLE: return UnaryOpSlow_ROUND<long double>;
+        
+        switch (atopInType1) {
+        case ATOP_DOUBLE: *wantedOutType = atopInType1; return UnaryOpSlow_ROUND<double>;
+        case ATOP_LONGDOUBLE: *wantedOutType = atopInType1; return UnaryOpSlow_ROUND<long double>;
         }
         break;
     case UNARY_OPERATION::SQRT:
-        *wantedOutType = ATOP_DOUBLE;
-        if (numpyInType1 == ATOP_FLOAT) {
-            *wantedOutType = ATOP_FLOAT;
-        }
-        if (numpyInType1 == ATOP_LONGDOUBLE) {
-            *wantedOutType = ATOP_LONGDOUBLE;
-        }
-        switch (numpyInType1) {
-        case ATOP_INT32:   return UnaryOpSlowDouble_SQRT<int32_t>;
-        case ATOP_UINT32:  return UnaryOpSlowDouble_SQRT<uint32_t>;
-        case ATOP_INT64:   return UnaryOpSlowDouble_SQRT<int64_t>;
-        case ATOP_UINT64:  return UnaryOpSlowDouble_SQRT<int64_t>;
-        case ATOP_DOUBLE:  return UnaryOpSlow_SQRT<double>;
-        case ATOP_LONGDOUBLE: return UnaryOpSlow_SQRT<long double>;
+        if (atopInType1 >= ATOP_FLOAT && atopInType1 < ATOP_LONGDOUBLE) {
+            *wantedOutType = ATOP_DOUBLE;
+            if (atopInType1 == ATOP_FLOAT) {
+                *wantedOutType = ATOP_FLOAT;
+            }
+            if (atopInType1 == ATOP_LONGDOUBLE) {
+                *wantedOutType = ATOP_LONGDOUBLE;
+            }
+            switch (atopInType1) {
+            case ATOP_INT32:   return UnaryOpSlowDouble_SQRT<int32_t>;
+            case ATOP_UINT32:  return UnaryOpSlowDouble_SQRT<uint32_t>;
+            case ATOP_INT64:   return UnaryOpSlowDouble_SQRT<int64_t>;
+            case ATOP_UINT64:  return UnaryOpSlowDouble_SQRT<int64_t>;
+            case ATOP_DOUBLE:  return UnaryOpSlow_SQRT<double>;
+            case ATOP_LONGDOUBLE: return UnaryOpSlow_SQRT<long double>;
+            }
         }
         break;
 
     case UNARY_OPERATION::SIGNBIT:
-        *wantedOutType = ATOP_BOOL;
-        switch (numpyInType1) {
-        case ATOP_FLOAT: return UnaryOpSlow_SIGNBIT<float>;
-        case ATOP_DOUBLE: return UnaryOpSlow_SIGNBIT<double>;
-        case ATOP_LONGDOUBLE: return UnaryOpSlow_SIGNBIT<long double>;
+        
+        switch (atopInType1) {
+        case ATOP_FLOAT: *wantedOutType = ATOP_BOOL;  return UnaryOpSlow_SIGNBIT<float>;
+        case ATOP_DOUBLE: *wantedOutType = ATOP_BOOL;  return UnaryOpSlow_SIGNBIT<double>;
+        case ATOP_LONGDOUBLE: *wantedOutType = ATOP_BOOL; return UnaryOpSlow_SIGNBIT<long double>;
             //case ATOP_INT32:  return UnaryOpSlowDouble_SIGNBIT<int32_t>;
         }
         break;
@@ -1470,6 +1463,15 @@ UNARY_FUNC GetUnaryOpFast(int func, int atopInType1, int* wantedOutType) {
         switch (atopInType1) {
         case ATOP_FLOAT:  return UnaryOpFast_NANF32<float, __m256>;
         case ATOP_DOUBLE: return UnaryOpFast_NANF64<double, __m256d>;
+        case ATOP_INT32:      
+        case ATOP_UINT32:     
+        case ATOP_INT64:      
+        case ATOP_UINT64:     
+        case ATOP_BOOL:
+        case ATOP_INT8:       
+        case ATOP_UINT8:      
+        case ATOP_INT16:      
+        case ATOP_UINT16:     return UnaryOpSlow_FillFalse;
         }
         break;
 

@@ -23,6 +23,7 @@ extern "C" {
     DllExport REDUCE_FUNC GetReduceMathOpFast(int func, int atopInType1);
     DllExport ANY_TWO_FUNC GetComparisonOpFast(int func, int atopInType1, int atopInType2, int* wantedOutType);
     DllExport UNARY_FUNC GetUnaryOpFast(int func, int atopInType1, int* wantedOutType);
+    DllExport UNARY_FUNC GetUnaryOpSlow(int func, int atopInType1, int* wantedOutType);
     DllExport UNARY_FUNC GetTrigOpFast(int func, int atopInType1, int* wantedOutType);
     DllExport UNARY_FUNC GetTrigOpSlow(int func, int atopInType1, int* wantedOutType);
     DllExport UNARY_FUNC GetLogOpFast(int func, int atopInType1, int* wantedOutType);
