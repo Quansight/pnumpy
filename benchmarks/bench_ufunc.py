@@ -1,6 +1,6 @@
 import functools
 import os
-from typing import List, Mapping, Optional, Tuple
+from typing import ClassVar, List, Mapping, Optional, Tuple
 
 import numpy as np
 import pnumpy
@@ -221,8 +221,18 @@ class BenchUtil:
 
 
 # Create the benchmark classes -- one for each ufunc.
-for ufunc in ufuncs:
+for _ufunc_name in ufuncs:
+    ### IMPORANT ###
+    # DO NOT reference the loop variable (the ufunc name) within the class we're creating below;
+    # it appears the loop variable is captured by reference so every benchmark class will run
+    # the last ufunc in the ufuncs list instead of the ufunc it's supposed to benchmark.
+    # Instead, pass the object to the code within the class by setting a class-level attribute
+    # and retrieving that inside the class.
     class UFunc():
+        target_ufunc: ClassVar[np.ufunc]
+
+        __slots__ = ('args', 'f')
+
         params = (
             # array rank
             [1, 2],
@@ -250,20 +260,26 @@ for ufunc in ufuncs:
         param_names = ['rank', 'input_dtype', 'nthreads', 'atop']
         timeout = 10
 
+        @property
+        def ufunc_obj(self) -> np.ufunc:
+            """Convenience property / shorthand for getting the ufunc for this benchmark, since it's stored as a class attribute."""
+            return self.__class__.target_ufunc
+
         def setup(self, rank, input_dtype: str, nthreads: int, atop):
             np.seterr(all='ignore')
 
             # Configure threading layer.
             BenchUtil.set_pnumpy_thread_count(nthreads)
-            BenchUtil.set_atop_thread_count(ufunc, np.dtype(input_dtype), (nthreads if atop else None))
+            BenchUtil.set_atop_thread_count(self.ufunc_obj.__name__, np.dtype(input_dtype), (nthreads if atop else None))
 
             try:
-                self.f = getattr(np, ufunc)
+                # Get the ufunc from the class attribute; if it hasn't been set,
+                # raise a NotImplementedError to tell ASV to skip this benchmark.
+                self.f = self.ufunc_obj
             except AttributeError:
-                raise NotImplementedError(f"The installed version of numpy does not have a '{ufunc}' function.")
+                raise NotImplementedError(f"The installed version of numpy does not have a '{self.__class__.__name__}' function.")
 
             # Build up the benchmark arguments.
-            self.args = []
             a = get_squares()[input_dtype]
 
             # If rank == 1, flatten the array for testing performance on 1D arrays,
@@ -293,25 +309,45 @@ for ufunc in ufuncs:
             except TypeError:
                 # Function couldn't be called with these arguments; can't proceed so raise NotImplementedError
                 # which means ASV will skip the current parameter tuple.
-                raise NotImplementedError(f"Constructed parameters were not compatible with the '{ufunc}' ufunc.")
+                raise NotImplementedError(f"Constructed parameters were not compatible with the '{self.ufunc_obj.__name__}' ufunc.")
 
-            self.args.append(arg)
+            self.args = arg
 
         def teardown(self, rank, input_dtype, nthreads, atop):
             # Disable threading / revert to 'off' state.
             BenchUtil.set_pnumpy_thread_count(None)
-            BenchUtil.set_atop_thread_count(ufunc, np.dtype(input_dtype), None)
+            BenchUtil.set_atop_thread_count(self.ufunc_obj.__name__, np.dtype(input_dtype), None)
 
             # TODO: Undo the np.seterr(all='ignore') call made in the setup() function.
 
         def time_ufunc_types(self, _dummy1, _dummy2, _dummy3, _dummy4):
-            [self.f(*arg) for arg in self.args]
+            # N.B. The splat operator adds a very tiny amount of overhead here, but it should
+            #       be negligble and dominated by the run-time of the function itself.
+            _ = self.f(*self.args)
 
-    UFunc.__name__ = 'UFunc_' + ufunc
+    # (See comment at the beginning of this loop.)
+    # Get the actual ufunc object from numpy then set a class attribute with it
+    # to pass the object into the class while avoiding name-capture issues.
+    try:
+        UFunc.target_ufunc = getattr(np, _ufunc_name)
+    except AttributeError:
+        # Just pass here; if the function isn't present in the loaded numpy module,
+        # we'll get another AttributeError when executing the class' setup() method
+        # which indicates to ASV that the benchmark should be skipped (without failing
+        # in a way that prevents the rest of the benchmarks from running).
+        pass
+
+    # Fix the name of the benchmark class created for this ufunc,
+    # then make it visible in the global namespace.
+    # TODO: Do we need to fix __qualname__ to match?
+    UFunc.__name__ = f'UFunc_{_ufunc_name}'
     globals()[UFunc.__name__] = UFunc
 
 
 class BitwiseOps:
+    # TODO: Include 'nonzero' here? Or is that not a ufunc/array_function?
+    _ufunc_names = frozenset(['bitwise_and', 'bitwise_not', 'bitwise_or', 'bitwise_xor'])
+
     # TODO: Define parameters for dtype, threads, array rank, array_pooling.
     params = (
         # array rank
@@ -354,7 +390,8 @@ class BitwiseOps:
 
         # Configure threading layer.
         BenchUtil.set_pnumpy_thread_count(nthreads)
-        BenchUtil.set_atop_thread_count(ufunc, np.dtype(input_dtype), (nthreads if atop else None))
+        for _ufunc_name in self.__class__._ufunc_names:
+            BenchUtil.set_atop_thread_count(_ufunc_name, np.dtype(input_dtype), (nthreads if atop else None))
 
         # Get the shape of the array to create based on the rank parameter.
         if rank == 1:
@@ -369,31 +406,37 @@ class BitwiseOps:
     def teardown(self, rank, input_dtype, nthreads, atop):
         # Disable threading / revert to 'off' state.
         BenchUtil.set_pnumpy_thread_count(None)
-        BenchUtil.set_atop_thread_count(ufunc, np.dtype(input_dtype), None)
+        for _ufunc_name in self.__class__._ufunc_names:
+            BenchUtil.set_atop_thread_count(_ufunc_name, np.dtype(input_dtype), None)
 
     def time_nonzero(self, _dummy1, _dummy2, _dummy3, _dummy4):
         # TODO: Does this need to switch between np and pnumpy/pn?
         np.nonzero(self.b)
 
-    def time_bitwise_not_bool(self, _dummy1, _dummy2, _dummy3, _dummy4):
-        (~self.b)
-
     def time_bitwise_and_bool(self, _dummy1, _dummy2, _dummy3, _dummy4):
         (self.b & self.b)
+
+    def time_bitwise_not_bool(self, _dummy1, _dummy2, _dummy3, _dummy4):
+        (~self.b)
 
     def time_bitwise_or_bool(self, _dummy1, _dummy2, _dummy3, _dummy4):
         (self.b | self.b)
 
+    def time_bitwise_xor_bool(self, _dummy1, _dummy2, _dummy3, _dummy4):
+        (self.b ^ self.b)
+
 
 class CustomInplace:
+    _ufunc_names = frozenset(['add', 'bitwise_or'])
+    _ufunc_dtypes = frozenset(['int8', 'int32', 'float32', 'float64'])
+
     def setup(self):
         # TEMP: Disable threading / revert to 'off' state until we can parameterize
         #       this fixture with thread counts, etc.
         BenchUtil.set_pnumpy_thread_count(None)
-        BenchUtil.set_atop_thread_count(ufunc, np.dtype(np.int8), None)
-        BenchUtil.set_atop_thread_count(ufunc, np.dtype(np.int32), None)
-        BenchUtil.set_atop_thread_count(ufunc, np.dtype(np.float32), None)
-        BenchUtil.set_atop_thread_count(ufunc, np.dtype(np.float64), None)
+        for _ufunc_name in self.__class__._ufunc_names:
+            for _ufunc_dtype in self.__class__._ufunc_dtypes:
+                BenchUtil.set_atop_thread_count(_ufunc_name, np.dtype(_ufunc_dtype), None)
 
         self.c = np.ones(30_000_000, dtype=np.int8)
         self.i = np.ones(3_000_000, dtype=np.int32)
@@ -406,10 +449,9 @@ class CustomInplace:
     def teardown(self):
         # Disable threading / revert to 'off' state.
         BenchUtil.set_pnumpy_thread_count(None)
-        BenchUtil.set_atop_thread_count(ufunc, np.dtype(np.int8), None)
-        BenchUtil.set_atop_thread_count(ufunc, np.dtype(np.int32), None)
-        BenchUtil.set_atop_thread_count(ufunc, np.dtype(np.float32), None)
-        BenchUtil.set_atop_thread_count(ufunc, np.dtype(np.float64), None)
+        for _ufunc_name in self.__class__._ufunc_names:
+            for _ufunc_dtype in self.__class__._ufunc_dtypes:
+                BenchUtil.set_atop_thread_count(_ufunc_name, np.dtype(_ufunc_dtype), None)
 
     def time_char_or(self):
         np.bitwise_or(self.c, 0, out=self.c)
@@ -441,6 +483,8 @@ class CustomInplace:
 
 
 class CustomScalar:
+    _ufunc_names = frozenset(['add', 'bitwise_or'])
+
     params = [np.float32, np.float64]
     param_names = ['dtype']
 
@@ -448,14 +492,18 @@ class CustomScalar:
         # TEMP: Disable threading / revert to 'off' state until we can parameterize
         #       this fixture with thread counts, etc.
         BenchUtil.set_pnumpy_thread_count(None)
-        BenchUtil.set_atop_thread_count(ufunc, np.dtype(dtype), None)
+        for _ufunc_name in self.__class__._ufunc_names:
+            for _ufunc_dtype in self.__class__.params:
+                BenchUtil.set_atop_thread_count(_ufunc_name, np.dtype(_ufunc_dtype), None)
 
         self.d = np.ones(7_000_000, dtype=dtype)
 
     def teardown(self, dtype):
         # Disable threading / revert to 'off' state.
         BenchUtil.set_pnumpy_thread_count(None)
-        BenchUtil.set_atop_thread_count(ufunc, np.dtype(dtype), None)
+        for _ufunc_name in self.__class__._ufunc_names:
+            for _ufunc_dtype in self.__class__.params:
+                BenchUtil.set_atop_thread_count(_ufunc_name, np.dtype(_ufunc_dtype), None)
 
     def time_add_scalar2(self, dtype):
         np.add(self.d, 1)
