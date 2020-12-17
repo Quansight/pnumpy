@@ -1,5 +1,17 @@
+"""
+Run benchmarks on pnumpy. The benchmarks will be run on all ufuncs with the
+combinations of
+- ``rank`` of the input ndarray (1 or 2)
+- ``input_dtype`` is the dtype of the input ndarray(float(16,32), int(16,32,64),
+  complex(64,128), or complex128 if it exists)
+- ``nthreads`` for distributing work (0, 2, or 4)
+- ``atop`` whether or not to us ethe ``atop`` inner loop function replacements
+
+Each benchmark will run 
+"""
 import functools
 import os
+import sys
 from typing import ClassVar, List, Mapping, Optional, Tuple
 
 import numpy as np
@@ -9,34 +21,44 @@ pnumpy.initialize()
 
 ########
 # TODO: Additional benchmarking aspects that should be incorporated into the benchmarks below:
-#       * start-of-array address alignment to 1/2/4/8/16/32/64/128-byte boundary to look for perf issues
-#         caused by things like missing some loop-peeling step (to process the first part of an array to
-#         get to an SIMD-vector-aligned boundary).
-#       * striding -- e.g. compare the performance of some function operating on an array of N elements
-#         vs. an array with the same number of elements but using a non-default stride (e.g. create an array
-#         2/3/4x the size then use slicing syntax with an explicit step value); maybe also include a 3rd
-#         comparison point where we use slicing syntax on the original array to take every other element
-#         (since that array/view would cover the same amount of memory but a smaller number of elements).
-#       * Can we report additional information at the process level (of the asv invocation)? Or would this
-#         need to be implemented in asv itself? It would be nice to use 'hwloc' to capture system topology
-#         info and save it as e.g. some metadata of the benchmark results, so we can consider doing some
-#         post-processing of the benchmark results to normalize by things like L2/L3 cache size, number of cores,
-#         SMT on/off (and SMT level), number of memory channels, etc.
-#       * Chunk/block size (in bytes, *not* number of elements) that arrays are (virtually) split into for
-#         parallel processing. The best value for this parameter will vary by function, CPU/memory characteristics,
-#         and (likely) the number of worker threads being used for that function.
+#       * start-of-array address alignment to 1/2/4/8/16/32/64/128-byte
+#         boundary to look for perf issues caused by things like missing some
+#         loop-peeling step (to process the first part of an array to get to an
+#         SIMD-vector-aligned boundary).
+#       * striding -- e.g. compare the performance of some function operating
+#         on an array of N elements vs. an array with the same number of
+#         elements but using a non-default stride (e.g. create an array 2/3/4x
+#         the size then use slicing syntax with an explicit step value); maybe
+#         also include a 3rd comparison point where we use slicing syntax on
+#         the original array to take every other element (since that array/view
+#         would cover the same amount of memory but a smaller number of
+#         elements).
+#       * Can we report additional information at the process level (of the asv
+#         invocation)? Or would this need to be implemented in asv itself? It
+#         would be nice to use 'hwloc' to capture system topology info and save
+#         it as e.g. some metadata of the benchmark results, so we can consider
+#         doing some post-processing of the benchmark results to normalize by
+#         things like L2/L3 cache size, number of cores, SMT on/off (and SMT
+#         level), number of memory channels, etc.
+#       * Chunk/block size (in bytes, *not* number of elements) that arrays are
+#         (virtually) split into for parallel processing. The best value for
+#         this parameter will vary by function, CPU/memory characteristics, and
+#         (likely) the number of worker threads being used for that function.
 #
-#         See academic literature on automatic, empirical performance optimization of software for
-#         examples of how parameterizing settings like the # of worker threads and the chunk/block
-#         size per function on each users' machine can be used to squeeze out a little extra performance.
-#         References (not an exhaustive list):
+#         See academic literature on automatic, empirical performance
+#         optimization of software for examples of how parameterizing settings
+#         like the # of worker threads and the chunk/block size per function on
+#         each users' machine can be used to squeeze out a little extra
+#         performance.  References (not an exhaustive list):
 #           * "Automated Empirical Optimization of Software and the ATLAS Project"
 #             https://doi.org/10.1016%2FS0167-8191%2800%2900087-9
-#           * "Automated empirical tuning of scientific codes for performance and power consumption"
-#             https://dl.acm.org/doi/abs/10.1145/1944862.1944880
-#           * "Stencil computation optimization and auto-tuning on state-of-the-art multicore architectures"
+#           * "Automated empirical tuning of scientific codes for performance
+#             and power consumption" https://dl.acm.org/doi/abs/10.1145/1944862.1944880
+#           * "Stencil computation optimization and auto-tuning on
+#             state-of-the-art multicore architectures"
 #             https://www.osti.gov/servlets/purl/964371-KongKj/
-#           * "Combining models and guided empirical search to optimize for multiple levels of the memory hierarchy"
+#           * "Combining models and guided empirical search to optimize for
+#             multiple levels of the memory hierarchy"
 #             http://citeseerx.ist.psu.edu/viewdoc/summary?doi=10.1.1.532.9511
 #           * "Statistical Models for Empirical Search-Based Performance Tuning"
 #             https://dl.acm.org/doi/abs/10.1177/1094342004041293
@@ -71,8 +93,9 @@ TYPES1: List[str] = [
 if 'complex256' in np.typeDict:
     TYPES1.append('complex256')
 
-
 def memoize(func):
+    """ TODO: why use this and not lru_cache?
+    """
     result = []
     def wrapper():
         if not result:
@@ -82,17 +105,16 @@ def memoize(func):
 
 
 # values which will be used to construct our sample data matrices
-# replicate 10 times to speed up initial imports of this helper
+# replicate 100 times to speed up initial imports of this helper
 # and generate some redundancy
 
-@memoize
 def get_values():
     rnd = np.random.RandomState(1)
     values = np.tile(rnd.uniform(0, 100, size=nx), ny)
     return values
 
 
-@memoize
+@functools.lru_cache(maxsize=5)
 def get_squares():
     values = get_values()
     squares = {
@@ -181,14 +203,16 @@ for name in dir(np):
         print("Missing ufunc %r" % (name,))
 
 
-
 class BenchUtil:
     @staticmethod
     def set_atop_thread_count(ufunc_name: str, elem_type: np.dtype, num_threads: Optional[int]) -> None:
         """
-        Set the number of worker threads used by atop for a given ufunc and dtype; if set to zero/None, disables threading.
+        Set the number of worker threads used by atop for a given `ufunc_name`
+        and `elem_type` to `num_threads`. If num_threads is set to zero/None,
+        disables threading.
 
-        TODO: What number of worker threads does atop use if given a mix of dtypes? E.g. the following:
+        TODO: What number of worker threads does atop use if given a mix of
+        dtypes? E.g. the following::
               num_elems = 100_000
               left = np.ones(num_elems, dtype=np.int32)
               right = np.ones(num_elems, dtype=np.int16)
@@ -197,7 +221,7 @@ class BenchUtil:
         if isinstance(elem_type, (str, type)):
             elem_type = np.dtype(elem_type)
 
-        if num_threads is not None and num_threads > 0:
+        if num_threads and num_threads > 0:
             pnumpy.atop_enable()
             # Current implementation in atop requires the number of threads to be set
             # after calling atop_enable(), otherwise setting the number of worker threads
@@ -211,7 +235,8 @@ class BenchUtil:
     @staticmethod
     def set_pnumpy_thread_count(num_threads: Optional[int]) -> None:
         """
-        Set the number of worker threads used by pnumpy; if set to zero/None, disables threading.
+        Set the number of worker threads used by pnumpy; if set to zero/None,
+        disables threading.
         """
         if num_threads is not None and num_threads > 0:
             pnumpy.thread_enable()
@@ -223,15 +248,16 @@ class BenchUtil:
 # Create the benchmark classes -- one for each ufunc.
 for _ufunc_name in ufuncs:
     ### IMPORANT ###
-    # DO NOT reference the loop variable (the ufunc name) within the class we're creating below;
-    # it appears the loop variable is captured by reference so every benchmark class will run
-    # the last ufunc in the ufuncs list instead of the ufunc it's supposed to benchmark.
-    # Instead, pass the object to the code within the class by setting a class-level attribute
+    # DO NOT reference the loop variable (the ufunc name) within the class
+    # we're creating below; it appears the loop variable is captured by
+    # reference so every benchmark class will run the last ufunc in the ufuncs
+    # list instead of the ufunc it's supposed to benchmark.# Instead, pass the
+    # object to the code within the class by setting a class-level attribute
     # and retrieving that inside the class.
     class UFunc():
         target_ufunc: ClassVar[np.ufunc]
 
-        __slots__ = ('args', 'f')
+        __slots__ = ('args', 'f', 'out')
 
         params = (
             # array rank
@@ -262,22 +288,27 @@ for _ufunc_name in ufuncs:
 
         @property
         def ufunc_obj(self) -> np.ufunc:
-            """Convenience property / shorthand for getting the ufunc for this benchmark, since it's stored as a class attribute."""
-            return self.__class__.target_ufunc
+            """Convenience property / shorthand for getting the ufunc for this
+            benchmark, since it's stored as a class attribute.
+            """
+            return self.target_ufunc
 
         def setup(self, rank, input_dtype: str, nthreads: int, atop):
             np.seterr(all='ignore')
 
             # Configure threading layer.
             BenchUtil.set_pnumpy_thread_count(nthreads)
-            BenchUtil.set_atop_thread_count(self.ufunc_obj.__name__, np.dtype(input_dtype), (nthreads if atop else None))
+            BenchUtil.set_atop_thread_count(self.ufunc_obj.__name__,
+                                            np.dtype(input_dtype),
+                                            nthreads if atop else None,
+                                           )
 
             try:
                 # Get the ufunc from the class attribute; if it hasn't been set,
                 # raise a NotImplementedError to tell ASV to skip this benchmark.
                 self.f = self.ufunc_obj
             except AttributeError:
-                raise NotImplementedError(f"The installed version of numpy does not have a '{self.__class__.__name__}' function.")
+                raise NotImplementedError(f"The installed version of numpy does not have a '{self.__name__}' function.")
 
             # Build up the benchmark arguments.
             a = get_squares()[input_dtype]
@@ -303,27 +334,31 @@ for _ufunc_name in ufuncs:
             #       Maybe also consider (as a separate, 3-valued parameter) whether we'll pass a pre-created array in
             #       for the 'out' parameter and whether that array is one of the operands or a separate array.
             arg = (a,) * self.f.nin
-
             try:
-                self.f(*arg)
+                self.out = self.f(*arg)
             except TypeError:
-                # Function couldn't be called with these arguments; can't proceed so raise NotImplementedError
-                # which means ASV will skip the current parameter tuple.
-                raise NotImplementedError(f"Constructed parameters were not compatible with the '{self.ufunc_obj.__name__}' ufunc.")
+                # Function couldn't be called with these arguments; can't
+                # proceed so raise NotImplementedError which means ASV will
+                # skip the current parameter tuple.
+                raise NotImplementedError(f"Constructed parameters were not "
+                                          f"compatible with the "
+                                          f"'{self.ufunc_obj.__name__}' ufunc.")
 
             self.args = arg
 
         def teardown(self, rank, input_dtype, nthreads, atop):
             # Disable threading / revert to 'off' state.
             BenchUtil.set_pnumpy_thread_count(None)
-            BenchUtil.set_atop_thread_count(self.ufunc_obj.__name__, np.dtype(input_dtype), None)
+            BenchUtil.set_atop_thread_count(self.ufunc_obj.__name__,
+                                            np.dtype(input_dtype), None)
 
-            # TODO: Undo the np.seterr(all='ignore') call made in the setup() function.
+            # TODO: Undo the np.seterr(all='ignore') call made in the setup()
+            # function.
 
         def time_ufunc_types(self, _dummy1, _dummy2, _dummy3, _dummy4):
             # N.B. The splat operator adds a very tiny amount of overhead here, but it should
             #       be negligble and dominated by the run-time of the function itself.
-            _ = self.f(*self.args)
+            _ = self.f(*self.args, out=self.out)
 
     # (See comment at the beginning of this loop.)
     # Get the actual ufunc object from numpy then set a class attribute with it
@@ -378,19 +413,25 @@ class BitwiseOps:
 
 
     def setup(self, rank, input_dtype: str, nthreads: int, atop):
-        # TODO: Increase array size; perhaps also add a parameter to vary the array size; may also want to
-        #       cache the created arrays (and maybe clean them up / purge the cache during fixture teardown).
-        # TODO: Need to test (perhaps controlled by a parameter) with a second array here; as-is, the benchmarks
-        #       below test bitwise operations where the same array is on both sides of the expression; this will
-        #       have different cache/memory utilization compared to the more-typical case where we have two
-        #       different arrays. A sufficiently-clever implementation of these functions could also detect the
-        #       self-application case and use a different way of producing the result (which is interesting and
-        #       worth including in a benchmark, it just needs to be differentiated from the typical case).
-        # TODO: Create this array in a 'setup_cache' function so ASV will cache it and speed up the benchmark run.
+        # TODO: Increase array size; perhaps also add a parameter to vary the
+        #       array size; may also want to cache the created arrays (and
+        #       maybe clean them up / purge the cache during fixture teardown).
+        # TODO: Need to test (perhaps controlled by a parameter) with a second
+        #       array here; as-is, the benchmarks below test bitwise operations
+        #       where the same array is on both sides of the expression; this
+        #       will have different cache/memory utilization compared to the
+        #       more-typical case where we have two different arrays. A
+        #       sufficiently-clever implementation of these functions could
+        #       also detect the self-application case and use a different way
+        #       of producing the result (which is interesting and worth
+        #       including in a benchmark, it just needs to be differentiated
+        #       from the typical case).
+        # TODO: Create this array in a 'setup_cache' function so ASV will cache
+        #       it and speed up the benchmark run.
 
         # Configure threading layer.
         BenchUtil.set_pnumpy_thread_count(nthreads)
-        for _ufunc_name in self.__class__._ufunc_names:
+        for _ufunc_name in self._ufunc_names:
             BenchUtil.set_atop_thread_count(_ufunc_name, np.dtype(input_dtype), (nthreads if atop else None))
 
         # Get the shape of the array to create based on the rank parameter.
@@ -406,7 +447,7 @@ class BitwiseOps:
     def teardown(self, rank, input_dtype, nthreads, atop):
         # Disable threading / revert to 'off' state.
         BenchUtil.set_pnumpy_thread_count(None)
-        for _ufunc_name in self.__class__._ufunc_names:
+        for _ufunc_name in self._ufunc_names:
             BenchUtil.set_atop_thread_count(_ufunc_name, np.dtype(input_dtype), None)
 
     def time_nonzero(self, _dummy1, _dummy2, _dummy3, _dummy4):
@@ -434,8 +475,8 @@ class CustomInplace:
         # TEMP: Disable threading / revert to 'off' state until we can parameterize
         #       this fixture with thread counts, etc.
         BenchUtil.set_pnumpy_thread_count(None)
-        for _ufunc_name in self.__class__._ufunc_names:
-            for _ufunc_dtype in self.__class__._ufunc_dtypes:
+        for _ufunc_name in self._ufunc_names:
+            for _ufunc_dtype in self._ufunc_dtypes:
                 BenchUtil.set_atop_thread_count(_ufunc_name, np.dtype(_ufunc_dtype), None)
 
         self.c = np.ones(30_000_000, dtype=np.int8)
@@ -449,8 +490,8 @@ class CustomInplace:
     def teardown(self):
         # Disable threading / revert to 'off' state.
         BenchUtil.set_pnumpy_thread_count(None)
-        for _ufunc_name in self.__class__._ufunc_names:
-            for _ufunc_dtype in self.__class__._ufunc_dtypes:
+        for _ufunc_name in self._ufunc_names:
+            for _ufunc_dtype in self._ufunc_dtypes:
                 BenchUtil.set_atop_thread_count(_ufunc_name, np.dtype(_ufunc_dtype), None)
 
     def time_char_or(self):
@@ -492,8 +533,8 @@ class CustomScalar:
         # TEMP: Disable threading / revert to 'off' state until we can parameterize
         #       this fixture with thread counts, etc.
         BenchUtil.set_pnumpy_thread_count(None)
-        for _ufunc_name in self.__class__._ufunc_names:
-            for _ufunc_dtype in self.__class__.params:
+        for _ufunc_name in self._ufunc_names:
+            for _ufunc_dtype in self.params:
                 BenchUtil.set_atop_thread_count(_ufunc_name, np.dtype(_ufunc_dtype), None)
 
         self.d = np.ones(7_000_000, dtype=dtype)
@@ -501,8 +542,8 @@ class CustomScalar:
     def teardown(self, dtype):
         # Disable threading / revert to 'off' state.
         BenchUtil.set_pnumpy_thread_count(None)
-        for _ufunc_name in self.__class__._ufunc_names:
-            for _ufunc_dtype in self.__class__.params:
+        for _ufunc_name in self._ufunc_names:
+            for _ufunc_dtype in self.params:
                 BenchUtil.set_atop_thread_count(_ufunc_name, np.dtype(_ufunc_dtype), None)
 
     def time_add_scalar2(self, dtype):
@@ -521,7 +562,8 @@ class CustomScalar:
 # TODO: Logical binary ops (e.g. logical_and).
 # TODO: Logical unary ops (e.g. logical_not)
 # TODO: Logical reductions (any, all, alltrue).
-# TODO: Fancy/bool indexing benchmarks; also: where (both 1- and 3-arg forms), putmask, copyto, choose, take.
+# TODO: Fancy/bool indexing benchmarks; also: where (both 1- and 3-arg forms),
+#       putmask, copyto, choose, take.
 # TODO: Reductions (e.g. sum, var, mean, amin, amax, argmin, argmax, nanargmin, nanargmax, nansum)
 # TODO: Set ops (e.g. isin, unique)
 # TODO: Sorting
