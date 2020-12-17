@@ -690,462 +690,204 @@ BooleanIndex(PyObject* self, PyObject* args)
 
 
 
-typedef void(*MBGET_FUNC)(void* pDataIn, void* pDataIn2, void* pDataOut, int64_t valSize, int64_t itemSize, int64_t start, int64_t len, void* pDefault);
+//----------------------------------------------------
+// Consider:  C=A[B]   where A is a value array
+// C must be the same type as A (and is also a value array)
+// B is an integer that indexes into A
+// The length of B is the length of the output C
+// valSize is the length of A
+// aValues  : remains constant (pointer to A)
+// aIndex   : incremented each call (pIndex) traverses B
+// aDataOut : incremented each call (pDataOut) traverses C
+// NOTE: The output CANNOT be strided
+template<typename VALUE, typename INDEX>
+static void GetItemInt(void* aValues, void* aIndex, void* aDataOut, int64_t valLength, int64_t itemSize, int64_t len, int64_t strideIndex, int64_t strideValue, void* pDefault) {
+    const VALUE* pValues = (VALUE*)aValues;
+    const INDEX* pIndex = (INDEX*)aIndex;
+    VALUE* pDataOut = (VALUE*)aDataOut;
+    VALUE  defaultVal = *(VALUE*)pDefault;
 
+    LOGGING("getitem sizes %lld  len: %lld   def: %I64d  or  %lf\n", valLength, len, (int64_t)defaultVal, (double)defaultVal);
+    LOGGING("**V %p    I %p    O  %p %llu \n", pValues, pIndex, pDataOut, valLength);
 
-//-------------------------------------------------------------------
-// T = data type as input type for values
-// U = data type as index type
-// thus <float, int32> converts a float to an int32
-template<typename T, typename U>
-class MergeBase {
-public:
-    MergeBase() {};
-    ~MergeBase() {};
-
-    //----------------------------------------------------
-    // In parallel mode aValues DOES NOT change
-    // aValues  : remains constant
-    // aIndex   : incremented each call
-    // aDataOut : incremented each call
-    // start    : incremented each call
-    static void GetItemInt(void* aValues, void* aIndex, void* aDataOut, int64_t valSize, int64_t itemSize, int64_t start, int64_t len, void* pDefault) {
-        const T* pValues = (T*)aValues;
-        const U* pIndex = (U*)aIndex;
-        T* pDataOut = (T*)aDataOut;
-        T  defaultVal = *(T*)pDefault;
-
-        LOGGING("mbget sizes %lld  start:%lld  len: %lld   def: %lld  or  %lf\n", valSize, start, len, (int64_t)defaultVal, (double)defaultVal);
-        LOGGING("**V %p    I %p    O  %p %llu \n", pValues, pIndex, pDataOut, valSize);
-
-        for (int64_t i = 0; i < len; i++)
-        {
-            const auto index = pIndex[i];
-            pDataOut[i] =
+    VALUE* pDataOutEnd = pDataOut + len;
+    if (sizeof(VALUE) == strideValue && sizeof(INDEX) == strideIndex) {
+        while (pDataOut != pDataOutEnd) {
+            const INDEX index = *pIndex;
+            *pDataOut =
                 // Make sure the item is in range; if the index is negative -- but otherwise
                 // still in range -- mimic Python's negative-indexing support.
-                index >= -valSize && index < valSize
-                ? pValues[index >= 0 ? index : index + valSize]
+                index >= -valLength && index < valLength
+                ? pValues[index >= 0 ? index : index + valLength]
 
                 // Index is out of range -- assign the invalid value.
                 : defaultVal;
+            pIndex++;
+            pDataOut++;
+        }
+
+    }
+    else {
+        // Either A or B or both are strided
+        while (pDataOut != pDataOutEnd) {
+            const INDEX index = *pIndex;
+            // Make sure the item is in range; if the index is negative -- but otherwise
+            // still in range -- mimic Python's negative-indexing support.
+            if (index >= -valLength && index < valLength) {
+                int64_t newindex = index >= 0 ? index : index + valLength;
+                newindex *= strideValue;
+                *pDataOut = *(VALUE*)((char*)pValues + newindex);
+            }
+            else {
+                // Index is out of range -- assign the invalid value.
+                *pDataOut = defaultVal;
+            }
+
+            pIndex = STRIDE_NEXT(const INDEX, pIndex, strideIndex);
+            pDataOut++;
         }
     }
+}
 
-    //----------------------------------------------------------
-    //
-    static void GetItemIntU(void* aValues, void* aIndex, void* aDataOut, int64_t valSizeX, int64_t itemSize, int64_t start, int64_t len, void* pDefault) {
-        const T* pValues = (T*)aValues;
-        const U* pIndex = (U*)aIndex;
-        T* pDataOut = (T*)aDataOut;
-        T  defaultVal = *(T*)pDefault;
 
-        uint64_t valSize = (uint64_t)valSizeX;
+//----------------------------------------------------
+// Consider:  C=A[B]   where A is a value array
+// C must be the same type as A (and is also a value array)
+// B is an integer that indexes into A
+// The length of B is the length of the output C
+// valSize is the length of A
+// aValues  : remains constant (pointer to A)
+// aIndex   : incremented each call (pIndex) traverses B
+// aDataOut : incremented each call (pDataOut) traverses C
+// NOTE: The output CANNOT be strided
+template<typename VALUE, typename INDEX>
+static void GetItemUInt(void* aValues, void* aIndex, void* aDataOut, int64_t valLength, int64_t itemSize, int64_t len, int64_t strideIndex, int64_t strideValue, void* pDefault) {
+    const VALUE* pValues = (VALUE*)aValues;
+    const INDEX* pIndex = (INDEX*)aIndex;
+    VALUE* pDataOut = (VALUE*)aDataOut;
+    VALUE  defaultVal = *(VALUE*)pDefault;
 
-        LOGGING("mbgetu sizes %lld  start:%lld  len: %lld   def: %lld  or  %lf\n", valSize, start, len, (int64_t)defaultVal, (double)defaultVal);
-        LOGGING("**V %p    I %p    O  %p %llu \n", pValues, pIndex, pDataOut, valSize);
+    LOGGING("getitem sizes %lld  len: %lld   def: %I64d  or  %lf\n", valLength, len, (int64_t)defaultVal, (double)defaultVal);
+    LOGGING("**V %p    I %p    O  %p %llu \n", pValues, pIndex, pDataOut, valLength);
 
-        for (int64_t i = 0; i < len; i++) {
-            const auto index = pIndex[i];
-            pDataOut[i] =
+    VALUE* pDataOutEnd = pDataOut + len;
+    if (sizeof(VALUE) == strideValue && sizeof(INDEX) == strideIndex) {
+        while (pDataOut != pDataOutEnd) {
+            const INDEX index = *pIndex;
+            *pDataOut =
                 // Make sure the item is in range
-                index >= 0 && index < valSize
+                index >= 0 && index < valLength
                 ? pValues[index]
                 : defaultVal;
+            pIndex++;
+            pDataOut++;
         }
+
     }
-
-
-    //----------------------------------------------------------
-    //
-    static void GetItemIntF(void* aValues, void* aIndex, void* aDataOut, int64_t valSizeX, int64_t itemSize, int64_t start, int64_t len, void* pDefault) {
-        const T* pValues = (T*)aValues;
-        const U* pIndex = (U*)aIndex;
-        T* pDataOut = (T*)aDataOut;
-        T  defaultVal = *(T*)pDefault;
-
-        uint64_t valSize = (uint64_t)valSizeX;
-
-        LOGGING("mbgetf sizes %lld  start:%lld  len: %lld   def: %lld  or  %lf\n", valSize, start, len, (int64_t)defaultVal, (double)defaultVal);
-        LOGGING("**V %p    I %p    O  %p %llu \n", pValues, pIndex, pDataOut, valSize);
-
-        for (int64_t i = 0; i < len; i++) {
-            // Make sure float is not fractional value
-            const auto index = (int64_t)pIndex[i];
-
-            pDataOut[i] =
+    else {
+        // Either A or B or both are strided
+        while (pDataOut != pDataOutEnd) {
+            const INDEX index = *pIndex;
+            *pDataOut =
                 // Make sure the item is in range
-                (U)index == pIndex[i] && index >= 0 && index < (int64_t)valSize
+                index >= 0 && index < valLength
                 ? pValues[index]
                 : defaultVal;
+            pIndex = STRIDE_NEXT(INDEX*, pIndex, strideIndex);
+            pDataOut++;
         }
     }
+}
 
 
-    //----------------------------------------------------
-    // In parallel mode aValues DOES NOT change
-    // aValues  : remains constant
-    // aIndex   : incremented each call
-    // aDataOut : incremented each call
-    // start    : incremented each call
-    static void GetItemString(void* aValues, void* aIndex, void* aDataOut, int64_t valSize, int64_t itemSize, int64_t start, int64_t len, void* pDefault) {
-        const char* pValues = (char*)aValues;
-        const U* pIndex = (U*)aIndex;
-        char* pDataOut = (char*)aDataOut;
-        char* defaultVal = (char*)pDefault;
+//----------------------------------------------------
+// This routine is for strings or NPY_VOID (variable length)
+// Consider:  C=A[B]   where A is a value array
+// C must be the same type as A (and is also a value array)
+// B is an integer that indexes into A
+// The length of B is the length of the output C
+// valSize is the length of A
+template<typename INDEX>
+static void GetItemIntVariable(void* aValues, void* aIndex, void* aDataOut, int64_t valLength, int64_t itemSize, int64_t len, int64_t strideIndex, int64_t strideValue, void* pDefault) {
+    const char* pValues = (char*)aValues;
+    const INDEX* pIndex = (INDEX*)aIndex;
+    char* pDataOut = (char*)aDataOut;
+    char  defaultVal = *(char*)pDefault;
 
-        LOGGING("mbget string sizes %lld  %lld %lld   \n", valSize, len, itemSize);
-        //printf("**V %p    I %p    O  %p %llu \n", pValues, pIndex, pDataOut, valSize);
+    LOGGING("getitem sizes %lld  len: %lld   def: %I64d  or  %lf\n", valLength, len, (int64_t)defaultVal, (double)defaultVal);
+    LOGGING("**V %p    I %p    O  %p %llu \n", pValues, pIndex, pDataOut, valLength);
 
-        for (int64_t i = 0; i < len; i++) {
-            const U index = pIndex[i];
-            char* const dest = pDataOut + (i * itemSize);
-
-            // Make sure the item is in range
-            if (index >= -valSize && index < valSize) {
-                // Handle Python-style negative indexing.
-                const int64_t newIndex = index >= 0 ? index : index + valSize;
-                const char* const src = pValues + (newIndex * itemSize);
-
-                for (int j = 0; j < itemSize; j++) {
-                    dest[j] = src[j];
-                }
-            }
-            else {
-                // This is an out-of-bounds index -- set the result to the default value,
-                // which for string types is all NUL (0x00) characters.
-                // TODO: Consider using memset here instead -- need to benchmark before changing.
-                for (int j = 0; j < itemSize; j++) {
-                    dest[j] = 0;
-                }
-            }
+    char* pDataOutEnd = pDataOut + (len * itemSize);
+    if (itemSize == strideValue && sizeof(INDEX) == strideIndex) {
+        while (pDataOut != pDataOutEnd) {
+            const INDEX index = *pIndex;
+            *pDataOut =
+                // Make sure the item is in range
+                index >= 0 && index < valLength
+                ? pValues[index]
+                : defaultVal;
+            pIndex++;
+            pDataOut+=itemSize;
         }
-    }
-
-
-    //----------------------------------------------------
-    // In parallel mode aValues DOES NOT change
-    // aValues  : remains constant
-    // aIndex   : incremented each call
-    // aDataOut : incremented each call
-    // start    : incremented each call
-    static void GetItemStringU(void* aValues, void* aIndex, void* aDataOut, int64_t valSizeX, int64_t itemSize, int64_t start, int64_t len, void* pDefault) {
-        const char* pValues = (char*)aValues;
-        const U* pIndex = (U*)aIndex;
-        char* pDataOut = (char*)aDataOut;
-        char* defaultVal = (char*)pDefault;
-
-        uint64_t valSize = (uint64_t)valSizeX;
-
-        LOGGING("mbgetu string sizes %lld  %lld %lld   \n", valSize, len, itemSize);
-        //printf("**V %p    I %p    O  %p %llu \n", pValues, pIndex, pDataOut, valSize);
-
-        for (int64_t i = 0; i < len; i++) {
-            U index = pIndex[i];
-            char* const dest = pDataOut + (i * itemSize);
-
-            // Make sure the item is in range
-            if (index >= 0 && index < valSize) {
-                const char* const src = pValues + (index * itemSize);
-
-                for (int j = 0; j < itemSize; j++) {
-                    dest[j] = src[j];
-                }
-            }
-            else {
-                // This is an out-of-bounds index -- set the result to the default value,
-                // which for string types is all NUL (0x00) characters.
-                // TODO: Consider using memset here instead -- need to benchmark before changing.
-                for (int j = 0; j < itemSize; j++) {
-                    dest[j] = 0;
-                }
-            }
-
-        }
-    }
-
-
-    static void GetItemStringF(void* aValues, void* aIndex, void* aDataOut, int64_t valSizeX, int64_t itemSize, int64_t start, int64_t len, void* pDefault) {
-        const char* pValues = (char*)aValues;
-        const U* pIndex = (U*)aIndex;
-        char* pDataOut = (char*)aDataOut;
-        char* defaultVal = (char*)pDefault;
-
-        uint64_t valSize = (uint64_t)valSizeX;
-
-        LOGGING("mbgetf string sizes %lld  %lld %lld   \n", valSize, len, itemSize);
-        //printf("**V %p    I %p    O  %p %llu \n", pValues, pIndex, pDataOut, valSize);
-
-        for (int64_t i = 0; i < len; i++) {
-            const int64_t index = (int64_t)pIndex[i];
-            char* const dest = pDataOut + (i * itemSize);
-
-            // Make sure the item is in range
-            if ((U)index == pIndex[i] && index >= 0 && index < (int64_t)valSize) {
-                const char* const src = pValues + (index * itemSize);
-
-                for (int j = 0; j < itemSize; j++) {
-                    dest[j] = src[j];
-                }
-            }
-            else {
-                // This is an out-of-bounds index -- set the result to the default value,
-                // which for string types is all NUL (0x00) characters.
-                // TODO: Consider using memset here instead -- need to benchmark before changing.
-                for (int j = 0; j < itemSize; j++) {
-                    dest[j] = 0;
-                }
-            }
-
-        }
-    }
-
-
-};
-
-
-//------------------------------------------------------------
-// inputType is Values type
-// inputType2 is Index type
-static MBGET_FUNC GetConversionFunction(int inputType, int inputType2, int func) {
-
-    switch (inputType2) {
-    case NPY_INT8:
-        switch (inputType) {
-        case NPY_FLOAT:  return MergeBase<float, int8_t>::GetItemInt;
-        case NPY_DOUBLE: return MergeBase<double, int8_t>::GetItemInt;
-        case NPY_LONGDOUBLE: return MergeBase<long double, int8_t>::GetItemInt;
-        case NPY_BOOL:
-        case NPY_BYTE:   return MergeBase<int8_t, int8_t>::GetItemInt;
-        case NPY_INT16:  return MergeBase<int16_t, int8_t>::GetItemInt;
-        CASE_NPY_INT32:  return MergeBase<int32_t, int8_t>::GetItemInt;
-        CASE_NPY_INT64:  return MergeBase<int64_t, int8_t>::GetItemInt;
-        case NPY_UINT8:  return MergeBase<uint8_t, int8_t>::GetItemInt;
-        case NPY_UINT16: return MergeBase<uint16_t, int8_t>::GetItemInt;
-        CASE_NPY_UINT32: return MergeBase<uint32_t, int8_t>::GetItemInt;
-        CASE_NPY_UINT64: return MergeBase<uint64_t, int8_t>::GetItemInt;
-        case NPY_VOID:
-        case NPY_UNICODE:
-        case NPY_STRING: return MergeBase<char*, int8_t>::GetItemString;
-        }
-        break;
-
-    case NPY_INT16:
-        switch (inputType) {
-        case NPY_FLOAT:  return MergeBase<float, int16_t>::GetItemInt;
-        case NPY_DOUBLE: return MergeBase<double, int16_t>::GetItemInt;
-        case NPY_LONGDOUBLE: return MergeBase<long double, int16_t>::GetItemInt;
-        case NPY_BOOL:
-        case NPY_BYTE:   return MergeBase<int8_t, int16_t>::GetItemInt;
-        case NPY_INT16:  return MergeBase<int16_t, int16_t>::GetItemInt;
-        CASE_NPY_INT32:  return MergeBase<int32_t, int16_t>::GetItemInt;
-        CASE_NPY_INT64:  return MergeBase<int64_t, int16_t>::GetItemInt;
-        case NPY_UINT8:  return MergeBase<uint8_t, int16_t>::GetItemInt;
-        case NPY_UINT16: return MergeBase<uint16_t, int16_t>::GetItemInt;
-        CASE_NPY_UINT32: return MergeBase<uint32_t, int16_t>::GetItemInt;
-        CASE_NPY_UINT64: return MergeBase<uint64_t, int16_t>::GetItemInt;
-        case NPY_VOID:
-        case NPY_UNICODE:
-        case NPY_STRING: return MergeBase<char*, int16_t>::GetItemString;
-        }
-        break;
-
-    CASE_NPY_INT32:
-        switch (inputType) {
-        case NPY_FLOAT:  return MergeBase<float, int32_t>::GetItemInt;
-        case NPY_DOUBLE: return MergeBase<double, int32_t>::GetItemInt;
-        case NPY_LONGDOUBLE: return MergeBase<long double, int32_t>::GetItemInt;
-        case NPY_BOOL:
-        case NPY_BYTE:   return MergeBase<int8_t, int32_t>::GetItemInt;
-        case NPY_INT16:  return MergeBase<int16_t, int32_t>::GetItemInt;
-        CASE_NPY_INT32:  return MergeBase<int32_t, int32_t>::GetItemInt;
-        CASE_NPY_INT64:  return MergeBase<int64_t, int32_t>::GetItemInt;
-        case NPY_UINT8:  return MergeBase<uint8_t, int32_t>::GetItemInt;
-        case NPY_UINT16: return MergeBase<uint16_t, int32_t>::GetItemInt;
-        CASE_NPY_UINT32: return MergeBase<uint32_t, int32_t>::GetItemInt;
-        CASE_NPY_UINT64: return MergeBase<uint64_t, int32_t>::GetItemInt;
-        case NPY_VOID:
-        case NPY_UNICODE:
-        case NPY_STRING: return MergeBase<char*, int32_t>::GetItemString;
-
-        }
-        break;
-
-    CASE_NPY_INT64:
-        switch (inputType) {
-            //case NPY_BOOL:   return MergeBase<bool, bool>::GetItemInt;
-        case NPY_FLOAT:  return MergeBase<float, int64_t>::GetItemInt;
-        case NPY_DOUBLE: return MergeBase<double, int64_t>::GetItemInt;
-        case NPY_LONGDOUBLE: return MergeBase<long double, int64_t>::GetItemInt;
-        case NPY_BOOL:
-        case NPY_BYTE:   return MergeBase<int8_t, int64_t>::GetItemInt;
-        case NPY_INT16:  return MergeBase<int16_t, int64_t>::GetItemInt;
-        CASE_NPY_INT32:  return MergeBase<int32_t, int64_t>::GetItemInt;
-        CASE_NPY_INT64:  return MergeBase<int64_t, int64_t>::GetItemInt;
-        case NPY_UINT8:  return MergeBase<uint8_t, int64_t>::GetItemInt;
-        case NPY_UINT16: return MergeBase<uint16_t, int64_t>::GetItemInt;
-        CASE_NPY_UINT32: return MergeBase<uint32_t, int64_t>::GetItemInt;
-        CASE_NPY_UINT64: return MergeBase<uint64_t, int64_t>::GetItemInt;
-        case NPY_VOID:
-        case NPY_UNICODE:
-        case NPY_STRING: return MergeBase<char*, int64_t>::GetItemString;
-        }
-        break;
-
-
-    case NPY_UINT8:
-        switch (inputType) {
-            //case NPY_BOOL:   return MergeBase<bool, bool>::GetConversionFunction(inputType, func);
-        case NPY_FLOAT:  return MergeBase<float, uint8_t>::GetItemIntU;
-        case NPY_DOUBLE: return MergeBase<double, uint8_t>::GetItemIntU;
-        case NPY_LONGDOUBLE: return MergeBase<long double, uint8_t>::GetItemIntU;
-        case NPY_BOOL:
-        case NPY_BYTE:   return MergeBase<int8_t, uint8_t>::GetItemIntU;
-        case NPY_INT16:  return MergeBase<int16_t, uint8_t>::GetItemIntU;
-        CASE_NPY_INT32:  return MergeBase<int32_t, uint8_t>::GetItemIntU;
-        CASE_NPY_INT64:  return MergeBase<int64_t, uint8_t>::GetItemIntU;
-        case NPY_UINT8:  return MergeBase<uint8_t, uint8_t>::GetItemIntU;
-        case NPY_UINT16: return MergeBase<uint16_t, uint8_t>::GetItemIntU;
-        CASE_NPY_UINT32: return MergeBase<uint32_t, uint8_t>::GetItemIntU;
-        CASE_NPY_UINT64: return MergeBase<uint64_t, uint8_t>::GetItemIntU;
-        case NPY_VOID:
-        case NPY_UNICODE:
-        case NPY_STRING: return MergeBase<char*, uint8_t>::GetItemStringU;
-        }
-        break;
-
-    case NPY_UINT16:
-        switch (inputType) {
-            //case NPY_BOOL:   return MergeBase<bool, bool>::GetItemInt;
-        case NPY_FLOAT:  return MergeBase<float, uint16_t>::GetItemIntU;
-        case NPY_DOUBLE: return MergeBase<double, uint16_t>::GetItemIntU;
-        case NPY_LONGDOUBLE: return MergeBase<long double, uint16_t>::GetItemIntU;
-        case NPY_BOOL:
-        case NPY_BYTE:   return MergeBase<int8_t, uint16_t>::GetItemIntU;
-        case NPY_INT16:  return MergeBase<int16_t, uint16_t>::GetItemIntU;
-        CASE_NPY_INT32:  return MergeBase<int32_t, uint16_t>::GetItemIntU;
-        CASE_NPY_INT64:  return MergeBase<int64_t, uint16_t>::GetItemIntU;
-        case NPY_UINT8:  return MergeBase<uint8_t, uint16_t>::GetItemIntU;
-        case NPY_UINT16: return MergeBase<uint16_t, uint16_t>::GetItemIntU;
-        CASE_NPY_UINT32: return MergeBase<uint32_t, uint16_t>::GetItemIntU;
-        CASE_NPY_UINT64: return MergeBase<uint64_t, uint16_t>::GetItemIntU;
-        case NPY_VOID:
-        case NPY_UNICODE:
-        case NPY_STRING: return MergeBase<char*, uint16_t>::GetItemStringU;
-        }
-        break;
-
-    CASE_NPY_UINT32:
-        switch (inputType) {
-        case NPY_FLOAT:  return MergeBase<float, uint32_t>::GetItemIntU;
-        case NPY_DOUBLE: return MergeBase<double, uint32_t>::GetItemIntU;
-        case NPY_LONGDOUBLE: return MergeBase<long double, uint32_t>::GetItemIntU;
-        case NPY_BOOL:
-        case NPY_BYTE:   return MergeBase<int8_t, uint32_t>::GetItemIntU;
-        case NPY_INT16:  return MergeBase<int16_t, uint32_t>::GetItemIntU;
-        CASE_NPY_INT32:  return MergeBase<int32_t, uint32_t>::GetItemIntU;
-        CASE_NPY_INT64:  return MergeBase<int64_t, uint32_t>::GetItemIntU;
-        case NPY_UINT8:  return MergeBase<uint8_t, uint32_t>::GetItemIntU;
-        case NPY_UINT16: return MergeBase<uint16_t, uint32_t>::GetItemIntU;
-        CASE_NPY_UINT32: return MergeBase<uint32_t, uint32_t>::GetItemIntU;
-        CASE_NPY_UINT64: return MergeBase<uint64_t, uint32_t>::GetItemIntU;
-        case NPY_VOID:
-        case NPY_UNICODE:
-        case NPY_STRING: return MergeBase<char*, uint32_t>::GetItemStringU;
-        }
-        break;
-
-    CASE_NPY_UINT64:
-        switch (inputType) {
-            //case NPY_BOOL:   return MergeBase<bool, bool>::GetItemInt;
-        case NPY_FLOAT:  return MergeBase<float, uint64_t>::GetItemIntU;
-        case NPY_DOUBLE: return MergeBase<double, uint64_t>::GetItemIntU;
-        case NPY_LONGDOUBLE: return MergeBase<long double, uint64_t>::GetItemIntU;
-        case NPY_BOOL:
-        case NPY_BYTE:   return MergeBase<int8_t, uint64_t>::GetItemIntU;
-        case NPY_INT16:  return MergeBase<int16_t, uint64_t>::GetItemIntU;
-        CASE_NPY_INT32:  return MergeBase<int32_t, uint64_t>::GetItemIntU;
-        CASE_NPY_INT64:  return MergeBase<int64_t, uint64_t>::GetItemIntU;
-        case NPY_UINT8:  return MergeBase<uint8_t, uint64_t>::GetItemIntU;
-        case NPY_UINT16: return MergeBase<uint16_t, uint64_t>::GetItemIntU;
-        CASE_NPY_UINT32: return MergeBase<uint32_t, uint64_t>::GetItemIntU;
-        CASE_NPY_UINT64: return MergeBase<uint64_t, uint64_t>::GetItemIntU;
-        case NPY_VOID:
-        case NPY_UNICODE:
-        case NPY_STRING: return MergeBase<char*, uint64_t>::GetItemStringU;
-        }
-        break;
-
-
-    case NPY_FLOAT32:
-        switch (inputType) {
-            //case NPY_BOOL:   return MergeBase<bool, bool>::GetItemInt;
-        case NPY_FLOAT:  return MergeBase<float, float>::GetItemIntF;
-        case NPY_DOUBLE: return MergeBase<double, float>::GetItemIntF;
-        case NPY_LONGDOUBLE: return MergeBase<long double, float>::GetItemIntF;
-        case NPY_BOOL:
-        case NPY_BYTE:   return MergeBase<int8_t, float>::GetItemIntF;
-        case NPY_INT16:  return MergeBase<int16_t, float>::GetItemIntF;
-        CASE_NPY_INT32:  return MergeBase<int32_t, float>::GetItemIntF;
-        CASE_NPY_INT64:  return MergeBase<int64_t, float>::GetItemIntF;
-        case NPY_UINT8:  return MergeBase<uint8_t, float>::GetItemIntF;
-        case NPY_UINT16: return MergeBase<uint16_t, float>::GetItemIntF;
-        CASE_NPY_UINT32: return MergeBase<uint32_t, float>::GetItemIntF;
-        CASE_NPY_UINT64: return MergeBase<uint64_t, float>::GetItemIntF;
-        case NPY_VOID:
-        case NPY_UNICODE:
-        case NPY_STRING: return MergeBase<char*, float>::GetItemStringF;
-
-        }
-        break;
-
-    case NPY_FLOAT64:
-        switch (inputType) {
-            //case NPY_BOOL:   return MergeBase<bool, bool>::GetItemInt;
-        case NPY_FLOAT:  return MergeBase<float, uint64_t>::GetItemIntF;
-        case NPY_DOUBLE: return MergeBase<double, uint64_t>::GetItemIntF;
-        case NPY_LONGDOUBLE: return MergeBase<long double, uint64_t>::GetItemIntF;
-        case NPY_BOOL:
-        case NPY_BYTE:   return MergeBase<int8_t, uint64_t>::GetItemIntF;
-        case NPY_INT16:  return MergeBase<int16_t, uint64_t>::GetItemIntF;
-        CASE_NPY_INT32:  return MergeBase<int32_t, uint64_t>::GetItemIntF;
-        CASE_NPY_INT64:  return MergeBase<int64_t, uint64_t>::GetItemIntF;
-        case NPY_UINT8:  return MergeBase<uint8_t, uint64_t>::GetItemIntF;
-        case NPY_UINT16: return MergeBase<uint16_t, uint64_t>::GetItemIntF;
-        CASE_NPY_UINT32: return MergeBase<uint32_t, uint64_t>::GetItemIntF;
-        CASE_NPY_UINT64: return MergeBase<uint64_t, uint64_t>::GetItemIntF;
-        case NPY_VOID:
-        case NPY_UNICODE:
-        case NPY_STRING: return MergeBase<char*, uint64_t>::GetItemStringF;
-        }
-        break;
 
     }
-    printf("mbget cannot find type for %d\n", inputType);
-    return NULL;
+    else {
+        // Either A or B or both are strided
+        while (pDataOut != pDataOutEnd) {
+            const INDEX index = *pIndex;
+            *pDataOut =
+                // Make sure the item is in range
+                index >= 0 && index < valLength
+                ? pValues[index]
+                : defaultVal;
+            pIndex = STRIDE_NEXT(const INDEX, pIndex, strideIndex);
+            pDataOut+=itemSize;
+        }
+    }
 }
 
 
 
-struct MBGET_CALLBACK {
-    MBGET_FUNC GetItemCallback;
 
-    void* pValues;
-    void* pIndex;
-    void* pDataOut;
-    int64_t    valSize1;
-    int64_t    aIndexSize;
+#if defined(_WIN32) && !defined(__GNUC__)
+
+#define CASE_NPY_INT32      case NPY_INT32:       case NPY_INT
+#define CASE_NPY_UINT32     case NPY_UINT32:      case NPY_UINT
+#define CASE_NPY_INT64      case NPY_INT64
+#define CASE_NPY_UINT64     case NPY_UINT64
+#define CASE_NPY_FLOAT64    case NPY_DOUBLE:     case NPY_LONGDOUBLE
+
+#else
+
+#define CASE_NPY_INT32      case NPY_INT32
+#define CASE_NPY_UINT32     case NPY_UINT32
+#define CASE_NPY_INT64      case NPY_INT64:    case NPY_LONGLONG
+#define CASE_NPY_UINT64     case NPY_UINT64:   case NPY_ULONGLONG
+#define CASE_NPY_FLOAT64    case NPY_DOUBLE
+#endif
+
+
+typedef void(*GETITEM_FUNC)(void* pDataIn, void* pDataIn2, void* pDataOut, int64_t valLength, int64_t itemSize, int64_t len, int64_t strideIndex, int64_t strideValue, void* pDefault);
+struct MBGET_CALLBACK {
+    GETITEM_FUNC GetItemCallback;
+
+    void* pValues;    // value array or A in the equation C=A[B]
+    void* pIndex;     // index array or B in the equation C=A[B]
+    void* pDataOut;   // output array or C in the equation C=A[B]
+    int64_t    aValueLength;
+    int64_t    aIndexLength;
+    int64_t    aValueItemSize;
+    int64_t    aIndexItemSize;
+    int64_t    strideValue;
+    int64_t    strideIndex;
     void* pDefault;
-    int64_t    TypeSizeValues;
-    int64_t    TypeSizeIndex;
 
 } stMBGCallback;
-
 
 //---------------------------------------------------------
 // Used by GetItem
 //  Concurrent callback from multiple threads
-static int64_t AnyGetItem(struct stMATH_WORKER_ITEM* pstWorkerItem, int core, int64_t workIndex) {
+static int64_t GetItemCallback(struct stMATH_WORKER_ITEM* pstWorkerItem, int core, int64_t workIndex) {
 
     int64_t didSomeWork = 0;
     MBGET_CALLBACK* Callback = &stMBGCallback; // (MBGET_CALLBACK*)&pstWorkerItem->WorkCallbackArg;
@@ -1153,8 +895,9 @@ static int64_t AnyGetItem(struct stMATH_WORKER_ITEM* pstWorkerItem, int core, in
     char* aValues = (char*)Callback->pValues;
     char* aIndex = (char*)Callback->pIndex;
 
-    int64_t typeSizeValues = Callback->TypeSizeValues;
-    int64_t typeSizeIndex = Callback->TypeSizeIndex;
+    int64_t valueItemSize = Callback->aValueItemSize;
+    int64_t strideValue = Callback->strideValue;
+    int64_t strideIndex = Callback->strideIndex;
 
     LOGGING("check2 ** %lld %lld\n", typeSizeValues, typeSizeIndex);
 
@@ -1172,12 +915,12 @@ static int64_t AnyGetItem(struct stMATH_WORKER_ITEM* pstWorkerItem, int core, in
         // Calculate how much to adjust the pointers to get to the data for this work block
         int64_t blockStart = workBlock * pstWorkerItem->BlockSize;
 
-        int64_t valueAdj = blockStart * typeSizeValues;
-        int64_t indexAdj = blockStart * typeSizeIndex;
+        int64_t valueAdj = blockStart * strideValue;
+        int64_t indexAdj = blockStart * strideIndex;
 
         LOGGING("%d : workBlock %lld   blocksize: %lld    lenx: %lld  %lld  %lld  %lld %lld\n", core, workBlock, pstWorkerItem->BlockSize, lenX, typeSizeValues, typeSizeIndex, valueAdj, indexAdj);
 
-        Callback->GetItemCallback(aValues, aIndex + indexAdj, (char*)Callback->pDataOut + valueAdj, Callback->valSize1, typeSizeValues, blockStart, lenX, Callback->pDefault);
+        Callback->GetItemCallback(aValues, aIndex + indexAdj, (char*)Callback->pDataOut + valueAdj, Callback->aValueLength, valueItemSize, lenX, strideIndex, strideValue, Callback->pDefault);
 
         // Indicate we completed a block
         didSomeWork++;
@@ -1191,17 +934,69 @@ static int64_t AnyGetItem(struct stMATH_WORKER_ITEM* pstWorkerItem, int core, in
 
 
 
+//------------------------------------------------------------
+// itemSize is Values itemSize
+// indexType is Index type
+static GETITEM_FUNC GetItemFunction(int64_t itemSize, int indexType) {
 
+    switch (indexType) {
+    case NPY_INT8:
+        switch (itemSize) {
+        case 1:  return GetItemInt<int8_t, int8_t>;
+        case 2:  return GetItemInt<int16_t, int8_t>;
+        case 4:  return GetItemInt<int32_t, int8_t>;
+        case 8:  return GetItemInt<int64_t, int8_t>;
+        case 16:  return GetItemInt<__m128, int8_t>;
+        default: return GetItemIntVariable<int8_t>;
+        }
+        break;
+
+    case NPY_INT16:
+        switch (itemSize) {
+        case 1:  return GetItemInt<int8_t, int16_t>;
+        case 2:  return GetItemInt<int16_t, int16_t>;
+        case 4:  return GetItemInt<int32_t, int16_t>;
+        case 8:  return GetItemInt<int64_t, int16_t>;
+        case 16:  return GetItemInt<__m128, int16_t>;
+        default: return GetItemIntVariable<int16_t>;
+        }
+        break;
+
+    CASE_NPY_INT32:
+        switch (itemSize) {
+        case 1:  return GetItemInt<int8_t, int32_t>;
+        case 2:  return GetItemInt<int16_t, int32_t>;
+        case 4:  return GetItemInt<int32_t, int32_t>;
+        case 8:  return GetItemInt<int64_t, int32_t>;
+        case 16:  return GetItemInt<__m128, int32_t>;
+        default: return GetItemIntVariable<int32_t>;
+        }
+        break;
+
+    CASE_NPY_INT64:
+        switch (itemSize) {
+        case 1:  return GetItemInt<int8_t, int64_t>;
+        case 2:  return GetItemInt<int16_t, int64_t>;
+        case 4:  return GetItemInt<int32_t, int64_t>;
+        case 8:  return GetItemInt<int64_t, int64_t>;
+        case 16:  return GetItemInt<__m128, int64_t>;
+        default: return GetItemIntVariable<int64_t>;
+        }
+        break;
+    }
+
+    return NULL;
+}
 
 //---------------------------------------------------------------------------
 // Input:
 // Arg1: numpy array aValues (can be anything)
-// Arg2: numpy array aIndex (must be int8/int16/int32 or int64)
+// Arg2: numpy array aIndex (must be int8_t/int16_t/int32_t or int64_t)
 // Arg3: default value
 //
 //def fixMbget(aValues, aIndex, result, default) :
 //   """
-//   A numba routine to speed up mbget for numerical values.
+//   A proto routine.
 //   """
 //   N = aIndex.shape[0]
 //   valSize = aValues.shape[0]
@@ -1209,7 +1004,7 @@ static int64_t AnyGetItem(struct stMATH_WORKER_ITEM* pstWorkerItem, int core, in
 //      if (aIndex[i] >= 0 and aIndex[i] < valSize) :
 //         result[i] = aValues[aIndex[i]]
 //      else :
-//   result[i] = default
+//         result[i] = default  (OR RETURN ERROR)
 extern "C" PyObject*
 getitem(PyObject* self, PyObject* args)
 {
@@ -1242,8 +1037,19 @@ getitem(PyObject* self, PyObject* args)
     int32_t numpyValuesType = PyArray_TYPE(aValues);
     int32_t numpyIndexType = PyArray_TYPE(aIndex);
 
+    // TODO: For boolean call
     if (numpyIndexType > NPY_LONGDOUBLE) {
         PyErr_Format(PyExc_ValueError, "Dont know how to convert these types %d using index dtype: %d", numpyValuesType, numpyIndexType);
+        return NULL;
+    }
+
+    // This logic is not quite correct, if the strides on all dimensions are the same, we can use this routine
+    if (PyArray_NDIM(aValues) != 1 && !PyArray_ISCONTIGUOUS(aValues)) {
+        PyErr_Format(PyExc_ValueError, "Dont know how to handle multidimensional array %d using index dtype: %d", numpyValuesType, numpyIndexType);
+        return NULL;
+    }
+    if (PyArray_NDIM(aIndex) != 1 && !PyArray_ISCONTIGUOUS(aIndex)) {
+        PyErr_Format(PyExc_ValueError, "Dont know how to handle multidimensional array %d using index dtype: %d", numpyValuesType, numpyIndexType);
         return NULL;
     }
 
@@ -1252,57 +1058,48 @@ getitem(PyObject* self, PyObject* args)
     void* pValues = PyArray_BYTES(aValues);
     void* pIndex = PyArray_BYTES(aIndex);
 
-    int ndim = PyArray_NDIM(aValues);
-    npy_intp* dims = PyArray_DIMS(aValues);
-    int64_t valSize1 = CalcArrayLength(ndim, dims);
-    int64_t len = valSize1;
+    int64_t aValueLength = ArrayLength(aValues);
+    int64_t aValueItemSize = PyArray_ITEMSIZE(aValues);
 
-    MBGET_FUNC  pFunction = GetConversionFunction(numpyValuesType, numpyIndexType, 0);
+    // Get the proper function to call
+    GETITEM_FUNC  pFunction = GetItemFunction(aValueItemSize, numpyIndexType);
 
     if (pFunction != NULL) {
 
         PyArrayObject* outArray = (PyArrayObject*)Py_None;
-        int64_t aIndexSize = ArrayLength(aIndex);
+        int64_t aIndexLength = ArrayLength(aIndex);
 
         // Allocate the size of aIndex but the type is the value
-        outArray = AllocateLikeResize(aValues, aIndexSize);
+        outArray = AllocateLikeResize(aValues, aIndexLength);
 
         if (outArray) {
             void* pDataOut = PyArray_BYTES(outArray);
             void* pDefault = GetDefaultForType(numpyValuesType);
+
+            int64_t strideIndex = PyArray_STRIDE(aIndex, 0);
+            int64_t strideValue = PyArray_STRIDE(aValues, 0);
 
             // reserve a full 16 bytes for default in case we have oneS
             _m256all tempDefault;
 
             // Check if a default value was passed in as third parameter
             if (defaultValue != Py_None) {
-                // TJD disabled this on Dec. 2020
-                //BOOL result;
-                //int64_t itemSize;
-                //void* pTempData = NULL;
-
-                //// Try to convert the scalar
-                //result = ConvertScalarObject(defaultValue, &tempDefault, numpyValuesType, &pTempData, &itemSize);
-
-                //if (result) {
-                //    // Assign the new default for out of range indexes
-                //    pDefault = &tempDefault;
-                //}
                 pDefault = &tempDefault;
             }
 
-            stMATH_WORKER_ITEM* pWorkItem = THREADER->GetWorkItem(aIndexSize);
+            stMATH_WORKER_ITEM* pWorkItem = THREADER ? THREADER->GetWorkItem(aIndexLength) : NULL;
 
             if (pWorkItem == NULL) {
 
                 // Threading not allowed for this work item, call it directly from main thread
-                pFunction(pValues, pIndex, pDataOut, valSize1, PyArray_ITEMSIZE(aValues), 0, aIndexSize, pDefault);
+                typedef void(*GETITEM_FUNC)(void* pDataIn, void* pDataIn2, void* pDataOut, int64_t valSize, int64_t itemSize, int64_t len, int64_t strideIndex, int64_t strideValue, void* pDefault);
+                pFunction(pValues, pIndex, pDataOut, aValueLength, aValueItemSize, aIndexLength, strideIndex, strideValue, pDefault);
 
             }
             else {
                 // Each thread will call this routine with the callbackArg
                 // typedef int64_t(*DOWORK_CALLBACK)(struct stMATH_WORKER_ITEM* pstWorkerItem, int core, int64_t workIndex);
-                pWorkItem->DoWorkCallback = AnyGetItem;
+                pWorkItem->DoWorkCallback = GetItemCallback;
 
                 pWorkItem->WorkCallbackArg = &stMBGCallback;
 
@@ -1312,19 +1109,21 @@ getitem(PyObject* self, PyObject* args)
                 stMBGCallback.pDataOut = pDataOut;
 
                 // arraylength of values input array -- used to check array bounds
-                stMBGCallback.valSize1 = valSize1;
-                stMBGCallback.aIndexSize = aIndexSize;
+                stMBGCallback.aValueLength = aValueLength;
+                stMBGCallback.aIndexLength = aIndexLength;
                 stMBGCallback.pDefault = pDefault;
 
                 //
-                stMBGCallback.TypeSizeValues = PyArray_ITEMSIZE(aValues);
-                stMBGCallback.TypeSizeIndex = PyArray_ITEMSIZE(aIndex);
+                stMBGCallback.aValueItemSize = aValueItemSize;
+                stMBGCallback.aIndexItemSize = PyArray_ITEMSIZE(aIndex);
+                stMBGCallback.strideIndex = strideIndex;
+                stMBGCallback.strideValue = strideValue;
 
                 //printf("**check %p %p %p %lld %lld\n", pValues, pIndex, pDataOut, stMBGCallback.TypeSizeValues, stMBGCallback.TypeSizeIndex);
 
                 // This will notify the worker threads of a new work item
-                THREADER->WorkMain(pWorkItem, aIndexSize, 0);
-                //g_cMathWorker->WorkMain(pWorkItem, aIndexSize);
+                THREADER->WorkMain(pWorkItem, aIndexLength, 0);
+                //g_cMathWorker->WorkMain(pWorkItem, aIndexLength);
             }
 
             return (PyObject*)outArray;
