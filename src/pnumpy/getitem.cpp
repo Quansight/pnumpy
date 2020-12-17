@@ -942,45 +942,45 @@ static GETITEM_FUNC GetItemFunction(int64_t itemSize, int indexType) {
     switch (indexType) {
     case NPY_INT8:
         switch (itemSize) {
-        case 1:  return GetItemInt<INT8, INT8>;
-        case 2:  return GetItemInt<INT16, INT8>;
-        case 4:  return GetItemInt<INT32, INT8>;
-        case 8:  return GetItemInt<INT64, INT8>;
-        case 16:  return GetItemInt<__m128, INT8>;
-        default: return GetItemIntVariable<INT8>;
+        case 1:  return GetItemInt<int8_t, int8_t>;
+        case 2:  return GetItemInt<int16_t, int8_t>;
+        case 4:  return GetItemInt<int32_t, int8_t>;
+        case 8:  return GetItemInt<int64_t, int8_t>;
+        case 16:  return GetItemInt<__m128, int8_t>;
+        default: return GetItemIntVariable<int8_t>;
         }
         break;
 
     case NPY_INT16:
         switch (itemSize) {
-        case 1:  return GetItemInt<INT8, INT16>;
-        case 2:  return GetItemInt<INT16, INT16>;
-        case 4:  return GetItemInt<INT32, INT16>;
-        case 8:  return GetItemInt<INT64, INT16>;
-        case 16:  return GetItemInt<__m128, INT16>;
-        default: return GetItemIntVariable<INT16>;
+        case 1:  return GetItemInt<int8_t, int16_t>;
+        case 2:  return GetItemInt<int16_t, int16_t>;
+        case 4:  return GetItemInt<int32_t, int16_t>;
+        case 8:  return GetItemInt<int64_t, int16_t>;
+        case 16:  return GetItemInt<__m128, int16_t>;
+        default: return GetItemIntVariable<int16_t>;
         }
         break;
 
     CASE_NPY_INT32:
         switch (itemSize) {
-        case 1:  return GetItemInt<INT8, INT32>;
-        case 2:  return GetItemInt<INT16, INT32>;
-        case 4:  return GetItemInt<INT32, INT32>;
-        case 8:  return GetItemInt<INT64, INT32>;
-        case 16:  return GetItemInt<__m128, INT32>;
-        default: return GetItemIntVariable<INT32>;
+        case 1:  return GetItemInt<int8_t, int32_t>;
+        case 2:  return GetItemInt<int16_t, int32_t>;
+        case 4:  return GetItemInt<int32_t, int32_t>;
+        case 8:  return GetItemInt<int64_t, int32_t>;
+        case 16:  return GetItemInt<__m128, int32_t>;
+        default: return GetItemIntVariable<int32_t>;
         }
         break;
 
     CASE_NPY_INT64:
         switch (itemSize) {
-        case 1:  return GetItemInt<INT8, INT64>;
-        case 2:  return GetItemInt<INT16, INT64>;
-        case 4:  return GetItemInt<INT32, INT64>;
-        case 8:  return GetItemInt<INT64, INT64>;
-        case 16:  return GetItemInt<__m128, INT64>;
-        default: return GetItemIntVariable<INT64>;
+        case 1:  return GetItemInt<int8_t, int64_t>;
+        case 2:  return GetItemInt<int16_t, int64_t>;
+        case 4:  return GetItemInt<int32_t, int64_t>;
+        case 8:  return GetItemInt<int64_t, int64_t>;
+        case 16:  return GetItemInt<__m128, int64_t>;
+        default: return GetItemIntVariable<int64_t>;
         }
         break;
     }
@@ -991,7 +991,7 @@ static GETITEM_FUNC GetItemFunction(int64_t itemSize, int indexType) {
 //---------------------------------------------------------------------------
 // Input:
 // Arg1: numpy array aValues (can be anything)
-// Arg2: numpy array aIndex (must be int8/int16/int32 or int64)
+// Arg2: numpy array aIndex (must be int8_t/int16_t/int32_t or int64_t)
 // Arg3: default value
 //
 //def fixMbget(aValues, aIndex, result, default) :
