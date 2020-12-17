@@ -812,34 +812,64 @@ static void GetItemIntVariable(void* aValues, void* aIndex, void* aDataOut, int6
     const char* pValues = (char*)aValues;
     const INDEX* pIndex = (INDEX*)aIndex;
     char* pDataOut = (char*)aDataOut;
-    char  defaultVal = *(char*)pDefault;
 
-    LOGGING("getitem sizes %lld  len: %lld   def: %I64d  or  %lf\n", valLength, len, (int64_t)defaultVal, (double)defaultVal);
+    LOGGING("getitem sizes %I64d  len: %I64d   itemsize:%I64d\n", valLength, len, itemSize);
     LOGGING("**V %p    I %p    O  %p %llu \n", pValues, pIndex, pDataOut, valLength);
 
     char* pDataOutEnd = pDataOut + (len * itemSize);
     if (itemSize == strideValue && sizeof(INDEX) == strideIndex) {
         while (pDataOut != pDataOutEnd) {
             const INDEX index = *pIndex;
-            *pDataOut =
-                // Make sure the item is in range
-                index >= 0 && index < valLength
-                ? pValues[index]
-                : defaultVal;
+            const char* pSrc;
+            if (index >= -valLength && index < valLength) {
+                int64_t newindex = index >= 0 ? index : index + valLength;
+                newindex *= itemSize;
+                pSrc = pValues + newindex;
+            }
+            else {
+                pSrc = (const char*)pDefault;
+            }
+
+            char* pEnd = pDataOut + itemSize;
+
+            while (pDataOut < (pEnd - 8)) {
+                *(int64_t*)pDataOut = *(int64_t*)pSrc;
+                pDataOut += 8;
+                pSrc += 8;
+            }
+            while (pDataOut < pEnd) {
+                *pDataOut++ = *pSrc++;
+            }
+            //    memcpy(pDataOut, pSrc, itemSize);
+
             pIndex++;
             pDataOut+=itemSize;
         }
-
     }
     else {
         // Either A or B or both are strided
         while (pDataOut != pDataOutEnd) {
             const INDEX index = *pIndex;
-            *pDataOut =
-                // Make sure the item is in range
-                index >= 0 && index < valLength
-                ? pValues[index]
-                : defaultVal;
+            const char* pSrc;
+            if (index >= -valLength && index < valLength) {
+                int64_t newindex = index >= 0 ? index : index + valLength;
+                newindex *= strideValue;
+                pSrc = pValues + newindex;
+            }
+            else {
+                pSrc = (const char*)pDefault;
+            }
+
+            char* pEnd = pDataOut + itemSize;
+
+            while (pDataOut < (pEnd - 8)) {
+                *(int64_t*)pDataOut = *(int64_t*)pSrc;
+                pDataOut += 8;
+                pSrc += 8;
+            }
+            while (pDataOut < pEnd) {
+                *pDataOut++ = *pSrc++;
+            }
             pIndex = STRIDE_NEXT(const INDEX, pIndex, strideIndex);
             pDataOut+=itemSize;
         }
