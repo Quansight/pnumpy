@@ -707,7 +707,7 @@ static void GetItemInt(void* aValues, void* aIndex, void* aDataOut, int64_t valL
     VALUE* pDataOut = (VALUE*)aDataOut;
     VALUE  defaultVal = *(VALUE*)pDefault;
 
-    LOGGING("getitem sizes %lld  len: %lld   def: %I64d  or  %lf\n", valSize, len, (int64_t)defaultVal, (double)defaultVal);
+    LOGGING("getitem sizes %lld  len: %lld   def: %I64d  or  %lf\n", valLength, len, (int64_t)defaultVal, (double)defaultVal);
     LOGGING("**V %p    I %p    O  %p %llu \n", pValues, pIndex, pDataOut, valLength);
 
     VALUE* pDataOutEnd = pDataOut + len;
@@ -767,7 +767,7 @@ static void GetItemUInt(void* aValues, void* aIndex, void* aDataOut, int64_t val
     VALUE* pDataOut = (VALUE*)aDataOut;
     VALUE  defaultVal = *(VALUE*)pDefault;
 
-    LOGGING("getitem sizes %lld  len: %lld   def: %I64d  or  %lf\n", valSize, len, (int64_t)defaultVal, (double)defaultVal);
+    LOGGING("getitem sizes %lld  len: %lld   def: %I64d  or  %lf\n", valLength, len, (int64_t)defaultVal, (double)defaultVal);
     LOGGING("**V %p    I %p    O  %p %llu \n", pValues, pIndex, pDataOut, valLength);
 
     VALUE* pDataOutEnd = pDataOut + len;
@@ -887,7 +887,7 @@ struct MBGET_CALLBACK {
 //---------------------------------------------------------
 // Used by GetItem
 //  Concurrent callback from multiple threads
-static int64_t AnyGetItem(struct stMATH_WORKER_ITEM* pstWorkerItem, int core, int64_t workIndex) {
+static int64_t GetItemCallback(struct stMATH_WORKER_ITEM* pstWorkerItem, int core, int64_t workIndex) {
 
     int64_t didSomeWork = 0;
     MBGET_CALLBACK* Callback = &stMBGCallback; // (MBGET_CALLBACK*)&pstWorkerItem->WorkCallbackArg;
@@ -937,7 +937,7 @@ static int64_t AnyGetItem(struct stMATH_WORKER_ITEM* pstWorkerItem, int core, in
 //------------------------------------------------------------
 // itemSize is Values itemSize
 // indexType is Index type
-static GETITEM_FUNC GetConversionFunction(int64_t itemSize, int indexType) {
+static GETITEM_FUNC GetItemFunction(int64_t itemSize, int indexType) {
 
     switch (indexType) {
     case NPY_INT8:
@@ -1061,7 +1061,8 @@ getitem(PyObject* self, PyObject* args)
     int64_t aValueLength = ArrayLength(aValues);
     int64_t aValueItemSize = PyArray_ITEMSIZE(aValues);
 
-    GETITEM_FUNC  pFunction = GetConversionFunction(aValueItemSize, numpyIndexType);
+    // Get the proper function to call
+    GETITEM_FUNC  pFunction = GetItemFunction(aValueItemSize, numpyIndexType);
 
     if (pFunction != NULL) {
 
@@ -1098,7 +1099,7 @@ getitem(PyObject* self, PyObject* args)
             else {
                 // Each thread will call this routine with the callbackArg
                 // typedef int64_t(*DOWORK_CALLBACK)(struct stMATH_WORKER_ITEM* pstWorkerItem, int core, int64_t workIndex);
-                pWorkItem->DoWorkCallback = AnyGetItem;
+                pWorkItem->DoWorkCallback = GetItemCallback;
 
                 pWorkItem->WorkCallbackArg = &stMBGCallback;
 
