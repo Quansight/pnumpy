@@ -105,5 +105,9 @@ extern "C" PyMODINIT_FUNC PyInit__pnumpy(void) {
     // Load numpy for PyArray_Type
     import_array();
     pPyArray_Type = &PyArray_Type;
+
+    atop_init();
+    LedgerInit();
+
     return module;
 }
