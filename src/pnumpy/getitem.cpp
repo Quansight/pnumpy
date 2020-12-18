@@ -775,8 +775,9 @@ static void GetItemUInt(void* aValues, void* aIndex, void* aDataOut, int64_t val
         while (pDataOut != pDataOutEnd) {
             const INDEX index = *pIndex;
             *pDataOut =
+                *pDataOut =
                 // Make sure the item is in range
-                index >= 0 && index < valLength
+                index < valLength
                 ? pValues[index]
                 : defaultVal;
             pIndex++;
@@ -788,12 +789,17 @@ static void GetItemUInt(void* aValues, void* aIndex, void* aDataOut, int64_t val
         // Either A or B or both are strided
         while (pDataOut != pDataOutEnd) {
             const INDEX index = *pIndex;
-            *pDataOut =
-                // Make sure the item is in range
-                index >= 0 && index < valLength
-                ? pValues[index]
-                : defaultVal;
-            pIndex = STRIDE_NEXT(INDEX*, pIndex, strideIndex);
+            // Make sure the item is in range; if the index is negative -- but otherwise
+            // still in range -- mimic Python's negative-indexing support.
+            if (index < valLength) {
+                *pDataOut = *(VALUE*)((char*)pValues + (strideValue * index));
+            }
+            else {
+                // Index is out of range -- assign the invalid value.
+                *pDataOut = defaultVal;
+            }
+
+            pIndex = STRIDE_NEXT(const INDEX, pIndex, strideIndex);
             pDataOut++;
         }
     }
@@ -876,6 +882,70 @@ static void GetItemIntVariable(void* aValues, void* aIndex, void* aDataOut, int6
     }
 }
 
+template<typename INDEX>
+static void GetItemUIntVariable(void* aValues, void* aIndex, void* aDataOut, int64_t valLength, int64_t itemSize, int64_t len, int64_t strideIndex, int64_t strideValue, void* pDefault) {
+    const char* pValues = (char*)aValues;
+    const INDEX* pIndex = (INDEX*)aIndex;
+    char* pDataOut = (char*)aDataOut;
+
+    LOGGING("getitem sizes %I64d  len: %I64d   itemsize:%I64d\n", valLength, len, itemSize);
+    LOGGING("**V %p    I %p    O  %p %llu \n", pValues, pIndex, pDataOut, valLength);
+
+    char* pDataOutEnd = pDataOut + (len * itemSize);
+    if (itemSize == strideValue && sizeof(INDEX) == strideIndex) {
+        while (pDataOut != pDataOutEnd) {
+            const INDEX index = *pIndex;
+            const char* pSrc;
+            if (index < valLength) {
+                pSrc = pValues + (itemSize * index);
+            }
+            else {
+                pSrc = (const char*)pDefault;
+            }
+
+            char* pEnd = pDataOut + itemSize;
+
+            while (pDataOut < (pEnd - 8)) {
+                *(int64_t*)pDataOut = *(int64_t*)pSrc;
+                pDataOut += 8;
+                pSrc += 8;
+            }
+            while (pDataOut < pEnd) {
+                *pDataOut++ = *pSrc++;
+            }
+            //    memcpy(pDataOut, pSrc, itemSize);
+
+            pIndex++;
+            pDataOut += itemSize;
+        }
+    }
+    else {
+        // Either A or B or both are strided
+        while (pDataOut != pDataOutEnd) {
+            const INDEX index = *pIndex;
+            const char* pSrc;
+            if (index < valLength) {
+                pSrc = pValues + (strideValue * index);
+            }
+            else {
+                pSrc = (const char*)pDefault;
+            }
+
+            char* pEnd = pDataOut + itemSize;
+
+            while (pDataOut < (pEnd - 8)) {
+                *(int64_t*)pDataOut = *(int64_t*)pSrc;
+                pDataOut += 8;
+                pSrc += 8;
+            }
+            while (pDataOut < pEnd) {
+                *pDataOut++ = *pSrc++;
+            }
+            pIndex = STRIDE_NEXT(const INDEX, pIndex, strideIndex);
+            pDataOut += itemSize;
+        }
+    }
+}
 
 
 
@@ -980,6 +1050,16 @@ static GETITEM_FUNC GetItemFunction(int64_t itemSize, int indexType) {
         default: return GetItemIntVariable<int8_t>;
         }
         break;
+    case NPY_UINT8:
+        switch (itemSize) {
+        case 1:  return GetItemUInt<int8_t, int8_t>;
+        case 2:  return GetItemUInt<int16_t, int8_t>;
+        case 4:  return GetItemUInt<int32_t, int8_t>;
+        case 8:  return GetItemUInt<int64_t, int8_t>;
+        case 16:  return GetItemUInt<__m128, int8_t>;
+        default: return GetItemUIntVariable<int8_t>;
+        }
+        break;
 
     case NPY_INT16:
         switch (itemSize) {
@@ -989,6 +1069,16 @@ static GETITEM_FUNC GetItemFunction(int64_t itemSize, int indexType) {
         case 8:  return GetItemInt<int64_t, int16_t>;
         case 16:  return GetItemInt<__m128, int16_t>;
         default: return GetItemIntVariable<int16_t>;
+        }
+        break;
+    case NPY_UINT16:
+        switch (itemSize) {
+        case 1:  return GetItemUInt<int8_t, int16_t>;
+        case 2:  return GetItemUInt<int16_t, int16_t>;
+        case 4:  return GetItemUInt<int32_t, int16_t>;
+        case 8:  return GetItemUInt<int64_t, int16_t>;
+        case 16:  return GetItemUInt<__m128, int16_t>;
+        default: return GetItemUIntVariable<int16_t>;
         }
         break;
 
@@ -1002,6 +1092,16 @@ static GETITEM_FUNC GetItemFunction(int64_t itemSize, int indexType) {
         default: return GetItemIntVariable<int32_t>;
         }
         break;
+    CASE_NPY_UINT32:
+        switch (itemSize) {
+        case 1:  return GetItemUInt<int8_t, int32_t>;
+        case 2:  return GetItemUInt<int16_t, int32_t>;
+        case 4:  return GetItemUInt<int32_t, int32_t>;
+        case 8:  return GetItemUInt<int64_t, int32_t>;
+        case 16:  return GetItemUInt<__m128, int32_t>;
+        default: return GetItemUIntVariable<int32_t>;
+        }
+        break;
 
     CASE_NPY_INT64:
         switch (itemSize) {
@@ -1011,6 +1111,16 @@ static GETITEM_FUNC GetItemFunction(int64_t itemSize, int indexType) {
         case 8:  return GetItemInt<int64_t, int64_t>;
         case 16:  return GetItemInt<__m128, int64_t>;
         default: return GetItemIntVariable<int64_t>;
+        }
+        break;
+    CASE_NPY_UINT64:
+        switch (itemSize) {
+        case 1:  return GetItemUInt<int8_t, int64_t>;
+        case 2:  return GetItemUInt<int16_t, int64_t>;
+        case 4:  return GetItemUInt<int32_t, int64_t>;
+        case 8:  return GetItemUInt<int64_t, int64_t>;
+        case 16:  return GetItemUInt<__m128, int64_t>;
+        default: return GetItemUIntVariable<int64_t>;
         }
         break;
     }
