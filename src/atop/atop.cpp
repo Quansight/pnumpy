@@ -64,6 +64,7 @@ void FmFree(void* _Block) {
 // Must be called to initialize atop
 // Will start threads and detect the CPU
 // Will build runtime lookup tables
+// NOTE: return FALSE if ALREADY initialized
 BOOL atop_init() {
 
     // Check if init already called

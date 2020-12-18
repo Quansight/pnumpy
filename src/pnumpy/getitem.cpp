@@ -216,7 +216,7 @@ PyArrayObject* AllocateLikeResize(PyArrayObject* inArr, npy_intp rowSize) {
  //       of this function for systems that don't support AVX2. Also consider implementing an SSE-based version
  //       of this function for the same reason (logic will be very similar, just using __m128i instead).
  // TODO: Consider changing `length` to uint64_t here so it agrees better with the result of sizeof().
-int64_t SumBooleanMask(const int8_t* const pData, const int64_t length) {
+int64_t SumBooleanMask(const int8_t* const pData, const int64_t length, const int64_t strideBoolean) {
     // Basic input validation.
     if (!pData)
     {
@@ -226,105 +226,116 @@ int64_t SumBooleanMask(const int8_t* const pData, const int64_t length) {
     {
         return 0;
     }
-
-    // Now that we know length is >= 0, it's safe to convert it to unsigned so it agrees with
-    // the sizeof() math in the logic below.
-    // Make sure to use this instead of 'length' in the code below to avoid signed/unsigned
-    // arithmetic warnings.
-    const size_t ulength = length;
-
     // Holds the accumulated result value.
     int64_t result = 0;
 
-    // YMM (32-byte) vector packed with 32 byte values, each set to 1.
-    // NOTE: The obvious thing here would be to use _mm256_set1_epi8(1),
-    //       but many compilers (e.g. MSVC) store the data for this vector
-    //       then load it here, which unnecessarily wastes cache space we could be
-    //       using for something else.
-    //       Generate the constants using a few intrinsics, it's faster than even an L1 cache hit anyway.
-    const auto zeros_ = _mm256_setzero_si256();
-    // compare 0 to 0 returns 0xFF; treated as an int8_t, 0xFF = -1, so abs(-1) = 1.
-    const auto ones = _mm256_abs_epi8(_mm256_cmpeq_epi8(zeros_, zeros_));
+    if (strideBoolean == 1) {
+        // Now that we know length is >= 0, it's safe to convert it to unsigned so it agrees with
+        // the sizeof() math in the logic below.
+        // Make sure to use this instead of 'length' in the code below to avoid signed/unsigned
+        // arithmetic warnings.
+        const size_t ulength = length;
 
-    //
-    // Convert each byte in the input to a 0 or 1 byte according to C-style boolean semantics.
-    //
+        // YMM (32-byte) vector packed with 32 byte values, each set to 1.
+        // NOTE: The obvious thing here would be to use _mm256_set1_epi8(1),
+        //       but many compilers (e.g. MSVC) store the data for this vector
+        //       then load it here, which unnecessarily wastes cache space we could be
+        //       using for something else.
+        //       Generate the constants using a few intrinsics, it's faster than even an L1 cache hit anyway.
+        const auto zeros_ = _mm256_setzero_si256();
+        // compare 0 to 0 returns 0xFF; treated as an int8_t, 0xFF = -1, so abs(-1) = 1.
+        const auto ones = _mm256_abs_epi8(_mm256_cmpeq_epi8(zeros_, zeros_));
 
-    // This first loop does the bulk of the processing for large vectors -- it doesn't use popcount
-    // instructions and instead relies on the fact we can sum 0/1 values to acheive the same result,
-    // up to CHAR_MAX. This allows us to use very inexpensive instructions for most of the accumulation
-    // so we're primarily limited by memory bandwidth.
-    const size_t vector_length = ulength / sizeof(__m256i);
-    const auto pVectorData = (__m256i*)pData;
-    for (size_t i = 0; i < vector_length;)
-    {
-        // Determine how much we can process in _this_ iteration of the loop.
-        // The maximum number of "inner" iterations here is CHAR_MAX (255),
-        // because otherwise our byte-sized counters would overflow.
-        auto inner_loop_iters = vector_length - i;
-        if (inner_loop_iters > 255) inner_loop_iters = 255;
+        //
+        // Convert each byte in the input to a 0 or 1 byte according to C-style boolean semantics.
+        //
 
-        // Holds the current per-vector-lane (i.e. per-byte-within-vector) popcount.
-        // PERF: If necessary, the loop below can be manually unrolled to ensure we saturate memory bandwidth.
-        auto byte_popcounts = _mm256_setzero_si256();
-        for (size_t j = 0; j < inner_loop_iters; j++)
+        // This first loop does the bulk of the processing for large vectors -- it doesn't use popcount
+        // instructions and instead relies on the fact we can sum 0/1 values to acheive the same result,
+        // up to CHAR_MAX. This allows us to use very inexpensive instructions for most of the accumulation
+        // so we're primarily limited by memory bandwidth.
+        const size_t vector_length = ulength / sizeof(__m256i);
+        const auto pVectorData = (__m256i*)pData;
+        for (size_t i = 0; i < vector_length;)
         {
-            // Use an unaligned load to grab a chunk of data;
-            // then call _mm256_min_epu8 where one operand is the register we set
-            // earlier containing packed byte-sized 1 values (e.g. 0x01010101...).
-            // This effectively converts each byte in the input to a 0 or 1 byte value.
-            const auto cstyle_bools = _mm256_min_epu8(ones, _mm256_loadu_si256(&pVectorData[i + j]));
+            // Determine how much we can process in _this_ iteration of the loop.
+            // The maximum number of "inner" iterations here is CHAR_MAX (255),
+            // because otherwise our byte-sized counters would overflow.
+            auto inner_loop_iters = vector_length - i;
+            if (inner_loop_iters > 255) inner_loop_iters = 255;
 
-            // Since each byte in the converted vector now contains either a 0 or 1,
-            // we can simply add it to the running per-byte sum to simulate a popcount.
-            byte_popcounts = _mm256_add_epi8(byte_popcounts, cstyle_bools);
+            // Holds the current per-vector-lane (i.e. per-byte-within-vector) popcount.
+            // PERF: If necessary, the loop below can be manually unrolled to ensure we saturate memory bandwidth.
+            auto byte_popcounts = _mm256_setzero_si256();
+            for (size_t j = 0; j < inner_loop_iters; j++)
+            {
+                // Use an unaligned load to grab a chunk of data;
+                // then call _mm256_min_epu8 where one operand is the register we set
+                // earlier containing packed byte-sized 1 values (e.g. 0x01010101...).
+                // This effectively converts each byte in the input to a 0 or 1 byte value.
+                const auto cstyle_bools = _mm256_min_epu8(ones, _mm256_loadu_si256(&pVectorData[i + j]));
+
+                // Since each byte in the converted vector now contains either a 0 or 1,
+                // we can simply add it to the running per-byte sum to simulate a popcount.
+                byte_popcounts = _mm256_add_epi8(byte_popcounts, cstyle_bools);
+            }
+
+            // Sum the per-byte-lane popcounts, then add them to the overall result.
+            // For the vectorized partial sums, it's important the 'zeros' argument is used as the second operand
+            // so that the zeros are 'unpacked' into the high byte(s) of each packed element in the result.
+            const auto zeros = _mm256_setzero_si256();
+
+            // Sum 32x 1-byte counts -> 16x 2-byte counts
+            const auto byte_popcounts_8a = _mm256_unpacklo_epi8(byte_popcounts, zeros);
+            const auto byte_popcounts_8b = _mm256_unpackhi_epi8(byte_popcounts, zeros);
+            const auto byte_popcounts_16 = _mm256_add_epi16(byte_popcounts_8a, byte_popcounts_8b);
+
+            // Sum 16x 2-byte counts -> 8x 4-byte counts
+            const auto byte_popcounts_16a = _mm256_unpacklo_epi16(byte_popcounts_16, zeros);
+            const auto byte_popcounts_16b = _mm256_unpackhi_epi16(byte_popcounts_16, zeros);
+            const auto byte_popcounts_32 = _mm256_add_epi32(byte_popcounts_16a, byte_popcounts_16b);
+
+            // Sum 8x 4-byte counts -> 4x 8-byte counts
+            const auto byte_popcounts_32a = _mm256_unpacklo_epi32(byte_popcounts_32, zeros);
+            const auto byte_popcounts_32b = _mm256_unpackhi_epi32(byte_popcounts_32, zeros);
+            const auto byte_popcounts_64 = _mm256_add_epi64(byte_popcounts_32a, byte_popcounts_32b);
+
+            // perform the operation horizontally in m0
+            union {
+                volatile int64_t  horizontal[4];
+                __m256i mathreg[1];
+            };
+
+            mathreg[0] = byte_popcounts_64;
+            for (int j = 0; j < 4; j++) {
+                result += horizontal[j];
+            }
+
+            // Increment the outer loop counter by the number of inner iterations we performed.
+            i += inner_loop_iters;
         }
 
-        // Sum the per-byte-lane popcounts, then add them to the overall result.
-        // For the vectorized partial sums, it's important the 'zeros' argument is used as the second operand
-        // so that the zeros are 'unpacked' into the high byte(s) of each packed element in the result.
-        const auto zeros = _mm256_setzero_si256();
-
-        // Sum 32x 1-byte counts -> 16x 2-byte counts
-        const auto byte_popcounts_8a = _mm256_unpacklo_epi8(byte_popcounts, zeros);
-        const auto byte_popcounts_8b = _mm256_unpackhi_epi8(byte_popcounts, zeros);
-        const auto byte_popcounts_16 = _mm256_add_epi16(byte_popcounts_8a, byte_popcounts_8b);
-
-        // Sum 16x 2-byte counts -> 8x 4-byte counts
-        const auto byte_popcounts_16a = _mm256_unpacklo_epi16(byte_popcounts_16, zeros);
-        const auto byte_popcounts_16b = _mm256_unpackhi_epi16(byte_popcounts_16, zeros);
-        const auto byte_popcounts_32 = _mm256_add_epi32(byte_popcounts_16a, byte_popcounts_16b);
-
-        // Sum 8x 4-byte counts -> 4x 8-byte counts
-        const auto byte_popcounts_32a = _mm256_unpacklo_epi32(byte_popcounts_32, zeros);
-        const auto byte_popcounts_32b = _mm256_unpackhi_epi32(byte_popcounts_32, zeros);
-        const auto byte_popcounts_64 = _mm256_add_epi64(byte_popcounts_32a, byte_popcounts_32b);
-
-        // perform the operation horizontally in m0
-        union {
-            volatile int64_t  horizontal[4];
-            __m256i mathreg[1];
-        };
-
-        mathreg[0] = byte_popcounts_64;
-        for (int j = 0; j < 4; j++) {
-            result += horizontal[j];
-        }
-
-        // Increment the outer loop counter by the number of inner iterations we performed.
-        i += inner_loop_iters;
-    }
-
-    // Handle the last few bytes, if any, that couldn't be handled with the vectorized loop.
-    const auto vectorized_length = vector_length * sizeof(__m256i);
-    for (size_t i = vectorized_length; i < ulength; i++)
-    {
-        if (pData[i])
+        // Handle the last few bytes, if any, that couldn't be handled with the vectorized loop.
+        const size_t vectorized_length = vector_length * sizeof(__m256i);
+        for (size_t i = vectorized_length; i < ulength; i++)
         {
-            result++;
+            if (pData[i])
+            {
+                result++;
+            }
         }
     }
+    else {
+        for (int64_t i = 0; i < length; i++)
+        {
+            if (pData[i*strideBoolean])
+            {
+                result++;
+            }
+        }
+        LOGGING("sum bool  %p   len:%I64d  vs  true:%I64d  stride:%I64d\n", pData, length, result, strideBoolean);
 
+    }
     return result;
 }
 
@@ -352,44 +363,416 @@ int64_t BooleanCount(PyArrayObject* aIndex, int64_t** ppChunkCount) {
 
     chunks = (chunks + (chunkSize - 1)) / chunkSize;
 
-    // TOOD: divide up per core instead
+    // TOOD: try to allocate on stack when possible
     int64_t* const pChunkCount = (int64_t*)WORKSPACE_ALLOC(chunks * sizeof(int64_t));
 
+    if (pChunkCount) {
+        // MT callback
+        struct BSCallbackStruct {
+            int64_t* pChunkCount;
+            const int8_t* pBooleanMask;
+            int64_t strideBoolean;
+        };
 
-    // MT callback
-    struct BSCallbackStruct {
-        int64_t* pChunkCount;
-        const int8_t* pBooleanMask;
-    };
+        // This is the routine that will be called back from multiple threads
+        // t64_t(*MTCHUNK_CALLBACK)(void* callbackArg, int core, int64_t start, int64_t length);
+        auto lambdaBSCallback = [](void* callbackArgT, int core, int64_t start, int64_t length) -> int64_t {
+            BSCallbackStruct* callbackArg = (BSCallbackStruct*)callbackArgT;
 
-    // This is the routine that will be called back from multiple threads
-    // t64_t(*MTCHUNK_CALLBACK)(void* callbackArg, int core, int64_t start, int64_t length);
-    auto lambdaBSCallback = [](void* callbackArgT, int core, int64_t start, int64_t length) -> int64_t {
-        BSCallbackStruct* callbackArg = (BSCallbackStruct*)callbackArgT;
+            const int8_t* pBooleanMask = callbackArg->pBooleanMask;
+            int64_t* pChunkCount = callbackArg->pChunkCount;
 
-        const int8_t* pBooleanMask = callbackArg->pBooleanMask;
-        int64_t* pChunkCount = callbackArg->pChunkCount;
+            // Use the single-threaded implementation to sum the number of
+            // 1-byte boolean TRUE values in the current chunk.
+            // This means the current function is just responsible for parallelizing over the chunks
+            // but doesn't do any real "math" itself.
+            int64_t strides = callbackArg->strideBoolean;
+            int64_t total = SumBooleanMask(&pBooleanMask[start * strides], length, strides);
 
-        // Use the single-threaded implementation to sum the number of
-        // 1-byte boolean TRUE values in the current chunk.
-        // This means the current function is just responsible for parallelizing over the chunks
-        // but doesn't do any real "math" itself.
-        int64_t total = SumBooleanMask(&pBooleanMask[start], length);
+            pChunkCount[start / THREADER->WORK_ITEM_CHUNK] = total;
+            return TRUE;
+        };
 
-        pChunkCount[start / THREADER->WORK_ITEM_CHUNK] = total;
-        return TRUE;
-    };
+        BSCallbackStruct stBSCallback;
+        stBSCallback.pChunkCount = pChunkCount;
+        stBSCallback.pBooleanMask = pBooleanMask;
+        stBSCallback.strideBoolean = PyArray_STRIDE(aIndex, 0);
 
-    BSCallbackStruct stBSCallback;
-    stBSCallback.pChunkCount = pChunkCount;
-    stBSCallback.pBooleanMask = pBooleanMask;
+        BOOL didMtWork = THREADER->DoMultiThreadedChunkWork(lengthBool, lambdaBSCallback, &stBSCallback);
 
-    BOOL didMtWork = THREADER->DoMultiThreadedChunkWork(lengthBool, lambdaBSCallback, &stBSCallback);
+        *ppChunkCount = pChunkCount;
+        // if multithreading turned off...
+        return didMtWork ? chunks : 1;
+    }
+    // out of memory
+    return 0;
+
+}
 
 
-    *ppChunkCount = pChunkCount;
-    // if multithreading turned off...
-    return didMtWork ? chunks : 1;
+//---------------------------------------------------------------------------
+// Input:
+// Arg1: numpy array aValues (can be any array)
+// Arg2: numpy array aIndex (must be BOOL)
+//
+PyObject*
+BooleanIndexInternal(
+    PyArrayObject* aValues,
+    PyArrayObject* aIndex) {
+
+    if (PyArray_TYPE(aIndex) != NPY_BOOL) {
+        PyErr_Format(PyExc_ValueError, "Second argument must be a boolean array");
+        return NULL;
+    }
+    // This logic is not quite correct, if the strides on all dimensions are the same, we can use this routine
+    if (PyArray_NDIM(aIndex) != 1 && !PyArray_ISCONTIGUOUS(aIndex)) {
+        PyErr_Format(PyExc_ValueError, "Dont know how to handle multidimensional boolean array.");
+        return NULL;
+    }
+    if (PyArray_NDIM(aValues) != 1 && !PyArray_ISCONTIGUOUS(aValues)) {
+        PyErr_Format(PyExc_ValueError, "Dont know how to handle multidimensional array to be indexed.");
+        return NULL;
+    }
+
+    // Pass one, count the values
+    // Eight at a time
+    int64_t lengthBool = ArrayLength(aIndex);
+    int64_t lengthValue = ArrayLength(aValues);
+
+    if (lengthBool != lengthValue) {
+        PyErr_Format(PyExc_ValueError, "Array lengths must match %lld vs %lld", lengthBool, lengthValue);
+        return NULL;
+    }
+
+    int64_t* pChunkCount = NULL;
+    int64_t    chunks = BooleanCount(aIndex, &pChunkCount);
+
+    if (chunks == 0) {
+        PyErr_Format(PyExc_ValueError, "Out of memory");
+        return NULL;
+    }
+
+    int64_t totalTrue = 0;
+
+    // Store the offset
+    for (int64_t i = 0; i < chunks; i++) {
+        int64_t temp = totalTrue;
+        totalTrue += pChunkCount[i];
+
+        // reassign to the cumulative sum so we know the offset
+        pChunkCount[i] = temp;
+    }
+
+    LOGGING("boolean index total: %I64d  length: %I64d  type:%d   chunks:%I64d\n", totalTrue, lengthBool, PyArray_TYPE(aValues), chunks);
+
+    int8_t* pBooleanMask = (int8_t*)PyArray_BYTES(aIndex);
+
+    // Now we know per chunk how many true there are... we can allocate the new array
+    PyArrayObject* pReturnArray = AllocateLikeResize(aValues, totalTrue);
+
+    if (pReturnArray) {
+        // If the resulting array is empty there is no work to do
+        if (totalTrue > 0) {
+
+            // MT callback
+            struct BICallbackStruct {
+                int64_t* pChunkCount;
+                int8_t* pBooleanMask;
+                int64_t strideBoolean;
+                char* pValuesIn;
+                int64_t strideValues;
+                char* pValuesOut;
+                int64_t    itemSize;
+            };
+
+
+            //-----------------------------------------------
+            //-----------------------------------------------
+            // This is the routine that will be called back from multiple threads
+            auto lambdaBICallback2 = [](void* callbackArgT, int core, int64_t start, int64_t length) -> int64_t {
+                BICallbackStruct* callbackArg = (BICallbackStruct*)callbackArgT;
+
+                int8_t* pBooleanMask = callbackArg->pBooleanMask;
+                int64_t  chunkCount = callbackArg->pChunkCount[start / THREADER->WORK_ITEM_CHUNK];
+                int64_t  itemSize = callbackArg->itemSize;
+                int64_t strideBoolean = callbackArg->strideBoolean;
+                int64_t* pData = (int64_t*)&pBooleanMask[start * strideBoolean];
+                int64_t strideValues = callbackArg->strideValues;
+                char* pValuesIn = &callbackArg->pValuesIn[start * strideValues];
+
+                // output is assumed contiguous
+                char* pValuesOut = &callbackArg->pValuesOut[chunkCount * itemSize];
+
+                // process 8 booleans at a time in the loop
+                int64_t  blength = length / 8;
+
+                if (strideBoolean == 1) {
+                    switch (itemSize) {
+                    case 1:
+                    {
+                        // NOTE: This routine can be improved further by
+                        // Loading 32 booleans at time in math register
+                        // Storing the result in a math register (shifting over new values) until full
+                        int8_t* pVOut = (int8_t*)pValuesOut;
+                        int8_t* pVIn = (int8_t*)pValuesIn;
+
+                        for (int64_t i = 0; i < blength; i++) {
+                            uint64_t bitmask = *(uint64_t*)pData;
+
+                            // NOTE: the below can be optimized with vector intrinsics
+                            // little endian, so the first value is low bit (not high bit)
+                            if (bitmask != 0) {
+                                for (int j = 0; j < 8; j++) {
+                                    if (bitmask & 0xff) { *pVOut++ = *pVIn; } pVIn += strideValues; bitmask >>= 8;
+                                }
+                            }
+                            else {
+                                pVIn += 8 * strideValues;
+                            }
+                            pData++;
+                        }
+
+                        // Get last
+                        pBooleanMask = (int8_t*)pData;
+
+                        blength = length & 7;
+                        for (int64_t i = 0; i < blength; i++) {
+                            if (*pBooleanMask++) {
+                                *pVOut++ = *pVIn;
+                            }
+                            pVIn += strideValues;
+                        }
+                    }
+                    break;
+                    case 2:
+                    {
+                        int16_t* pVOut = (int16_t*)pValuesOut;
+                        int16_t* pVIn = (int16_t*)pValuesIn;
+
+                        for (int64_t i = 0; i < blength; i++) {
+
+                            uint64_t bitmask = *(uint64_t*)pData;
+                            uint64_t mask = 0xff;
+                            // little endian, so the first value is low bit (not high bit)
+                            if (bitmask != 0) {
+                                for (int j = 0; j < 8; j++) {
+                                    if (bitmask & 0xff) { *pVOut++ = *pVIn; } pVIn = STRIDE_NEXT(int16_t, pVIn, strideValues); bitmask >>= 8;
+                                }
+                            }
+                            else {
+                                pVIn = STRIDE_NEXT(int16_t, pVIn, 8*strideValues);
+                            }
+                            pData++;
+                        }
+
+                        // Get last
+                        pBooleanMask = (int8_t*)pData;
+
+                        blength = length & 7;
+                        for (int64_t i = 0; i < blength; i++) {
+                            if (*pBooleanMask++) {
+                                *pVOut++ = *pVIn;
+                            }
+                            pVIn = STRIDE_NEXT(int16_t, pVIn, strideValues);
+                        }
+                    }
+                    break;
+                    case 4:
+                    {
+                        int32_t* pVOut = (int32_t*)pValuesOut;
+                        int32_t* pVIn = (int32_t*)pValuesIn;
+
+                        for (int64_t i = 0; i < blength; i++) {
+
+                            // little endian, so the first value is low bit (not high bit)
+                            uint64_t bitmask = *(uint64_t*)pData;
+                            if (bitmask != 0) {
+                                for (int j = 0; j < 8; j++) {
+                                    if (bitmask & 0xff) { *pVOut++ = *pVIn; } pVIn = STRIDE_NEXT(int32_t, pVIn, strideValues); bitmask >>= 8;
+                                }
+                            }
+                            else {
+                                pVIn = STRIDE_NEXT(int32_t, pVIn, 8 * strideValues);
+                            }
+                            pData++;
+                        }
+
+                        // Get last
+                        pBooleanMask = (int8_t*)pData;
+
+                        blength = length & 7;
+                        for (int64_t i = 0; i < blength; i++) {
+                            if (*pBooleanMask++) {
+                                *pVOut++ = *pVIn;
+                            }
+                            pVIn = STRIDE_NEXT(int32_t, pVIn, strideValues);
+                        }
+                    }
+                    break;
+                    case 8:
+                    {
+                        int64_t* pVOut = (int64_t*)pValuesOut;
+                        int64_t* pVIn = (int64_t*)pValuesIn;
+
+                        for (int64_t i = 0; i < blength; i++) {
+
+                            // little endian, so the first value is low bit (not high bit)
+                            uint64_t bitmask = *(uint64_t*)pData;
+                            if (bitmask != 0) {
+                                for (int j = 0; j < 8; j++) {
+                                    if (bitmask & 0xff) { *pVOut++ = *pVIn; } pVIn = STRIDE_NEXT(int64_t, pVIn, strideValues); bitmask >>= 8;
+                                }
+                            }
+                            else {
+                                pVIn = STRIDE_NEXT(int64_t, pVIn, 8 * strideValues);
+                            }
+                            pData++;
+                        }
+
+                        // Get last
+                        pBooleanMask = (int8_t*)pData;
+
+                        blength = length & 7;
+                        for (int64_t i = 0; i < blength; i++) {
+                            if (*pBooleanMask++) {
+                                *pVOut++ = *pVIn;
+                            }
+                            pVIn = STRIDE_NEXT(int64_t, pVIn, strideValues);
+                        }
+                    }
+                    break;
+
+                    default:
+                    {
+                        for (int64_t i = 0; i < blength; i++) {
+
+                            // little endian, so the first value is low bit (not high bit)
+                            uint64_t bitmask = *(uint64_t*)pData;
+                            if (bitmask != 0) {
+                                int counter = 8;
+                                while (counter--) {
+                                    if (bitmask & 0xff) {
+                                        memcpy(pValuesOut, pValuesIn, itemSize);
+                                        pValuesOut += itemSize;
+                                    }
+                                    pValuesIn += strideValues;
+                                    bitmask >>= 8;
+                                }
+                            }
+                            else {
+                                pValuesIn += (strideValues * 8);
+                            }
+                            pData++;
+                        }
+
+                        // Get last
+                        pBooleanMask = (int8_t*)pData;
+
+                        blength = length & 7;
+                        for (int64_t i = 0; i < blength; i++) {
+                            if (*pBooleanMask++) {
+                                memcpy(pValuesOut, pValuesIn, itemSize);
+                                pValuesOut += strideValues;
+                            }
+                            pValuesIn += strideValues;
+                        }
+                    }
+                    break;
+                    }
+                }  else {
+                    // The boolean mask is strided
+                    // FUTURE OPTIMIZATION: We can use the gather command to speed this path
+                    int8_t* pBool = (int8_t*)pData;
+                    switch (itemSize) {
+                    case 1:
+                    {
+                        int8_t* pVOut = (int8_t*)pValuesOut;
+                        int8_t* pVIn = (int8_t*)pValuesIn;
+                        for (int64_t i = 0; i < length; i++) {
+                            if (*pBool) {
+                                *pVOut++ = *pVIn;
+                            }
+                            pBool += strideBoolean;
+                            pVIn += strideValues;
+                        }
+                    }
+                    break;
+                    case 2:
+                    {
+                        int16_t* pVOut = (int16_t*)pValuesOut;
+                        int16_t* pVIn = (int16_t*)pValuesIn;
+                        for (int64_t i = 0; i < length; i++) {
+                            if (*pBool) {
+                                *pVOut++ = *pVIn;
+                            }
+                            pBool += strideBoolean;
+                            pVIn = STRIDE_NEXT(int16_t,pVIn,strideValues);
+                        }
+                    }
+                    break;
+                    case 4:
+                    {
+                        int32_t* pVOut = (int32_t*)pValuesOut;
+                        int32_t* pVIn = (int32_t*)pValuesIn;
+                        for (int64_t i = 0; i < length; i++) {
+                            if (*pBool) {
+                                *pVOut++ = *pVIn;
+                            }
+                            pBool += strideBoolean;
+                            pVIn = STRIDE_NEXT(int32_t, pVIn, strideValues);
+                        }
+                    }
+                    break;
+                    case 8:
+                    {
+                        int64_t* pVOut = (int64_t*)pValuesOut;
+                        int64_t* pVIn = (int64_t*)pValuesIn;
+                        for (int64_t i = 0; i < length; i++) {
+                            if (*pBool) {
+                                *pVOut++ = *pVIn;
+                            }
+                            pBool += strideBoolean;
+                            pVIn = STRIDE_NEXT(int64_t, pVIn, strideValues);
+                        }
+                    }
+                    break;
+                    default:
+                    {
+                        char* pVOut = (char*)pValuesOut;
+                        char* pVIn = (char*)pValuesIn;
+                        for (int64_t i = 0; i < length; i++) {
+                            if (*pBool) {
+                                memcpy(pVOut, pVIn, itemSize);
+                                pVOut+=itemSize;
+                            }
+                            pBool += strideBoolean;
+                            pVIn += strideValues;
+                        }
+                    }
+                    break;
+                    }
+                }
+                return TRUE;
+            };
+
+            BICallbackStruct stBICallback;
+            stBICallback.pChunkCount = pChunkCount;
+            stBICallback.pBooleanMask = pBooleanMask;
+            stBICallback.pValuesIn = (char*)PyArray_BYTES(aValues);
+            stBICallback.pValuesOut = (char*)PyArray_BYTES(pReturnArray);
+            stBICallback.itemSize = PyArray_ITEMSIZE(aValues);
+            stBICallback.strideBoolean = PyArray_STRIDE(aIndex, 0);
+            stBICallback.strideValues = PyArray_STRIDE(aValues, 0);
+
+            THREADER->DoMultiThreadedChunkWork(lengthBool, lambdaBICallback2, &stBICallback);
+        }
+    }  else {
+        // ran out of memory
+        PyErr_Format(PyExc_ValueError, "Out of memory");
+    }
+
+    WORKSPACE_FREE(pChunkCount);
+    return (PyObject*)pReturnArray;
 }
 
 
@@ -412,281 +795,8 @@ BooleanIndex(PyObject* self, PyObject* args)
 
         return NULL;
     }
-
-    if (PyArray_TYPE(aIndex) != NPY_BOOL) {
-        PyErr_Format(PyExc_ValueError, "Second argument must be a boolean array");
-        return NULL;
-    }
-
-    // Pass one, count the values
-    // Eight at a time
-    int64_t lengthBool = ArrayLength(aIndex);
-    int64_t lengthValue = ArrayLength(aValues);
-
-    if (lengthBool != lengthValue) {
-        PyErr_Format(PyExc_ValueError, "Array lengths must match %lld vs %lld", lengthBool, lengthValue);
-        return NULL;
-    }
-
-    int64_t* pChunkCount = NULL;
-    int64_t    chunks = BooleanCount(aIndex, &pChunkCount);
-
-    int64_t totalTrue = 0;
-
-    // Store the offset
-    for (int64_t i = 0; i < chunks; i++) {
-        int64_t temp = totalTrue;
-        totalTrue += pChunkCount[i];
-
-        // reassign to the cumulative sum so we know the offset
-        pChunkCount[i] = temp;
-    }
-
-    LOGGING("boolindex total: %I64d  length: %I64d  type:%d\n", totalTrue, lengthBool, PyArray_TYPE(aValues));
-
-    int8_t* pBooleanMask = (int8_t*)PyArray_BYTES(aIndex);
-
-    // Now we know per chunk how many true there are... we can allocate the new array
-    PyArrayObject* pReturnArray = AllocateLikeResize(aValues, totalTrue);
-
-    if (pReturnArray) {
-
-        // MT callback
-        struct BICallbackStruct {
-            int64_t* pChunkCount;
-            int8_t* pBooleanMask;
-            char* pValuesIn;
-            char* pValuesOut;
-            int64_t    itemSize;
-        };
-
-
-        //-----------------------------------------------
-        //-----------------------------------------------
-        // This is the routine that will be called back from multiple threads
-        auto lambdaBICallback2 = [](void* callbackArgT, int core, int64_t start, int64_t length) -> int64_t {
-            BICallbackStruct* callbackArg = (BICallbackStruct*)callbackArgT;
-
-            int8_t* pBooleanMask = callbackArg->pBooleanMask;
-            int64_t* pData = (int64_t*)&pBooleanMask[start];
-            int64_t  chunkCount = callbackArg->pChunkCount[start / THREADER->WORK_ITEM_CHUNK];
-            int64_t  itemSize = callbackArg->itemSize;
-            char* pValuesIn = &callbackArg->pValuesIn[start * itemSize];
-            char* pValuesOut = &callbackArg->pValuesOut[chunkCount * itemSize];
-
-            int64_t  blength = length / 8;
-
-            switch (itemSize) {
-            case 1:
-            {
-                int8_t* pVOut = (int8_t*)pValuesOut;
-                int8_t* pVIn = (int8_t*)pValuesIn;
-
-                for (int64_t i = 0; i < blength; i++) {
-                    uint64_t bitmask = *(uint64_t*)pData;
-                    uint64_t mask = 0xff;
-
-                    // NOTE: the below can be optimized with vector intrinsics
-                    // little endian, so the first value is low bit (not high bit)
-                    if (bitmask != 0) {
-                        if (bitmask & mask) { *pVOut++ = *pVIn; } pVIn++;  mask <<= 8;
-                        if (bitmask & mask) { *pVOut++ = *pVIn; } pVIn++;  mask <<= 8;
-                        if (bitmask & mask) { *pVOut++ = *pVIn; } pVIn++;  mask <<= 8;
-                        if (bitmask & mask) { *pVOut++ = *pVIn; } pVIn++;  mask <<= 8;
-                        if (bitmask & mask) { *pVOut++ = *pVIn; } pVIn++;  mask <<= 8;
-                        if (bitmask & mask) { *pVOut++ = *pVIn; } pVIn++;  mask <<= 8;
-                        if (bitmask & mask) { *pVOut++ = *pVIn; } pVIn++;  mask <<= 8;
-                        if (bitmask & mask) { *pVOut++ = *pVIn; } pVIn++; 
-                    }
-                    else {
-                        pVIn += 8;
-                    }
-                    pData++;
-                }
-
-                // Get last
-                pBooleanMask = (int8_t*)pData;
-
-                blength = length & 7;
-                for (int64_t i = 0; i < blength; i++) {
-                    if (*pBooleanMask++) {
-                        *pVOut++ = *pVIn;
-                    }
-                    pVIn++;
-                }
-            }
-            break;
-            case 2:
-            {
-                int16_t* pVOut = (int16_t*)pValuesOut;
-                int16_t* pVIn = (int16_t*)pValuesIn;
-
-                for (int64_t i = 0; i < blength; i++) {
-
-                    uint64_t bitmask = *(uint64_t*)pData;
-                    uint64_t mask = 0xff;
-                    // little endian, so the first value is low bit (not high bit)
-                    if (bitmask != 0) {
-                        if (bitmask & mask) { *pVOut++ = *pVIn; } pVIn++;  mask <<= 8;
-                        if (bitmask & mask) { *pVOut++ = *pVIn; } pVIn++;  mask <<= 8;
-                        if (bitmask & mask) { *pVOut++ = *pVIn; } pVIn++;  mask <<= 8;
-                        if (bitmask & mask) { *pVOut++ = *pVIn; } pVIn++;  mask <<= 8;
-                        if (bitmask & mask) { *pVOut++ = *pVIn; } pVIn++;  mask <<= 8;
-                        if (bitmask & mask) { *pVOut++ = *pVIn; } pVIn++;  mask <<= 8;
-                        if (bitmask & mask) { *pVOut++ = *pVIn; } pVIn++;  mask <<= 8;
-                        if (bitmask & mask) { *pVOut++ = *pVIn; } pVIn++;
-                    }
-                    else {
-                        pVIn += 8;
-                    }
-                    pData++;
-                }
-
-                // Get last
-                pBooleanMask = (int8_t*)pData;
-
-                blength = length & 7;
-                for (int64_t i = 0; i < blength; i++) {
-                    if (*pBooleanMask++) {
-                        *pVOut++ = *pVIn;
-                    }
-                    pVIn++;
-                }
-            }
-            break;
-            case 4:
-            {
-                int32_t* pVOut = (int32_t*)pValuesOut;
-                int32_t* pVIn = (int32_t*)pValuesIn;
-
-                for (int64_t i = 0; i < blength; i++) {
-
-                    // little endian, so the first value is low bit (not high bit)
-                    uint64_t bitmask = *(uint64_t*)pData;
-                    uint64_t mask = 0xff;
-                    if (bitmask != 0) {
-                        if (bitmask & mask) { *pVOut++ = *pVIn; } pVIn++;  mask <<= 8;
-                        if (bitmask & mask) { *pVOut++ = *pVIn; } pVIn++;  mask <<= 8;
-                        if (bitmask & mask) { *pVOut++ = *pVIn; } pVIn++;  mask <<= 8;
-                        if (bitmask & mask) { *pVOut++ = *pVIn; } pVIn++;  mask <<= 8;
-                        if (bitmask & mask) { *pVOut++ = *pVIn; } pVIn++;  mask <<= 8;
-                        if (bitmask & mask) { *pVOut++ = *pVIn; } pVIn++;  mask <<= 8;
-                        if (bitmask & mask) { *pVOut++ = *pVIn; } pVIn++;  mask <<= 8;
-                        if (bitmask & mask) { *pVOut++ = *pVIn; } pVIn++;
-                    }
-                    else {
-                        pVIn += 8;
-                    }
-                    pData++;
-                }
-
-                // Get last
-                pBooleanMask = (int8_t*)pData;
-
-                blength = length & 7;
-                for (int64_t i = 0; i < blength; i++) {
-                    if (*pBooleanMask++) {
-                        *pVOut++ = *pVIn;
-                    }
-                    pVIn++;
-                }
-            }
-            break;
-            case 8:
-            {
-                int64_t* pVOut = (int64_t*)pValuesOut;
-                int64_t* pVIn = (int64_t*)pValuesIn;
-
-                for (int64_t i = 0; i < blength; i++) {
-
-                    // little endian, so the first value is low bit (not high bit)
-                    uint64_t bitmask = *(uint64_t*)pData;
-                    uint64_t mask = 0xff;
-                    if (bitmask != 0) {
-                        if (bitmask & mask) { *pVOut++ = *pVIn; } pVIn++;  mask <<= 8;
-                        if (bitmask & mask) { *pVOut++ = *pVIn; } pVIn++;  mask <<= 8;
-                        if (bitmask & mask) { *pVOut++ = *pVIn; } pVIn++;  mask <<= 8;
-                        if (bitmask & mask) { *pVOut++ = *pVIn; } pVIn++;  mask <<= 8;
-                        if (bitmask & mask) { *pVOut++ = *pVIn; } pVIn++;  mask <<= 8;
-                        if (bitmask & mask) { *pVOut++ = *pVIn; } pVIn++;  mask <<= 8;
-                        if (bitmask & mask) { *pVOut++ = *pVIn; } pVIn++;  mask <<= 8;
-                        if (bitmask & mask) { *pVOut++ = *pVIn; } pVIn++;
-                    }
-                    else {
-                        pVIn += 8;
-                    }
-                    pData++;
-                }
-
-                // Get last
-                pBooleanMask = (int8_t*)pData;
-
-                blength = length & 7;
-                for (int64_t i = 0; i < blength; i++) {
-                    if (*pBooleanMask++) {
-                        *pVOut++ = *pVIn;
-                    }
-                    pVIn++;
-                }
-            }
-            break;
-
-            default:
-            {
-                for (int64_t i = 0; i < blength; i++) {
-
-                    // little endian, so the first value is low bit (not high bit)
-                    uint64_t bitmask = *(uint64_t*)pData;
-                    uint64_t mask = 0xff;
-                    if (bitmask != 0) {
-                        int counter = 8;
-                        while (counter--) {
-                            if (bitmask & mask) {
-                                memcpy(pValuesOut, pValuesIn, itemSize);
-                                pValuesOut += itemSize;
-                            }
-                            pValuesIn += itemSize;
-                            bitmask >>= 8;
-                        }
-                    }
-                    else {
-                        pValuesIn += (itemSize * 8);
-                    }
-                    pData++;
-                }
-
-                // Get last
-                pBooleanMask = (int8_t*)pData;
-
-                blength = length & 7;
-                for (int64_t i = 0; i < blength; i++) {
-                    if (*pBooleanMask++) {
-                        memcpy(pValuesOut, pValuesIn, itemSize);
-                        pValuesOut += itemSize;
-                    }
-                    pValuesIn += itemSize;
-                }
-            }
-            break;
-            }
-
-            return TRUE;
-        };
-
-        BICallbackStruct stBICallback;
-        stBICallback.pChunkCount = pChunkCount;
-        stBICallback.pBooleanMask = pBooleanMask;
-        stBICallback.pValuesIn = (char*)PyArray_BYTES(aValues);
-        stBICallback.pValuesOut = (char*)PyArray_BYTES(pReturnArray);
-        stBICallback.itemSize = PyArray_ITEMSIZE(aValues);
-
-        THREADER->DoMultiThreadedChunkWork(lengthBool, lambdaBICallback2, &stBICallback);
-    }
-
-    WORKSPACE_FREE(pChunkCount);
-    return (PyObject*)pReturnArray;
+    return BooleanIndexInternal(aValues, aIndex);
 }
-
 
 
 
@@ -1181,6 +1291,11 @@ getitem(PyObject* self, PyObject* args)
     if (numpyIndexType > NPY_LONGDOUBLE) {
         PyErr_Format(PyExc_ValueError, "Dont know how to convert these types %d using index dtype: %d", numpyValuesType, numpyIndexType);
         return NULL;
+    }
+
+    if (numpyIndexType == NPY_BOOL) {
+        // special path for boolean
+        return BooleanIndexInternal(aValues, aIndex);
     }
 
     // This logic is not quite correct, if the strides on all dimensions are the same, we can use this routine

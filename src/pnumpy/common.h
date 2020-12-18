@@ -22,6 +22,7 @@ struct stSettings {
     int32_t  LedgerEnabled;
     int32_t  RecyclerEnabled;
     int32_t  ZigZag;  // set to 0 to disable
+    int32_t  Initialized;
 };
 
 extern stSettings g_Settings;

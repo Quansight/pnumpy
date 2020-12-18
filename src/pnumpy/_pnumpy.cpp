@@ -226,7 +226,7 @@ stUFunc  g_UnaryFuncLUT[UNARY_OPERATION::UNARY_LAST][ATOP_LAST];
 stUFunc  g_TrigFuncLUT[TRIG_OPERATION::TRIG_LAST][ATOP_LAST];
 
 // set to 0 to disable
-stSettings g_Settings = { 1, 0, 0, 0 };
+stSettings g_Settings = { 1, 0, 0, 0, 0 };
 
 // Macro used just before call a ufunc
 #define LEDGER_START()    g_Settings.LedgerEnabled = 0; int64_t ledgerStartTime = __rdtsc();
@@ -996,7 +996,9 @@ PyObject* newinit(PyObject* self, PyObject* args, PyObject* kwargs) {
     //int dtypes[] = {  NPY_INT32,  NPY_INT64};
 
     // Init atop: array threading operations
-    if (atop_init() && g_avx2) {
+    if (!g_Settings.Initialized && g_avx2) {
+
+        g_Settings.Initialized = 1;
         memset(g_UFuncLUT, 0, sizeof(g_UFuncLUT));
 
         // Initialize numpy's C-API.
@@ -1247,8 +1249,6 @@ PyObject* newinit(PyObject* self, PyObject* args, PyObject* kwargs) {
                 AddToDict(ufunc_name, dtype, pstUFunc);
             }
         }
-
-        LedgerInit();
 
         RETURN_NONE;
     }
