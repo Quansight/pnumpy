@@ -2266,7 +2266,7 @@ SortInPlace(void* pDataIn1, int64_t arraySize1, SORT_MODE mode) {
     }
 
     if (result != 0) {
-        printf("**Error sorting.  size %llu   mode %d\n", arraySize1, mode);
+        LOGGING("**Error sorting.  size %llu   mode %d\n", arraySize1, mode);
     }
 
     return result;
@@ -2298,7 +2298,7 @@ SortInPlaceFloat(void* pDataIn1, int64_t arraySize1, SORT_MODE mode) {
     }
 
     if (result != 0) {
-        printf("**Error sorting.  size %llu   mode %d\n", (int64_t)arraySize1, mode);
+        LOGGING("**Error sorting.  size %llu   mode %d\n", (int64_t)arraySize1, mode);
     }
 
     return result;
@@ -2331,7 +2331,7 @@ SortIndex(
     }
 
     if (result != 0) {
-        printf("**Error sorting.  size %llu   mode %d\n", (int64_t)arraySize1, mode);
+        LOGGING("**Error sorting.  size %llu   mode %d\n", (int64_t)arraySize1, mode);
     }
 
     return result;
@@ -2361,7 +2361,7 @@ SortIndexFloat(int64_t* pCutOffs, int64_t cutOffLength, void* pDataIn1, UINDEX* 
     }
 
     if (result != 0) {
-        printf("**Error sorting.  size %llu   mode %d\n", (int64_t)arraySize1, mode);
+        LOGGING("**Error sorting.  size %llu   mode %d\n", (int64_t)arraySize1, mode);
     }
 
     return result;
@@ -2480,7 +2480,7 @@ static void SortIndex(
         SortIndexFloat<long double, UINDEX>(pCutOffs, cutOffLength, pDataIn1, pDataOut1, arraySize1, mode);
         break;
     default:
-        printf("SortIndex does not understand type %d\n", arrayType1);
+        LOGGING("SortIndex does not understand type %d\n", arrayType1);
     }
 
 }
@@ -2557,7 +2557,7 @@ extern "C" BOOL SortArray(void* pDataIn1, int64_t arraySize1, int32_t arrayType1
         SortInPlaceFloat<long double>(pDataIn1, arraySize1, mode);
         break;
     default:
-        //printf("SortArray does not understand type %d\n", arrayType1);
+        LOGGING("SortArray does not understand type %d\n", arrayType1);
         return FALSE;
         break;
     }
