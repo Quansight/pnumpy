@@ -2337,98 +2337,6 @@ SortIndex(
     return result;
 }
 
-//------------------------------------------------------------------------------------------
-// Internal and can be called from groupby
-// caller must allocate the pDataOut1 as int64_t with size arraySize1
-// UINDEX = int32_t or int64_t
-template <typename UINDEX>
-static void SortIndex(
-    int64_t* pCutOffs,
-    int64_t       cutOffLength,
-
-    void* pDataIn1,
-    UINDEX      arraySize1,
-    UINDEX* pDataOut1,
-    SORT_MODE   mode,
-    int       arrayType1,
-    int64_t      strlen) {
-
-    switch (arrayType1) {
-    case ATOP_UNICODE:
-        SortIndexUnicode<UINDEX>(pCutOffs, cutOffLength, (const char*)pDataIn1, pDataOut1, arraySize1, mode, strlen);
-        break;
-    case ATOP_VOID:
-        SortIndexVoid<UINDEX>(pCutOffs, cutOffLength, (const char*)pDataIn1, pDataOut1, arraySize1, mode, strlen);
-        break;
-    case ATOP_STRING:
-        SortIndexString<UINDEX>(pCutOffs, cutOffLength, (const char*)pDataIn1, pDataOut1, arraySize1, mode, strlen);
-        break;
-    case ATOP_BOOL:
-    case ATOP_INT8:
-        SortIndex<int8_t, UINDEX>(pCutOffs, cutOffLength, pDataIn1, pDataOut1, arraySize1, mode);
-        break;
-    case ATOP_INT16:
-        SortIndex<int16_t, UINDEX>(pCutOffs, cutOffLength, pDataIn1, pDataOut1, arraySize1, mode);
-        break;
-    case ATOP_INT32:
-        SortIndex<int32_t, UINDEX>(pCutOffs, cutOffLength, pDataIn1, pDataOut1, arraySize1, mode);
-        break;
-    case ATOP_INT64:
-        SortIndex<int64_t, UINDEX>(pCutOffs, cutOffLength, pDataIn1, pDataOut1, arraySize1, mode);
-        break;
-    case ATOP_UINT8:
-        SortIndex<uint8_t, UINDEX>(pCutOffs, cutOffLength, pDataIn1, pDataOut1, arraySize1, mode);
-        break;
-    case ATOP_UINT16:
-        SortIndex<uint16_t, UINDEX>(pCutOffs, cutOffLength, pDataIn1, pDataOut1, arraySize1, mode);
-        break;
-    case ATOP_UINT32:
-        SortIndex<uint32_t, UINDEX>(pCutOffs, cutOffLength, pDataIn1, pDataOut1, arraySize1, mode);
-        break;
-    case ATOP_UINT64:
-        SortIndex<uint64_t, UINDEX>(pCutOffs, cutOffLength, pDataIn1, pDataOut1, arraySize1, mode);
-        break;
-    case ATOP_FLOAT:
-        SortIndexFloat<float, UINDEX>(pCutOffs, cutOffLength, pDataIn1, pDataOut1, arraySize1, mode);
-        break;
-    case ATOP_DOUBLE:
-        SortIndexFloat<double, UINDEX>(pCutOffs, cutOffLength, pDataIn1, pDataOut1, arraySize1, mode);
-        break;
-    case ATOP_LONGDOUBLE:
-        SortIndexFloat<long double, UINDEX>(pCutOffs, cutOffLength, pDataIn1, pDataOut1, arraySize1, mode);
-        break;
-    default:
-        printf("SortIndex does not understand type %d\n", arrayType1);
-    }
-
-}
-
-extern "C" void SortIndex32(
-    int64_t * pCutOffs,
-    int64_t     cutOffLength,
-    void* pDataIn1,
-    int64_t     arraySize1,
-    int32_t * pDataOut1,
-    SORT_MODE   mode,
-    int         arrayType1,
-    int64_t     strlen) {
-
-    return SortIndex<int32_t>(pCutOffs, cutOffLength, pDataIn1, (int32_t)arraySize1,pDataOut1, mode, arrayType1, strlen);
-}
-
-extern "C" void SortIndex64(
-    int64_t * pCutOffs,
-    int64_t     cutOffLength,
-    void* pDataIn1,
-    int64_t     arraySize1,
-    int64_t * pDataOut1,
-    SORT_MODE   mode,
-    int         arrayType1,
-    int64_t     strlen) {
-    return SortIndex<int64_t>(pCutOffs, cutOffLength, pDataIn1, arraySize1, pDataOut1, mode, arrayType1, strlen);
-
-}
-
 
 //-----------------------------------------------------------------------------------------------
 template <typename T, typename UINDEX>
@@ -2511,6 +2419,97 @@ SortIndexVoid(int64_t* pCutOffs, int64_t cutOffLength, const char* pDataIn1, UIN
     return result;
 }
 
+
+//------------------------------------------------------------------------------------------
+// Internal and can be called from groupby
+// caller must allocate the pDataOut1 as int64_t with size arraySize1
+// UINDEX = int32_t or int64_t
+template <typename UINDEX>
+static void SortIndex(
+    int64_t*   pCutOffs,
+    int64_t    cutOffLength,
+    void*      pDataIn1,
+    UINDEX     arraySize1,
+    UINDEX*    pDataOut1,
+    SORT_MODE  mode,
+    int        arrayType1,
+    int64_t    strlen) {
+
+    switch (arrayType1) {
+    case ATOP_UNICODE:
+        SortIndexUnicode<UINDEX>(pCutOffs, cutOffLength, (const char*)pDataIn1, pDataOut1, arraySize1, mode, strlen);
+        break;
+    case ATOP_VOID:
+        SortIndexVoid<UINDEX>(pCutOffs, cutOffLength, (const char*)pDataIn1, pDataOut1, arraySize1, mode, strlen);
+        break;
+    case ATOP_STRING:
+        SortIndexString<UINDEX>(pCutOffs, cutOffLength, (const char*)pDataIn1, pDataOut1, arraySize1, mode, strlen);
+        break;
+    case ATOP_BOOL:
+    case ATOP_INT8:
+        SortIndex<int8_t, UINDEX>(pCutOffs, cutOffLength, pDataIn1, pDataOut1, arraySize1, mode);
+        break;
+    case ATOP_INT16:
+        SortIndex<int16_t, UINDEX>(pCutOffs, cutOffLength, pDataIn1, pDataOut1, arraySize1, mode);
+        break;
+    case ATOP_INT32:
+        SortIndex<int32_t, UINDEX>(pCutOffs, cutOffLength, pDataIn1, pDataOut1, arraySize1, mode);
+        break;
+    case ATOP_INT64:
+        SortIndex<int64_t, UINDEX>(pCutOffs, cutOffLength, pDataIn1, pDataOut1, arraySize1, mode);
+        break;
+    case ATOP_UINT8:
+        SortIndex<uint8_t, UINDEX>(pCutOffs, cutOffLength, pDataIn1, pDataOut1, arraySize1, mode);
+        break;
+    case ATOP_UINT16:
+        SortIndex<uint16_t, UINDEX>(pCutOffs, cutOffLength, pDataIn1, pDataOut1, arraySize1, mode);
+        break;
+    case ATOP_UINT32:
+        SortIndex<uint32_t, UINDEX>(pCutOffs, cutOffLength, pDataIn1, pDataOut1, arraySize1, mode);
+        break;
+    case ATOP_UINT64:
+        SortIndex<uint64_t, UINDEX>(pCutOffs, cutOffLength, pDataIn1, pDataOut1, arraySize1, mode);
+        break;
+    case ATOP_FLOAT:
+        SortIndexFloat<float, UINDEX>(pCutOffs, cutOffLength, pDataIn1, pDataOut1, arraySize1, mode);
+        break;
+    case ATOP_DOUBLE:
+        SortIndexFloat<double, UINDEX>(pCutOffs, cutOffLength, pDataIn1, pDataOut1, arraySize1, mode);
+        break;
+    case ATOP_LONGDOUBLE:
+        SortIndexFloat<long double, UINDEX>(pCutOffs, cutOffLength, pDataIn1, pDataOut1, arraySize1, mode);
+        break;
+    default:
+        printf("SortIndex does not understand type %d\n", arrayType1);
+    }
+
+}
+
+extern "C" void SortIndex32(
+    int64_t * pCutOffs,
+    int64_t     cutOffLength,
+    void* pDataIn1,
+    int64_t     arraySize1,
+    int32_t * pDataOut1,
+    SORT_MODE   mode,
+    int         arrayType1,
+    int64_t     strlen) {
+
+    return SortIndex<int32_t>(pCutOffs, cutOffLength, pDataIn1, (int32_t)arraySize1, pDataOut1, mode, arrayType1, strlen);
+}
+
+extern "C" void SortIndex64(
+    int64_t * pCutOffs,
+    int64_t     cutOffLength,
+    void* pDataIn1,
+    int64_t     arraySize1,
+    int64_t * pDataOut1,
+    SORT_MODE   mode,
+    int         arrayType1,
+    int64_t     strlen) {
+    return SortIndex<int64_t>(pCutOffs, cutOffLength, pDataIn1, arraySize1, pDataOut1, mode, arrayType1, strlen);
+
+}
 
 
 
