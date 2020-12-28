@@ -48,12 +48,76 @@ struct stOpCategory {
     stUFuncToAtop*  pUFuncToAtop;
 };
 
+// defined in common.cpp
+// Structs used to hold any type of AVX 256 bit registers
+struct _m128comboi {
+    __m128i  i1;
+    __m128i  i2;
+};
+
+struct _m256all {
+    union {
+        __m256i  i;
+        __m256d  d;
+        __m256   s;
+        _m128comboi ci;
+    };
+};
+
+//---------------------------------------------------------------------
+// NOTE: See SDSArrayInfo and keep same
+struct ArrayInfo {
+
+    // Numpy object
+    PyArrayObject* pObject;
+
+    // First bytes
+    char* pData;
+
+    // Width in bytes of one row
+    int64_t      ItemSize;
+
+    // total number of items
+    int64_t       ArrayLength;
+
+    int64_t       NumBytes;
+
+    int           NumpyDType;
+    int           NDim;
+
+    // When calling ensure contiguous, we might make a copy
+    // if so, pObject is the copy and must be deleted.  pOriginal was passed in
+    PyArrayObject* pOriginalObject;
+
+};
+
+extern void* GetDefaultForType(int numpyInType);
+extern int64_t CalcArrayLength(int ndim, npy_intp* dims);
+extern int64_t ArrayLength(PyArrayObject* inArr);
+extern PyArrayObject* AllocateNumpyArray(int ndim, npy_intp* dims, int32_t numpyType, int64_t itemsize = 0, int fortran_array = 0, npy_intp* strides = nullptr);
+extern PyArrayObject* AllocateLikeResize(PyArrayObject* inArr, npy_intp rowSize);
+extern PyArrayObject* AllocateLikeNumpyArray(PyArrayObject* inArr, int numpyType);
+extern BOOL ConvertScalarObject(PyObject* inObject1, _m256all* pDest, int16_t numpyOutType, void** ppDataIn, int64_t* pItemSize);
+extern int GetStridesAndContig(PyArrayObject* inArray, int& ndim, int64_t& stride);
+
 // defined in pnumpy
 extern stOpCategory gOpCategory[OPCAT_LAST];
 
 extern void LedgerRecord(int32_t op_category, int64_t start_time, int64_t end_time, char** args, const npy_intp* dimensions, const npy_intp* steps, void* innerloop, int funcop, int atype);
 extern void LedgerInit();
+extern int64_t CalcArrayLength(int ndim, npy_intp* dims);
+extern int64_t ArrayLength(PyArrayObject* inArr);
+extern PyArrayObject* AllocateNumpyArray(int ndim, npy_intp* dims, int32_t numpyType, int64_t itemsize, int fortran_array, npy_intp* strides);
+extern PyArrayObject* AllocateLikeResize(PyArrayObject* inArr, npy_intp rowSize);
+extern PyArrayObject* AllocateLikeNumpyArray(PyArrayObject* inArr, int numpyType);
+extern ArrayInfo* BuildArrayInfo(
+    PyObject* listObject,
+    int64_t* pTupleSize,
+    int64_t* pTotalItemSize,
+    BOOL checkrows = TRUE,
+    BOOL convert = TRUE);
 
+extern void FreeArrayInfo(ArrayInfo* pAlloc);
 
 #define RETURN_NONE Py_INCREF(Py_None); return Py_None;
 #define RETURN_FALSE Py_XINCREF(Py_False); return Py_False;
@@ -64,3 +128,22 @@ extern void LedgerInit();
         && (steps[0] == 0))
 
 extern PyTypeObject* pPyArray_Type;
+
+#if defined(_WIN32) && !defined(__GNUC__)
+
+#define CASE_NPY_INT32      case NPY_INT32:       case NPY_INT
+#define CASE_NPY_UINT32     case NPY_UINT32:      case NPY_UINT
+#define CASE_NPY_INT64      case NPY_INT64
+#define CASE_NPY_UINT64     case NPY_UINT64
+#define CASE_NPY_FLOAT64    case NPY_DOUBLE:     case NPY_LONGDOUBLE
+
+#else
+
+#define CASE_NPY_INT32      case NPY_INT32
+#define CASE_NPY_UINT32     case NPY_UINT32
+#define CASE_NPY_INT64      case NPY_INT64:    case NPY_LONGLONG
+#define CASE_NPY_UINT64     case NPY_UINT64:   case NPY_ULONGLONG
+#define CASE_NPY_FLOAT64    case NPY_DOUBLE
+#endif
+
+

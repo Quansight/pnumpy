@@ -6,203 +6,7 @@
 #include "../atop/atop.h"
 #include "../atop/threads.h"
 
-//#if defined(_WIN32) && !defined(__GNUC__)
-//#include <../Lib/site-packages/numpy/core/include/numpy/arrayobject.h>
-//#else
-//#include <numpy/arrayobject.h>
-//#endif
-
-//#include "Python.h"
-//#define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
-//#include "numpy/ndarrayobject.h"
-//#include <stdint.h>
-//#include <stdio.h>
-//#include "../atop/threads.h"
 #define LOGGING(...)
-
-
-#if defined(_WIN32) && !defined(__GNUC__)
-
-#define CASE_NPY_INT32      case NPY_INT32:       case NPY_INT
-#define CASE_NPY_UINT32     case NPY_UINT32:      case NPY_UINT
-#define CASE_NPY_INT64      case NPY_INT64
-#define CASE_NPY_UINT64     case NPY_UINT64
-#define CASE_NPY_FLOAT64    case NPY_DOUBLE:     case NPY_LONGDOUBLE
-
-#else
-
-#define CASE_NPY_INT32      case NPY_INT32
-#define CASE_NPY_UINT32     case NPY_UINT32
-#define CASE_NPY_INT64      case NPY_INT64:    case NPY_LONGLONG
-#define CASE_NPY_UINT64     case NPY_UINT64:   case NPY_ULONGLONG
-#define CASE_NPY_FLOAT64    case NPY_DOUBLE
-#endif
-
-
-//int64_t default1 = -9223372036854775808L;
-static int64_t  gDefaultInt64 = 0x8000000000000000;
-static int32_t  gDefaultInt32 = 0x80000000;
-static uint16_t gDefaultInt16 = 0x8000;
-static uint8_t  gDefaultInt8 = 0x80;
-
-static uint64_t gDefaultUInt64 = 0xFFFFFFFFFFFFFFFF;
-static uint32_t gDefaultUInt32 = 0xFFFFFFFF;
-static uint16_t gDefaultUInt16 = 0xFFFF;
-static uint8_t  gDefaultUInt8 = 0xFF;
-
-static float  gDefaultFloat = NAN;
-static double gDefaultDouble = NAN;
-static int8_t   gDefaultBool = 0;
-static char   gString[1024] = { 0,0,0,0 };
-
-//----------------------------------------------------
-// returns pointer to a data type (of same size in memory) that holds the invalid value for the type
-// does not yet handle strings
-void* GetDefaultForType(int numpyInType) {
-    void* pgDefault = &gDefaultInt64;
-
-    switch (numpyInType) {
-    case NPY_FLOAT:  pgDefault = &gDefaultFloat;
-        break;
-    case NPY_LONGDOUBLE:
-    case NPY_DOUBLE: pgDefault = &gDefaultDouble;
-        break;
-        // BOOL should not really have an invalid value inhabiting the type
-    case NPY_BOOL:   pgDefault = &gDefaultBool;
-        break;
-    case NPY_BYTE:   pgDefault = &gDefaultInt8;
-        break;
-    case NPY_INT16:  pgDefault = &gDefaultInt16;
-        break;
-    CASE_NPY_INT32:  pgDefault = &gDefaultInt32;
-        break;
-    CASE_NPY_INT64:  pgDefault = &gDefaultInt64;
-        break;
-    case NPY_UINT8:  pgDefault = &gDefaultUInt8;
-        break;
-    case NPY_UINT16: pgDefault = &gDefaultUInt16;
-        break;
-    CASE_NPY_UINT32: pgDefault = &gDefaultUInt32;
-        break;
-    CASE_NPY_UINT64: pgDefault = &gDefaultUInt64;
-        break;
-    case NPY_STRING: pgDefault = &gString;
-        break;
-    case NPY_UNICODE: pgDefault = &gString;
-        break;
-    default:
-        printf("!!! likely problem in GetDefaultForType\n");
-    }
-
-    return pgDefault;
-}
-
-// Structs used to hold any type of AVX 256 bit registers
-struct _m128comboi {
-    __m128i  i1;
-    __m128i  i2;
-};
-
-struct _m256all {
-    union {
-        __m256i  i;
-        __m256d  d;
-        __m256   s;
-        _m128comboi ci;
-    };
-};
-
-
-//----------------------------------------------------------------
-// Calculate the total number of bytes used by the array.
-// TODO: Need to extend this to accomodate strided arrays.
-int64_t CalcArrayLength(int ndim, npy_intp* dims) {
-    int64_t length = 1;
-
-    // handle case of zero length array
-    if (dims && ndim > 0) {
-        for (int i = 0; i < ndim; i++) {
-            length *= dims[i];
-        }
-    }
-    else {
-        // Want to set this to zero, but scalar issue?
-        //length = 0;
-    }
-    return length;
-}
-
-//----------------------------------------------------------------
-// calcluate the total number of bytes used
-int64_t ArrayLength(PyArrayObject* inArr) {
-
-    return CalcArrayLength(PyArray_NDIM(inArr), PyArray_DIMS(inArr));
-}
-
-//-----------------------------------------------------------------------------------
-PyArrayObject* AllocateNumpyArray(int ndim, npy_intp* dims, int32_t numpyType, int64_t itemsize=0, int fortran_array=0, npy_intp* strides=nullptr) {
-
-    PyArrayObject* returnObject = nullptr;
-    const int64_t    len = CalcArrayLength(ndim, dims);
-
-    // PyArray_New (and the functions it wraps) don't truly respect the 'flags' argument
-    // passed into them; they only check whether it's zero or non-zero, and based on that they
-    // set the NPY_ARRAY_CARRAY or NPY_ARRAY_FARRAY flags. Construct our flags value so we end
-    // up with an array with the layout the caller requested.
-    const int array_flags = fortran_array ? NPY_ARRAY_F_CONTIGUOUS : 0;
-
-    // Make one dimension size on stack
-    volatile int64_t dimensions[1] = { len };
-
-    // This is the safest way...
-    if (!dims) {
-        // Happens with a=FA([]); 100*a;  or  FA([1])[0] / FA([2])
-        ndim = 1;
-        dims = (npy_intp*)dimensions;
-    }
-
-    PyTypeObject* const allocType =  pPyArray_Type;
-
-    // probably runt object from matlab -- have to fix this up or it will fail
-    // comes from empty strings in matlab - might need to
-    if (PyTypeNum_ISFLEXIBLE(numpyType) && itemsize == 0) {
-        itemsize = 1;
-    }
-
-    // NOTE: this path taken when we already have data in our own memory
-    returnObject = (PyArrayObject*)PyArray_New(
-        allocType,
-        ndim,
-        dims,
-        numpyType,
-        strides,      // Strides
-        nullptr,
-        (int)itemsize,
-        array_flags,
-        NULL);
-
-    if (!returnObject) {
-        printf("!!!out of memory allocating numpy array size:%lld  dims:%d  dtype:%d  itemsize:%lld  flags:%d  dim0:%lld\n", (long long)len, ndim, numpyType, (long long)itemsize, array_flags, (long long)dims[0]);
-        return nullptr;
-    }
-
-    return returnObject;
-}
-
-
-//-----------------------------------------------------------------------------------
-// NOTE: will only allocate 1 dim arrays
-PyArrayObject* AllocateLikeResize(PyArrayObject* inArr, npy_intp rowSize) {
-    int numpyType = PyArray_TYPE(inArr);
-
-    PyArrayObject* result = NULL;
-
-    int64_t itemSize = PyArray_ITEMSIZE(inArr);
-    result = AllocateNumpyArray(1, &rowSize, numpyType, itemSize);
-
-    return result;
-}
-
 
 /**
  * Count the number of 'True' (nonzero) 1-byte bool values in an array,
@@ -328,7 +132,7 @@ int64_t SumBooleanMask(const int8_t* const pData, const int64_t length, const in
     else {
         for (int64_t i = 0; i < length; i++)
         {
-            if (pData[i*strideBoolean])
+            if (pData[i * strideBoolean])
             {
                 result++;
             }
@@ -338,7 +142,6 @@ int64_t SumBooleanMask(const int8_t* const pData, const int64_t length, const in
     }
     return result;
 }
-
 
 //===================================================
 // Input: boolean array
@@ -945,7 +748,6 @@ static void GetItemIntVariable(void* aValues, void* aIndex, void* aDataOut, int6
             else {
                 pSrc = (const char*)pDefault;
             }
-
             char* pEnd = pDataOut + itemSize;
 
             while (pDataOut < (pEnd - 8)) {
@@ -959,7 +761,6 @@ static void GetItemIntVariable(void* aValues, void* aIndex, void* aDataOut, int6
             //    memcpy(pDataOut, pSrc, itemSize);
 
             pIndex++;
-            pDataOut+=itemSize;
         }
     }
     else {
@@ -987,7 +788,6 @@ static void GetItemIntVariable(void* aValues, void* aIndex, void* aDataOut, int6
                 *pDataOut++ = *pSrc++;
             }
             pIndex = STRIDE_NEXT(const INDEX, pIndex, strideIndex);
-            pDataOut+=itemSize;
         }
     }
 }
@@ -1056,25 +856,6 @@ static void GetItemUIntVariable(void* aValues, void* aIndex, void* aDataOut, int
         }
     }
 }
-
-
-
-#if defined(_WIN32) && !defined(__GNUC__)
-
-#define CASE_NPY_INT32      case NPY_INT32:       case NPY_INT
-#define CASE_NPY_UINT32     case NPY_UINT32:      case NPY_UINT
-#define CASE_NPY_INT64      case NPY_INT64
-#define CASE_NPY_UINT64     case NPY_UINT64
-#define CASE_NPY_FLOAT64    case NPY_DOUBLE:     case NPY_LONGDOUBLE
-
-#else
-
-#define CASE_NPY_INT32      case NPY_INT32
-#define CASE_NPY_UINT32     case NPY_UINT32
-#define CASE_NPY_INT64      case NPY_INT64:    case NPY_LONGLONG
-#define CASE_NPY_UINT64     case NPY_UINT64:   case NPY_ULONGLONG
-#define CASE_NPY_FLOAT64    case NPY_DOUBLE
-#endif
 
 
 typedef void(*GETITEM_FUNC)(void* pDataIn, void* pDataIn2, void* pDataOut, int64_t valLength, int64_t itemSize, int64_t len, int64_t strideIndex, int64_t strideValue, void* pDefault);
@@ -1298,14 +1079,27 @@ getitem(PyObject* self, PyObject* args)
         return BooleanIndexInternal(aValues, aIndex);
     }
 
+    int ndimValue;
+    int ndimIndex;
+    int64_t strideValue = 0;
+    int64_t strideIndex = 0;
+
+    int result1 = GetStridesAndContig(aValues, ndimValue, strideValue);
+    int result2 = GetStridesAndContig(aIndex, ndimIndex, strideIndex);
+
+
     // This logic is not quite correct, if the strides on all dimensions are the same, we can use this routine
-    if (PyArray_NDIM(aValues) != 1 && !PyArray_ISCONTIGUOUS(aValues)) {
-        PyErr_Format(PyExc_ValueError, "Dont know how to handle multidimensional array %d using index dtype: %d", numpyValuesType, numpyIndexType);
-        return NULL;
+    if (result1 != 0) {
+        if (!PyArray_ISCONTIGUOUS(aValues)) {
+            PyErr_Format(PyExc_ValueError, "Dont know how to handle multidimensional array %d using index dtype: %d", numpyValuesType, numpyIndexType);
+            return NULL;
+        }
     }
-    if (PyArray_NDIM(aIndex) != 1 && !PyArray_ISCONTIGUOUS(aIndex)) {
-        PyErr_Format(PyExc_ValueError, "Dont know how to handle multidimensional array %d using index dtype: %d", numpyValuesType, numpyIndexType);
-        return NULL;
+    if (result2 != 0) {
+        if (!PyArray_ISCONTIGUOUS(aIndex)) {
+            PyErr_Format(PyExc_ValueError, "Dont know how to handle multidimensional array %d using index dtype: %d", numpyValuesType, numpyIndexType);
+            return NULL;
+        }
     }
 
     //printf("numpy types %d %d\n", numpyValuesType, numpyIndexType);
@@ -1331,15 +1125,20 @@ getitem(PyObject* self, PyObject* args)
             void* pDataOut = PyArray_BYTES(outArray);
             void* pDefault = GetDefaultForType(numpyValuesType);
 
-            int64_t strideIndex = PyArray_STRIDE(aIndex, 0);
-            int64_t strideValue = PyArray_STRIDE(aValues, 0);
-
             // reserve a full 16 bytes for default in case we have oneS
             _m256all tempDefault;
 
             // Check if a default value was passed in as third parameter
             if (defaultValue != Py_None) {
-                pDefault = &tempDefault;
+                BOOL result;
+                int64_t itemSize;
+                void* pTempData = NULL;
+                // Try to convert the scalar
+                result = ConvertScalarObject(defaultValue, &tempDefault, numpyValuesType, &pTempData, &itemSize);
+                if (result) {
+                    // Assign the new default for out of range indexes
+                    pDefault = &tempDefault;
+                }
             }
 
             stMATH_WORKER_ITEM* pWorkItem = THREADER ? THREADER->GetWorkItem(aIndexLength) : NULL;

@@ -25,7 +25,7 @@ if 'TOX_ENV_NAME' in os.environ and os.environ.get('SETUP_PY_EXT_COVERAGE') == '
     CFLAGS = os.environ['CFLAGS'] = '-fprofile-arcs -ftest-coverage -DNPY_NO_DEPRECATED_API=NPY_1_7_API_VERSION'
     LFLAGS = os.environ['LFLAGS'] = '-lgcov'
 else:
-    CFLAGS = '-DNPY_NO_DEPRECATED_API=NPY_1_7_API_VERSION -DPy_LIMITED_API'
+    CFLAGS = '-DNPY_NO_DEPRECATED_API=NPY_1_7_API_VERSION'
     LFLAGS = ''
 
 if platform.system() == 'Windows':
@@ -104,13 +104,16 @@ setup(
             'pnumpy._pnumpy',
             sources=['src/pnumpy/_pnumpy.cpp',
                      'src/pnumpy/module_init.cpp',
+                     'src/pnumpy/common.cpp',
                      'src/pnumpy/ledger.cpp',
                      'src/pnumpy/getitem.cpp',
                      'src/pnumpy/conversions.cpp',
                      'src/pnumpy/recycler.cpp',
+                     'src/pnumpy/sorting.cpp',
                      'src/atop/atop.cpp',
                      'src/atop/threads.cpp',
                      'src/atop/recarray.cpp',
+                     'src/atop/sort.cpp',
                      'src/atop/ops_binary.cpp',
                      'src/atop/ops_compare.cpp',
                      'src/atop/ops_unary.cpp',

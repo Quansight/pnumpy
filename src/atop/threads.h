@@ -147,7 +147,7 @@ extern WaitAddress g_WaitAddress;
 typedef int64_t(*DOWORK_CALLBACK)(struct stMATH_WORKER_ITEM* pstWorkerItem, int core, int64_t workIndex);
 
 // Callback routine from multithreaded worker thread (items just count up from 0,1,2,...)
-typedef BOOL(*MTWORK_CALLBACK)(void* callbackArg, int core, int64_t workIndex);
+typedef int64_t(*MTWORK_CALLBACK)(void* callbackArg, int core, int64_t workIndex);
 
 // Callback routine from multithreaded chunk thread (0, 65536, 130000, etc.)
 typedef int64_t(*MTCHUNK_CALLBACK)(void* callbackArg, int core, int64_t start, int64_t length);
