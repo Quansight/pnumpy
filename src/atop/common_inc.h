@@ -149,7 +149,7 @@ typedef unsigned char       BYTE;
 #endif
 #define InterlockedIncrement _InterlockedIncrement
 
-#define FMInterlockedOr(X,Y) _InterlockedOr64((int64_t*)X,Y)
+#define FMInterlockedOr(X,Y) InterlockedOr64((int64_t*)X,Y)
 
 #include <intrin.h>
 #ifndef MEM_ALIGN
