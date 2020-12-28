@@ -2515,7 +2515,7 @@ extern "C" void SortIndex64(
 
 //================================================================================================
 //===============================================================================
-static void SortArray(void* pDataIn1, int64_t arraySize1, int32_t arrayType1, SORT_MODE mode) {
+extern "C" BOOL SortArray(void* pDataIn1, int64_t arraySize1, int32_t arrayType1, SORT_MODE mode) {
     switch (arrayType1) {
     case ATOP_STRING:
         SortInPlace<char>(pDataIn1, arraySize1, mode);
@@ -2557,9 +2557,11 @@ static void SortArray(void* pDataIn1, int64_t arraySize1, int32_t arrayType1, SO
         SortInPlaceFloat<long double>(pDataIn1, arraySize1, mode);
         break;
     default:
-        printf("SortArray does not understand type %d\n", arrayType1);
+        //printf("SortArray does not understand type %d\n", arrayType1);
+        return FALSE;
         break;
     }
+    return TRUE;
 }
 
 

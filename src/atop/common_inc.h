@@ -451,7 +451,7 @@ enum SORT_MODE {
     SORT_MODE_HEAP = 3
 };
 
-extern "C" void SortArray(void* pDataIn1, int64_t arraySize1, int32_t arrayType1, SORT_MODE mode);
+extern "C" BOOL SortArray(void* pDataIn1, int64_t arraySize1, int32_t arrayType1, SORT_MODE mode);
 extern "C" int64_t IsSorted(void* pDataIn1,int64_t arraySize1, int32_t arrayType1, int64_t itemSize);
 extern "C" void SortIndex32(
     int64_t *   pCutOffs,
