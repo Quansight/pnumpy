@@ -186,7 +186,7 @@ extern "C" void RecArrayToColMajor(
         stConvert.itemSize = itemSize;
         stConvert.lastRow = items - 1;
 
-        auto lambdaConvertRecCallback = [](void* callbackArgT, int core, int64_t workIndex) -> BOOL {
+        auto lambdaConvertRecCallback = [](void* callbackArgT, int core, int64_t workIndex) -> int64_t {
             stConvertRec* callbackArg = (stConvertRec*)callbackArgT;
             int64_t startRow = callbackArg->startRow + (workIndex * CHUNKSIZE);
             int64_t totalRows = startRow + CHUNKSIZE;
@@ -204,7 +204,7 @@ extern "C" void RecArrayToColMajor(
                 callbackArg->itemSize);
 
             LOGGING("[%d] %lld completed\n", core, workIndex);
-            return TRUE;
+            return 1;
         };
 
         THREADER->DoMultiThreadedWork((int)items, lambdaConvertRecCallback, &stConvert);

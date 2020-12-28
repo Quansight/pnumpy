@@ -3,28 +3,6 @@
 #define LOGGING(...)
 
 
-//----------------------------------------------------------------
-// calcluate the total number of bytes used
-static int64_t ArrayLength(PyArrayObject* inArr) {
-
-    int ndim = PyArray_NDIM(inArr);
-    npy_intp* dims = PyArray_DIMS(inArr);
-    int64_t length = 1;
-
-    // handle case of zero length array
-    if (dims && ndim > 0) {
-        for (int i = 0; i < ndim; i++) {
-            length *= dims[i];
-        }
-    }
-    else {
-        // Want to set this to zero, but scalar issue?
-        //length = 0;
-    }
-    return length;
-}
-
-
 
 //-----------------------------------
 // Converts (in parallel) a numpy recarray (void type)

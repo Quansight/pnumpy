@@ -149,7 +149,7 @@ typedef unsigned char       BYTE;
 #endif
 #define InterlockedIncrement _InterlockedIncrement
 
-#define FMInterlockedOr(X,Y) _InterlockedOr64((int64_t*)X,Y)
+#define FMInterlockedOr(X,Y) InterlockedOr64((int64_t*)X,Y)
 
 #include <intrin.h>
 #ifndef MEM_ALIGN
@@ -442,3 +442,71 @@ extern "C" void RecArrayToColMajor(
     int64_t totalRows,
     int64_t numArrays,
     int64_t itemSize);
+
+//=====================================================================
+// Sorting
+enum SORT_MODE {
+    SORT_MODE_QSORT = 1,
+    SORT_MODE_MERGE = 2,
+    SORT_MODE_HEAP = 3
+};
+
+extern "C" BOOL SortArray(void* pDataIn1, int64_t arraySize1, int32_t arrayType1, SORT_MODE mode);
+extern "C" int64_t IsSorted(void* pDataIn1,int64_t arraySize1, int32_t arrayType1, int64_t itemSize);
+extern "C" void SortIndex32(
+    int64_t *   pCutOffs,
+    int64_t     cutOffLength,
+    void*       pDataIn1,
+    int64_t     arraySize1,
+    int32_t *   pDataOut1,
+    SORT_MODE   mode,
+    int         arrayType1,
+    int64_t     strlen);
+
+extern "C" void SortIndex64(
+    int64_t * pCutOffs,
+    int64_t     cutOffLength,
+    void*       pDataIn1,
+    int64_t     arraySize1,
+    int64_t *   pDataOut1,
+    SORT_MODE   mode,
+    int         arrayType1,
+    int64_t     strlen);
+
+
+typedef int64_t(*GROUP_INDEX_FUNC)(
+    void* pDataIn1,
+    int64_t       arraySize1V,
+    void* pDataIndexInV,
+    void* pGroupOutV,
+    void* pFirstOutV,
+    void* pCountOutV,
+    bool* pFilter,       // optional
+    int64_t       base_index,
+    int64_t       strlen);
+
+
+extern "C" int64_t GroupIndex32(
+    void* pDataIn1,
+    int64_t    arraySize1V,
+    void* pDataIndexInV,
+    void* pGroupOutV,
+    void* pFirstOutV,
+    void* pCountOutV,
+    bool* pFilter,       // optional
+    int64_t       base_index,
+    int64_t       strlen);
+
+extern "C" int64_t GroupIndex64(
+    void* pDataIn1,
+    int64_t    arraySize1V,
+    void* pDataIndexInV,
+    void* pGroupOutV,
+    void* pFirstOutV,
+    void* pCountOutV,
+    bool* pFilter,       // optional
+    int64_t       base_index,
+    int64_t       strlen);
+
+
+
