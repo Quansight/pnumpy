@@ -48,21 +48,6 @@ struct stOpCategory {
     stUFuncToAtop*  pUFuncToAtop;
 };
 
-// defined in common.cpp
-// Structs used to hold any type of AVX 256 bit registers
-struct _m128comboi {
-    __m128i  i1;
-    __m128i  i2;
-};
-
-struct _m256all {
-    union {
-        __m256i  i;
-        __m256d  d;
-        __m256   s;
-        _m128comboi ci;
-    };
-};
 
 //---------------------------------------------------------------------
 // NOTE: See SDSArrayInfo and keep same
@@ -97,7 +82,7 @@ extern int64_t ArrayLength(PyArrayObject* inArr);
 extern PyArrayObject* AllocateNumpyArray(int ndim, npy_intp* dims, int32_t numpyType, int64_t itemsize = 0, int fortran_array = 0, npy_intp* strides = nullptr);
 extern PyArrayObject* AllocateLikeResize(PyArrayObject* inArr, npy_intp rowSize);
 extern PyArrayObject* AllocateLikeNumpyArray(PyArrayObject* inArr, int numpyType);
-extern BOOL ConvertScalarObject(PyObject* inObject1, _m256all* pDest, int16_t numpyOutType, void** ppDataIn, int64_t* pItemSize);
+extern BOOL ConvertScalarObject(PyObject* inObject1, void* pDest, int16_t numpyOutType, void** ppDataIn, int64_t* pItemSize);
 extern int GetStridesAndContig(PyArrayObject* inArray, int& ndim, int64_t& stride);
 
 // defined in pnumpy

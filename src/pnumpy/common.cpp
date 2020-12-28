@@ -212,8 +212,24 @@ PyArrayObject* AllocateLikeNumpyArray(PyArrayObject* inArr, int numpyType) {
 // If inObject1 is a string or unicode, then ppDataIn is filled in with the itemsize
 //
 // NOTE: Cannot handle numpy scalar types like numpy.int32
-BOOL ConvertScalarObject(PyObject* inObject1, _m256all* pDest, int16_t numpyOutType, void** ppDataIn, int64_t* pItemSize) {
+BOOL ConvertScalarObject(PyObject* inObject1,  void* pDestVoid, int16_t numpyOutType, void** ppDataIn, int64_t* pItemSize) {
+    // defined in common.cpp
+    // Structs used to hold any type of AVX 256 bit registers
+    struct _m128comboi {
+        __m128i  i1;
+        __m128i  i2;
+    };
 
+    struct _m256all {
+        union {
+            __m256i  i;
+            __m256d  d;
+            __m256   s;
+            _m128comboi ci;
+        };
+    };
+
+    _m256all* pDest = (_m256all * )pDestVoid;
     *pItemSize = 0;
     *ppDataIn = pDest;
 

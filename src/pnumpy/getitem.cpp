@@ -1126,7 +1126,7 @@ getitem(PyObject* self, PyObject* args)
             void* pDefault = GetDefaultForType(numpyValuesType);
 
             // reserve a full 16 bytes for default in case we have oneS
-            _m256all tempDefault;
+            char tempDefault[128];
 
             // Check if a default value was passed in as third parameter
             if (defaultValue != Py_None) {
