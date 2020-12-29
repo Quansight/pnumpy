@@ -336,6 +336,17 @@ PyObject* lexsort(PyObject* self, PyObject* args, PyObject* kwargs) {
             return NULL;
         }
 
+        // Check types that we can sort
+        for (UINDEX i = 0; i < mlp.tupleSize; i++) {
+            int dtype = mlp.aInfo[i].NumpyDType;
+            int atype = dtype_to_atop(dtype);
+            if (atype == -1 || (atype > ATOP_LONGDOUBLE && (atype != ATOP_STRING && atype != ATOP_UNICODE))) {
+                PyErr_Format(PyExc_ValueError, "LexSort cannot handle type %d\n",dtype);
+                return NULL;
+            }
+        }
+
+
         int indexDType = 0;
         int64_t indexLength = 0;
 
@@ -407,12 +418,13 @@ PyObject* lexsort(PyObject* self, PyObject* args, PyObject* kwargs) {
             // When multiple arrays are passed, we sort in order of how it is passed
             // Thus, the last array is the last sort, and therefore determines the primary sort order
             for (UINDEX i = 0; i < mlp.tupleSize; i++) {
+                int atype = dtype_to_atop(mlp.aInfo[i].NumpyDType);
                 // For each array...
                 if (sizeof(UINDEX) == 4) {
-                    SortIndex32(pCutOffs, cutOffLength, mlp.aInfo[i].pData, arraySize1, (int32_t*)pDataOut, SORT_MODE::SORT_MODE_MERGE, mlp.aInfo[i].NumpyDType, mlp.aInfo[i].ItemSize);
+                    SortIndex32(pCutOffs, cutOffLength, mlp.aInfo[i].pData, arraySize1, (int32_t*)pDataOut, SORT_MODE::SORT_MODE_MERGE, atype, mlp.aInfo[i].ItemSize);
                 }
                 else {
-                    SortIndex64(pCutOffs, cutOffLength, mlp.aInfo[i].pData, arraySize1, (int64_t*)pDataOut, SORT_MODE::SORT_MODE_MERGE, mlp.aInfo[i].NumpyDType, mlp.aInfo[i].ItemSize);
+                    SortIndex64(pCutOffs, cutOffLength, mlp.aInfo[i].pData, arraySize1, (int64_t*)pDataOut, SORT_MODE::SORT_MODE_MERGE, atype, mlp.aInfo[i].ItemSize);
                 }
             }
 
@@ -427,7 +439,7 @@ PyObject* lexsort(PyObject* self, PyObject* args, PyObject* kwargs) {
 
 //===============================================================================
 // Returns int32_t
-PyObject* lexsort32(PyObject* self, PyObject* args, PyObject* kwargs) {
+extern "C" PyObject* lexsort32(PyObject* self, PyObject* args, PyObject* kwargs) {
 
     return lexsort<int32_t>(self, args, kwargs);
 }
@@ -435,7 +447,7 @@ PyObject* lexsort32(PyObject* self, PyObject* args, PyObject* kwargs) {
 
 //===============================================================================
 // Returns int64_t
-PyObject* lexsort64(PyObject* self, PyObject* args, PyObject* kwargs) {
+extern "C" PyObject* lexsort64(PyObject* self, PyObject* args, PyObject* kwargs) {
 
     return lexsort<int64_t>(self, args, kwargs);
 }

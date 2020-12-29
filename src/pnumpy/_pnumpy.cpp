@@ -53,6 +53,14 @@ int convert_atop_to_itemsize[] = {
     0
 };
 
+// Helper function, converts numpy dtype to atop type
+// return -1 on failure
+int dtype_to_atop(int dtype) {
+    if (dtype >= 0 && dtype < sizeof(convert_dtype_to_atop)) {
+        return convert_dtype_to_atop[dtype];
+    }
+    return -1;
+}
 //------------------------------------------------------------------------------------------
 // A full list of ufuncs as of Oct 2020
 // abs, absolute, add, arccos, arccosh, arcsin, arcsinh, arctan, arctan2, arctanh,

@@ -48,6 +48,7 @@ static __inline int npy_get_msb(uint64_t unum)
 #define FLOAT_LT(_X_,_Y_) (_X_ < _Y_ || (_Y_ != _Y_ && _X_ == _X_))  
 
 #define INT32_LT(_X_,_Y_) (_X_ < _Y_)
+#define INT32_LT(_X_,_Y_) (_X_ < _Y_)
 #define INT32_SWAP(_X_,_Y_) { int32_t temp; temp=_X_; _X_=_Y_; _Y_=temp;}
 #define INTP_SWAP(_X_,_Y_) { auto temp=_X_; _X_=_Y_; _Y_=temp;}
 
@@ -902,126 +903,6 @@ mergesort_(T* start, int64_t num)
 
 
 
-//-----------------------------------------------------------------------------------------------
-// binary mergesort with no recursion (num must be power of 2)
-// TJD NOTE: Does not appear much faster
-template <typename T>
-static int
-mergesort_binary_norecursion(T* start, int64_t num)
-{
-    T* pl, * pr, * pw, * pm, * pk, * pi, * pj;
-
-    pl = start;
-    pr = pl + num;
-    pw = (T*)WORKSPACE_ALLOC((num / 2) * sizeof(T));
-    if (pw == NULL) {
-        return -1;
-    }
-
-    T* pEnd;
-
-    pEnd = pr - SMALL_MERGESORT;
-
-    while (pl < pEnd) {
-
-        T* pMiddle;
-        T  vp;
-
-        pMiddle = pl + SMALL_MERGESORT;
-
-        /* insertion sort */
-        for (pi = pl + 1; pi < pMiddle; ++pi) {
-            vp = *pi;
-            pj = pi;
-            pk = pi - 1;
-            while (pj > pl&& T_LT(vp, *pk)) {
-                *pj-- = *pk--;
-            }
-            *pj = vp;
-        }
-
-        pl += SMALL_MERGESORT;
-
-    }
-
-    //-- reamining for insertion sort
-    pEnd = pr;
-    while (pl < pEnd) {
-
-        T* pMiddle;
-        T  vp;
-
-        pMiddle = pl + SMALL_MERGESORT;
-
-        /* insertion sort */
-        for (pi = pl + 1; pi < pMiddle; ++pi) {
-            vp = *pi;
-            pj = pi;
-            pk = pi - 1;
-            while (pj > pl&& T_LT(vp, *pk)) {
-                *pj-- = *pk--;
-            }
-            *pj = vp;
-        }
-
-        pl += SMALL_MERGESORT;
-
-    }
-
-    // START MERGING ----------------------------------
-    //----------------------------------------------------------------
-    int64_t startSize = SMALL_MERGESORT;
-
-    pEnd = start + num;
-    pl = start;
-
-    while ((pl + startSize) < pEnd) {
-
-        while ((pl + startSize) < pEnd) {
-
-            pr = pl + (2 * startSize);
-            pm = pl + ((pr - pl) >> 1);
-
-            // memcpy first half into workspace
-            memcpy(pw, pl, (pm - pj) * sizeof(T));
-
-            // merge
-            pi = pw + (pm - pl);
-            pj = pw;
-            pk = pl;
-
-            while (pj < pi && pm < pr) {
-                if (T_LT(*pm, *pj)) {
-                    *pk++ = *pm++;
-                }
-                else {
-                    *pk++ = *pj++;
-                }
-            }
-
-            // memcpy 
-            while (pj < pi) {
-                *pk++ = *pj++;
-            }
-
-            // move to next segment to merger
-            pl = pr;
-        }
-
-        // Now merge again
-        pl = start;
-        startSize <<= 1;
-    }
-
-    //printf("%llu  vs %llu\n", startSize, num);
-    //mergesort0_(pl, pr, pw);
-
-    WORKSPACE_FREE(pw);
-    return 0;
-}
-
-
-
 //--------------------------------------------------------------------------------------
 template <typename T>
 static void
@@ -1122,24 +1003,39 @@ amergesort0_string(UINDEX* pl, UINDEX* pr, const char* strItem, UINDEX* pw, int6
     if (pr - pl > SMALL_MERGESORT) {
         /* merge sort */
         pm = pl + ((pr - pl) >> 1);
+        //printf("merge sort %p %p %p diff:%lld\n", pl, pm, pr, pr-pl);
         amergesort0_string(pl, pm, strItem, pw, strlen);
         amergesort0_string(pm, pr, strItem, pw, strlen);
-        for (pi = pw, pj = pl; pj < pm;) {
-            *pi++ = *pj++;
-        }
-        pi = pw + (pm - pl);
-        pj = pw;
-        pk = pl;
-        while (pj < pi && pm < pr) {
-            if (STRING_LT(strItem + (*pm) * strlen, strItem + (*pj) * strlen, strlen)) {
-                *pk++ = *pm++;
+        pm = pl + ((pr - pl) >> 1);
+
+        if (STRING_LT(strItem + (*pm) * strlen, strItem + (*(pm - 1)) * strlen, strlen)) {
+
+            if ((pm - pl) >= 32) {
+                memcpy(pw, pl, (pm - pl) * sizeof(UINDEX));
             }
             else {
+                // Copy left side into workspace
+                pi = pw;
+                pj = pl;
+                while (pj < pm) {
+                    *pi++ = *pj++;
+                }
+            }
+
+            pi = pw + (pm - pl);
+            pj = pw;
+            pk = pl;
+            while (pj < pi && pm < pr) {
+                if (STRING_LT(strItem + (*pm) * strlen, strItem + (*pj) * strlen, strlen)) {
+                    *pk++ = *pm++;
+                }
+                else {
+                    *pk++ = *pj++;
+                }
+            }
+            while (pj < pi) {
                 *pk++ = *pj++;
             }
-        }
-        while (pj < pi) {
-            *pk++ = *pj++;
         }
     }
     else {
@@ -1171,22 +1067,33 @@ amergesort0_unicode(UINDEX* pl, UINDEX* pr, const char* strItem, UINDEX* pw, int
         pm = pl + ((pr - pl) >> 1);
         amergesort0_unicode(pl, pm, strItem, pw, strlen);
         amergesort0_unicode(pm, pr, strItem, pw, strlen);
-        for (pi = pw, pj = pl; pj < pm;) {
-            *pi++ = *pj++;
-        }
-        pi = pw + (pm - pl);
-        pj = pw;
-        pk = pl;
-        while (pj < pi && pm < pr) {
-            if (UNICODE_LT(strItem + (*pm) * strlen, strItem + (*pj) * strlen, strlen)) {
-                *pk++ = *pm++;
+
+        if (UNICODE_LT(strItem + (*pm) * strlen, strItem + (*(pm - 1)) * strlen, strlen)) {
+            if ((pm - pl) >= 32) {
+                memcpy(pw, pl, (pm - pl) * sizeof(UINDEX));
             }
             else {
+                // Copy left side into workspace
+                pi = pw;
+                pj = pl;
+                while (pj < pm) {
+                    *pi++ = *pj++;
+                }
+            }
+            pi = pw + (pm - pl);
+            pj = pw;
+            pk = pl;
+            while (pj < pi && pm < pr) {
+                if (UNICODE_LT(strItem + (*pm) * strlen, strItem + (*pj) * strlen, strlen)) {
+                    *pk++ = *pm++;
+                }
+                else {
+                    *pk++ = *pj++;
+                }
+            }
+            while (pj < pi) {
                 *pk++ = *pj++;
             }
-        }
-        while (pj < pi) {
-            *pk++ = *pj++;
         }
     }
     else {
@@ -1271,29 +1178,21 @@ amergesort0_float(UINDEX* pl, UINDEX* pr, T* v, UINDEX* pw, int64_t strlen = 0)
         amergesort0_float(pl, pm, v, pw);
         amergesort0_float(pm, pr, v, pw);
 
-        //if (COMPARE_LT(v[*pm], v[*(pm - 1)])) {
+        if (COMPARE_LT(v[*pm], v[*(pm - 1)])) 
         {
             // MERGES DATA, memcpy
-#ifdef USE_MEMCPY
-            //int64_t bytescopy = (pm - pl) * sizeof(UINDEX);
-            //aligned_block_copy_backwards((int64_t*)pw, (int64_t*)pl, bytescopy);
-            //   
-            memcpy(pw, pl, (pm - pl) * sizeof(UINDEX));
-
-            //pi = pw +(pm-pl) -1;
-            //pj = pl + (pm-pl) -1;
-            //while (pj >= pl) {
-            //   *pi-- = *pj--;
-            //}
-
-#else
-         // Copy left side into workspace
-            pi = pw;
-            pj = pl;
-            while (pj < pm) {
-                *pi++ = *pj++;
+            if ((pm - pl) >= 32) {
+                memcpy(pw, pl, (pm - pl) * sizeof(UINDEX));
             }
-#endif
+            else {
+                // Copy left side into workspace
+                pi = pw;
+                pj = pl;
+                while (pj < pm) {
+                    *pi++ = *pj++;
+                }
+            }
+
             // merge
             pi = pw + (pm - pl);
             pj = pw;
@@ -1348,10 +1247,18 @@ amergesort0_(UINDEX* pl, UINDEX* pr, T* v, UINDEX* pw)
         // if the first element on the right is less than the last element on the left
         //printf("comparing %d to %d ", (int)pm[0], (int)pm[-1]);
         if (T_LT(v[*pm], v[*(pm - 1)])) {
-
-            for (pi = pw, pj = pl; pj < pm;) {
-                *pi++ = *pj++;
+            if ((pm - pl) >= 32) {
+                memcpy(pw, pl, (pm - pl) * sizeof(UINDEX));
             }
+            else {
+                // Copy left side into workspace
+                pi = pw;
+                pj = pl;
+                while (pj < pm) {
+                    *pi++ = *pj++;
+                }
+            }
+
             pi = pw + (pm - pl);
             pj = pw;
             pk = pl;
@@ -1541,16 +1448,17 @@ ParMergeMergeString(void* pValue1, void* pToSort1, int64_t totalLen, int64_t str
     pm = pl + ((pr - pl) >> 1);
 
 
-    //if (COMPARE_LT(v[*pm], v[*(pm - 1)])) {
+    //if (STRING_LT(pValue + (*pm) * strlen, pValue + (*pm - 1) * strlen, strlen)) {
 
-    //   for (pi = pw, pj = pl; pj < pm;) {
+    //   // Copy the left to a temp buffer
+    //   for (pi = pWorkSpace, pj = pl; pj < pm;) {
     //      *pi++ = *pj++;
     //   }
-    //   pi = pw + (pm - pl);
-    //   pj = pw;
+    //   pi = pWorkSpace + (pm - pl);
+    //   pj = pWorkSpace;
     //   pk = pl;
     //   while (pj < pi && pm < pr) {
-    //      if (COMPARE_LT(v[*pm], v[*pj])) {
+    //       if (STRING_LT(pValue + (*pm) * strlen, pValue + (*pj) * strlen, strlen)) {
     //         *pk++ = *pm++;
     //      }
     //      else {
@@ -1561,13 +1469,14 @@ ParMergeMergeString(void* pValue1, void* pToSort1, int64_t totalLen, int64_t str
     //      *pk++ = *pj++;
     //   }
     //}
+    PLOGGING("Comparing %s to %s  ALSO %s\n", pValue + (*pm) * strlen, pValue + (*pm - 1) * strlen, pValue + (*pm + 1) * strlen);
 
     // BUG BUG doing lexsort on two arrays: string, int.  Once sorted, resorting does not work.
-    if (TRUE || STRING_LT(pValue + (*pm) * strlen, pValue + (*pm - 1) * strlen, strlen)) {
+    if ( STRING_LT(pValue + (*pm) * strlen, pValue + (*pm - 1) * strlen, strlen)) {
 
         //printf("%lld %lld %lld %lld\n", (int64_t)pValue[*pl], (int64_t)pValue[*(pm - 1)], (int64_t)pValue[*pm], (int64_t)pValue[*(pr - 1)]);
         //printf("%lld %lld %lld %lld %lld\n", (int64_t)*pl, (int64_t)*(pm - 2), (int64_t)*(pm - 1), (int64_t)*pm, (int64_t)*(pr - 1));
-
+        // copy the left to workspace
         memcpy(pWorkSpace, pl, (pm - pl) * sizeof(UINDEX));
 
         // pi is end of workspace
@@ -1590,8 +1499,7 @@ ParMergeMergeString(void* pValue1, void* pToSort1, int64_t totalLen, int64_t str
         //printf("last items %lld %lld %lld\n", pk[-3], pk[-2], pk[-1]);
     }
     else {
-        PLOGGING("**Already sorted string %lld\n", (int64_t)(*pm));
-
+        PLOGGING("refusing to merge\n");
     }
 
 }
@@ -1615,7 +1523,7 @@ ParMergeMergeUnicode(void* pValue1, void* pToSort1, int64_t totalLen, int64_t st
     UINDEX* pi, * pj, * pk, * pm;
     pm = pl + ((pr - pl) >> 1);
 
-    if (TRUE || UNICODE_LT(pValue + (*pm) * strlen, pValue + (*pm - 1) * strlen, strlen)) {
+    if (UNICODE_LT(pValue + (*pm) * strlen, pValue + (*pm - 1) * strlen, strlen)) {
 
         //printf("%lld %lld %lld %lld\n", (int64_t)pValue[*pl], (int64_t)pValue[*(pm - 1)], (int64_t)pValue[*pm], (int64_t)pValue[*(pr - 1)]);
         //printf("%lld %lld %lld %lld %lld\n", (int64_t)*pl, (int64_t)*(pm - 2), (int64_t)*(pm - 1), (int64_t)*pm, (int64_t)*(pr - 1));
@@ -1666,8 +1574,7 @@ ParMergeMergeVoid(void* pValue1, void* pToSort1, int64_t totalLen, int64_t strle
     UINDEX* pi, * pj, * pk, * pm;
     pm = pl + ((pr - pl) >> 1);
 
-    // BUG BUG doing lexsort on two arrays: string, int.  Once sorted, resorting does not work.
-    if (TRUE || VOID_LT(pValue + (*pm) * strlen, pValue + (*pm - 1) * strlen, strlen)) {
+    if (VOID_LT(pValue + (*pm) * strlen, pValue + (*pm - 1) * strlen, strlen)) {
 
         memcpy(pWorkSpace, pl, (pm - pl) * sizeof(UINDEX));
 
@@ -1719,33 +1626,10 @@ ParMergeMerge(void* pValue1, void* pToSort1, int64_t totalLen, int64_t strlen, v
     pm = pl + ((pr - pl) >> 1);
 
 
-    //if (COMPARE_LT(v[*pm], v[*(pm - 1)])) {
-
-    //   for (pi = pw, pj = pl; pj < pm;) {
-    //      *pi++ = *pj++;
-    //   }
-    //   pi = pw + (pm - pl);
-    //   pj = pw;
-    //   pk = pl;
-    //   while (pj < pi && pm < pr) {
-    //      if (COMPARE_LT(v[*pm], v[*pj])) {
-    //         *pk++ = *pm++;
-    //      }
-    //      else {
-    //         *pk++ = *pj++;
-    //      }
-    //   }
-    //   while (pj < pi) {
-    //      *pk++ = *pj++;
-    //   }
-    //}
+    PLOGGING("merging len %lld\n", totalLen);
 
     // quickcheck to see if we have to copy
-    // BUG BUG doing lexsort on two arrays: string, int.  Once sorted, resorting does not work.
-    if (TRUE || COMPARE_LT(pValue[*pm], pValue[*(pm - 1)])) {
-
-        //printf("%lld %lld %lld %lld\n", (int64_t)pValue[*pl], (int64_t)pValue[*(pm - 1)], (int64_t)pValue[*pm], (int64_t)pValue[*(pr - 1)]);
-        //printf("%lld %lld %lld %lld %lld\n", (int64_t)*pl, (int64_t)*(pm - 2), (int64_t)*(pm - 1), (int64_t)*pm, (int64_t)*(pr - 1));
+    if (COMPARE_LT(pValue[*pm], pValue[*(pm - 1)])) {
 
         memcpy(pWorkSpace, pl, (pm - pl) * sizeof(UINDEX));
 
@@ -1769,7 +1653,7 @@ ParMergeMerge(void* pValue1, void* pToSort1, int64_t totalLen, int64_t strlen, v
         //printf("last items %lld %lld %lld\n", pk[-3], pk[-2], pk[-1]);
     }
     else {
-        PLOGGING("**Already sorted %lld\n", (int64_t)(*pm));
+        //printf("**Already sorted %lld\n", (int64_t)(*pm), (int64_t)*(pm - 1), (int64_t)pValue[*pm], (int64_t)pValue[*(pm - 1)]);
     }
 
 }
@@ -1790,12 +1674,13 @@ struct MERGE_STEP_ONE_CALLBACK {
     int64_t StrLen;
 
     void* pWorkSpace;
+    int64_t AllocChunk;
     int64_t MergeBlocks;
     int64_t TypeSizeInput;
     int64_t TypeSizeOutput;
 
     // used to synchronize parallel merges
-    int64_t EndPositions[8];
+    int64_t EndPositions[9];
     int64_t Level[3];
 
 } stParMergeCallback;
@@ -1817,27 +1702,22 @@ static int64_t ParMergeThreadCallback(struct stMATH_WORKER_ITEM* pstWorkerItem, 
         // First index is 1 so we subtract
         index--;
 
-        //PLOGGING("[%d] DoWork start loop -- %lld  index: %lld\n", core, workIndex, index);
-
         // the very first index starts at 0
-        int64_t pFirst = 0;
+        int64_t pFirst =  Callback->EndPositions[index];
+        int64_t pSecond = Callback->EndPositions[index+1];
 
-        if (index >= 1) {
-            pFirst = Callback->EndPositions[index - 1];
-        }
+        PLOGGING("[%d] DoWork start loop -- %lld  index: %lld   pFirst: %lld   pSecond: %lld\n", core, workIndex, index, pFirst, pSecond);
 
-        int64_t pSecond = Callback->EndPositions[index];
         char* pToSort1 = (char*)(Callback->pToSort);
 
         int64_t MergeSize = (pSecond - pFirst);
-        int64_t OffsetSize = pFirst;
         PLOGGING("%d : MergeOne index: %llu  %lld  %lld  %lld\n", core, index, pFirst, MergeSize, OffsetSize);
 
         // Workspace uses half the size
         //char* pWorkSpace1 = (char*)pWorkSpace + (offsetAdjToSort / 2);
-        char* pWorkSpace1 = (char*)Callback->pWorkSpace + (OffsetSize * Callback->TypeSizeOutput);
+        char* pWorkSpace1 = (char*)Callback->pWorkSpace + (index * Callback->AllocChunk * Callback->TypeSizeOutput);
 
-        Callback->MergeCallbackOne(Callback->pValues, pToSort1 + (OffsetSize * Callback->TypeSizeOutput), MergeSize, Callback->StrLen, pWorkSpace1);
+        Callback->MergeCallbackOne(Callback->pValues, pToSort1 + (pFirst * Callback->TypeSizeOutput), MergeSize, Callback->StrLen, pWorkSpace1);
 
         int64_t bitshift = 1LL << index;
 
@@ -1854,30 +1734,22 @@ static int64_t ParMergeThreadCallback(struct stMATH_WORKER_ITEM* pstWorkerItem, 
         int64_t result = FMInterlockedOr(&Callback->Level[0], bitshift);
 
         // Check if our buddy was already set
-        PLOGGING("index: %lld  %lld %lld -- %s\n", index, buddy, (result & buddy), buddy == (result & buddy) ? "GOOD" : "WAIT");
+        PLOGGING("index -- LEVEL 1: %lld  %lld %lld -- %s\n", index, buddy, (result & buddy), buddy == (result & buddy) ? "GOOD" : "WAIT");
 
         if (buddy == (result & buddy)) {
             // Move to next level -- 4 things to sort
             index = index / 2;
-            index = index * 2;
-            index += 1;
+            pWorkSpace1 = (char*)Callback->pWorkSpace + (index * 2 * Callback->AllocChunk * Callback->TypeSizeOutput);
 
-            pFirst = 0;
-
-            if (index >= 2) {
-                pFirst = Callback->EndPositions[index - 2];
-            }
-
-            pSecond = Callback->EndPositions[index];
-            pToSort1 = (char*)(Callback->pToSort);
+            pFirst = Callback->EndPositions[index*2];
+            pSecond = Callback->EndPositions[index*2 + 2];
             MergeSize = (pSecond - pFirst);
-            OffsetSize = pFirst;
 
-            PLOGGING("%d : MergeTwo index: %llu  %lld  %lld  %lld\n", core, index, pFirst, MergeSize, OffsetSize);
-            pWorkSpace1 = (char*)Callback->pWorkSpace + (OffsetSize * Callback->TypeSizeOutput);
-            Callback->MergeCallbackTwo(Callback->pValues, pToSort1 + (OffsetSize * Callback->TypeSizeOutput), MergeSize, Callback->StrLen, pWorkSpace1);
+            PLOGGING("size:%lld  first: %lld  second: %lld   expected: %lld\n", MergeSize, pFirst, pSecond, pFirst + (MergeSize >> 1));
 
-            index /= 2;
+            //pWorkSpace1 = (char*)Callback->pWorkSpace + (OffsetSize * Callback->TypeSizeOutput);
+            Callback->MergeCallbackTwo(Callback->pValues, pToSort1 + (pFirst * Callback->TypeSizeOutput), MergeSize, Callback->StrLen, pWorkSpace1);
+
             bitshift = 1LL << index;
 
             // Now find the buddy bit (adjacent bit)
@@ -1896,31 +1768,21 @@ static int64_t ParMergeThreadCallback(struct stMATH_WORKER_ITEM* pstWorkerItem, 
             PLOGGING("index -- LEVEL 2: %lld  %lld %lld -- %s\n", index, buddy, (result & buddy), buddy == (result & buddy) ? "GOOD" : "WAIT");
 
             if (buddy == (result & buddy)) {
+                index /= 2;
+
                 // Move to next level -- 2 things to sort
-                index = index / 2;
-                index = index * 4;
-                index += 3;
+                pWorkSpace1 = (char*)Callback->pWorkSpace + (index * 4 * Callback->AllocChunk * Callback->TypeSizeOutput);
 
-                pFirst = 0;
-
-                if (index >= 4) {
-                    pFirst = Callback->EndPositions[index - 4];
-                }
-
-                pSecond = Callback->EndPositions[index];
-                pToSort1 = (char*)(Callback->pToSort);
+                pFirst = Callback->EndPositions[index*4];
+                pSecond = Callback->EndPositions[index*4 + 4];
                 MergeSize = (pSecond - pFirst);
-                OffsetSize = pFirst;
 
-                PLOGGING("%d : MergeThree index: %llu  %lld  %lld  %lld\n", core, index, pFirst, MergeSize, OffsetSize);
-                pWorkSpace1 = (char*)Callback->pWorkSpace + (OffsetSize * Callback->TypeSizeOutput);
-                Callback->MergeCallbackTwo(Callback->pValues, pToSort1 + (OffsetSize * Callback->TypeSizeOutput), MergeSize, Callback->StrLen, pWorkSpace1);
+                PLOGGING("%d : MergeThree index: %llu  %lld  %lld\n", core, index, pFirst, MergeSize);
+                //pWorkSpace1 = (char*)Callback->pWorkSpace + (OffsetSize * Callback->TypeSizeOutput);
+                PLOGGING("Level 2 %p %p,  size: %lld,  pworkspace: %p\n", Callback->pValues, pToSort1 + (pFirst * Callback->TypeSizeOutput), MergeSize, pWorkSpace1);
+                Callback->MergeCallbackTwo(Callback->pValues, pToSort1 + (pFirst * Callback->TypeSizeOutput), MergeSize, Callback->StrLen, pWorkSpace1);
 
-
-                index /= 4;
                 bitshift = 1LL << index;
-
-                // Now find the buddy bit (adjacent bit)
                 buddy = 0;
                 if (index & 1) {
                     buddy = 1LL << (index - 1);
@@ -1928,10 +1790,11 @@ static int64_t ParMergeThreadCallback(struct stMATH_WORKER_ITEM* pstWorkerItem, 
                 else {
                     buddy = 1LL << (index + 1);
                 }
-
+               
                 // Get back which bits were set before the OR operation
                 result = FMInterlockedOr(&Callback->Level[2], bitshift);
 
+                PLOGGING("bitshift %lld %lld  %lld\n", index, bitshift, result);
                 if (buddy == (result & buddy)) {
                     // Final merge
                     PLOGGING("%d : MergeFinal index: %llu  %lld  %lld  %lld\n", core, index, 0LL, Callback->ArrayLength, 0LL);
@@ -2110,12 +1973,13 @@ par_amergesort(
 
             PLOGGING("Parallel version  %p  %p  %p\n", pToSort, pToSort + arrayLength, pValues);
             // Divide into 8 jobs
-            // Allocate all memory up front?
-            //UINDEX* pWorkSpace = (UINDEX*)WORKSPACE_FREE(((arrayLength / 2) + 256)* sizeof(UINDEX));
+            // Allocate all memory up front
+            // Allocate enough for 8 
+            int64_t allocChunk = (arrayLength /16) + 1;
             void* pWorkSpace = NULL;
-            uint64_t allocSize = arrayLength * sizeof(UINDEX);
 
-            //(UINDEX*)WORKSPACE_ALLOC(arrayLength * sizeof(UINDEX));
+            // Allocate half the size since the workspace is only needed for left
+            uint64_t allocSize = allocChunk * 8 * sizeof(UINDEX);
             pWorkSpace = WORKSPACE_ALLOC(allocSize);
 
             if (pWorkSpace == NULL) {
@@ -2175,6 +2039,7 @@ par_amergesort(
                 stParMergeCallback.pToSort = pToSort;
                 stParMergeCallback.ArrayLength = arrayLength;
                 stParMergeCallback.StrLen = strlen;
+                stParMergeCallback.AllocChunk = allocChunk;
                 stParMergeCallback.pWorkSpace = pWorkSpace;
                 stParMergeCallback.TypeSizeInput = sizeof(T);
                 if (strlen) {
@@ -2189,33 +2054,20 @@ par_amergesort(
                     stParMergeCallback.Level[i] = 0;
                 }
 
-                if (stParMergeCallback.MergeBlocks == 2) {
-
-                    stParMergeCallback.EndPositions[1] = arrayLength;
-                    stParMergeCallback.EndPositions[0] = arrayLength / 2;
-                }
-                else if (stParMergeCallback.MergeBlocks == 4) {
-
-                    stParMergeCallback.EndPositions[3] = arrayLength;
-                    stParMergeCallback.EndPositions[1] = arrayLength / 2;
-                    stParMergeCallback.EndPositions[2] = stParMergeCallback.EndPositions[1] + (stParMergeCallback.EndPositions[3] - stParMergeCallback.EndPositions[1]) / 2;
-                    stParMergeCallback.EndPositions[0] = 0 + (stParMergeCallback.EndPositions[1] - 0) / 2;
-                }
-
-                else {
-                    // We use an 8 way merge, we need the size breakdown
-                    stParMergeCallback.EndPositions[7] = arrayLength;
-                    stParMergeCallback.EndPositions[3] = arrayLength / 2;
-                    stParMergeCallback.EndPositions[5] = stParMergeCallback.EndPositions[3] + (stParMergeCallback.EndPositions[7] - stParMergeCallback.EndPositions[3]) / 2;
-                    stParMergeCallback.EndPositions[1] = 0 + (stParMergeCallback.EndPositions[3] - 0) / 2;
-                    stParMergeCallback.EndPositions[6] = stParMergeCallback.EndPositions[5] + (stParMergeCallback.EndPositions[7] - stParMergeCallback.EndPositions[5]) / 2;
-                    stParMergeCallback.EndPositions[4] = stParMergeCallback.EndPositions[3] + (stParMergeCallback.EndPositions[5] - stParMergeCallback.EndPositions[3]) / 2;
-                    stParMergeCallback.EndPositions[2] = stParMergeCallback.EndPositions[1] + (stParMergeCallback.EndPositions[3] - stParMergeCallback.EndPositions[1]) / 2;
-                    stParMergeCallback.EndPositions[0] = 0 + (stParMergeCallback.EndPositions[1] - 0) / 2;
-                }
+                // We use an 8 way merge, we need the size breakdown
+                stParMergeCallback.EndPositions[8] = arrayLength;
+                stParMergeCallback.EndPositions[4] = arrayLength / 2;
+                stParMergeCallback.EndPositions[6] = stParMergeCallback.EndPositions[4] + (arrayLength - stParMergeCallback.EndPositions[4]) / 2;
+                stParMergeCallback.EndPositions[2] = 0 + (stParMergeCallback.EndPositions[4] - 0) / 2;
+                stParMergeCallback.EndPositions[7] = stParMergeCallback.EndPositions[6] + (arrayLength - stParMergeCallback.EndPositions[6]) / 2;
+                stParMergeCallback.EndPositions[5] = stParMergeCallback.EndPositions[4] + (stParMergeCallback.EndPositions[6] - stParMergeCallback.EndPositions[4]) / 2;
+                stParMergeCallback.EndPositions[3] = stParMergeCallback.EndPositions[2] + (stParMergeCallback.EndPositions[4] - stParMergeCallback.EndPositions[2]) / 2;
+                stParMergeCallback.EndPositions[1] = 0 + (stParMergeCallback.EndPositions[2] - 0) / 2;
+                stParMergeCallback.EndPositions[0] = 0;
 
                 // This will notify the worker threads of a new work item
-                THREADER->WorkMain(pWorkItem, stParMergeCallback.MergeBlocks, 0, 1, FALSE);
+                // Default thead wakeup to 7
+                THREADER->WorkMain(pWorkItem, stParMergeCallback.MergeBlocks, 7, 1, FALSE);
 
             }
 

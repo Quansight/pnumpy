@@ -15,6 +15,9 @@
 #include <stdio.h>
 #include "../atop/atop.h"
 
+
+int dtype_to_atop(int dtype);
+
 // Global user settings controlled by python functions
 // set to 0 to disable
 struct stSettings {
@@ -26,7 +29,6 @@ struct stSettings {
 };
 
 extern stSettings g_Settings;
-
 
 struct stUFuncToAtop {
     const char* str_ufunc_name;
