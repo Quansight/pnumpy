@@ -466,8 +466,9 @@ extern "C" PyObject* sort(PyObject* self, PyObject* args, PyObject* kwargs) {
 
     int dtype = PyArray_TYPE(inArrValues);
 
+    // TODO: if we get TIMEDELTA, can we convert that to int64?
     int atype = dtype_to_atop(dtype);
-    if (atype == -1 || (atype > ATOP_LONGDOUBLE && (atype != ATOP_STRING && atype != ATOP_UNICODE))) {
+    if (atype == -1 || (atype > ATOP_LONGDOUBLE && (atype != ATOP_STRING && atype != ATOP_UNICODE && atype != ATOP_HALF_FLOAT))) {
         PyErr_Format(PyExc_ValueError, "Sort cannot handle type %d\n", dtype);
         return NULL;
     }
@@ -483,10 +484,26 @@ extern "C" PyObject* sort(PyObject* self, PyObject* args, PyObject* kwargs) {
         }
     }
 
-    QuickSort(atype, PyArray_BYTES(inArrValues), ArrayLength(inArrValues), strideValue, PyArray_ITEMSIZE(inArrValues));
+    // Now make a copy of the array, first allocate empty array
+    PyArrayObject* outArrValues = AllocateLikeNumpyArray(inArrValues, dtype);
 
-    Py_INCREF(inArrValues);
-    return (PyObject*)inArrValues;
+    if (outArrValues) {
+        // Call the atop parallel quicksort
+        // -1 indictes an error
+        int result=
+        QuickSort(atype, PyArray_BYTES(inArrValues), ArrayLength(inArrValues), strideValue, PyArray_ITEMSIZE(inArrValues), PyArray_BYTES(outArrValues), PyArray_ITEMSIZE(outArrValues) );
+
+        if (result >= 0) {
+            return (PyObject*)outArrValues;
+        }
+        else {
+            Py_DECREF(outArrValues);
+        }
+    }
+
+    PyErr_Format(PyExc_ValueError, "Sort: out of memory or cannot sort");
+    return NULL;
+
 }
 
 

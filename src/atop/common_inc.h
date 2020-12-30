@@ -511,7 +511,9 @@ extern "C" int QuickSort(
     int atype,
     void* pDataIn,
     int64_t arrayLength,
-    int64_t stride,
-    int64_t itemSize);
+    int64_t stridesIn,
+    int64_t itemSize,
+    void* pDataOut1,
+    int64_t stridesOut);
 
 
