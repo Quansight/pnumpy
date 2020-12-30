@@ -43,6 +43,7 @@ extern "C" PyObject* cpustring(PyObject * self, PyObject * args);
 extern "C" PyObject * getitem(PyObject * self, PyObject * args);
 extern "C" PyObject * lexsort32(PyObject * self, PyObject * args, PyObject * kwargs);
 extern "C" PyObject * lexsort64(PyObject * self, PyObject * args, PyObject * kwargs);
+extern "C" PyObject * sort(PyObject * self, PyObject * args, PyObject * kwargs);
 
 // conversions.cpp
 extern "C" PyObject* recarray_to_colmajor(PyObject* self, PyObject* args);
@@ -80,8 +81,9 @@ static PyMethodDef module_functions[] = {
     {"oldinit",          (PyCFunction)oldinit, METH_VARARGS | METH_KEYWORDS, OLDINIT_DOC},
     {"recarray_to_colmajor",    (PyCFunction)recarray_to_colmajor,  METH_VARARGS, "convert record array to col major"},
     {"getitem",          (PyCFunction)getitem, METH_VARARGS | METH_KEYWORDS, "alternative to fancy index or boolean index"},
-    {"lexsort32",          (PyCFunction)lexsort32, METH_VARARGS | METH_KEYWORDS, "lexigraphical sort returning int32 fancy indexing"},
-    {"lexsort64",          (PyCFunction)lexsort64, METH_VARARGS | METH_KEYWORDS, "lexigraphical sort returning int64 fancy indexing"},
+    {"lexsort32",        (PyCFunction)lexsort32, METH_VARARGS | METH_KEYWORDS, "lexigraphical sort returning int32 fancy indexing"},
+    {"lexsort64",        (PyCFunction)lexsort64, METH_VARARGS | METH_KEYWORDS, "lexigraphical sort returning int64 fancy indexing"},
+    {"sort",             (PyCFunction)sort, METH_VARARGS | METH_KEYWORDS, "parallel inplace quicksort, followed by mergesort"},
     {NULL, NULL, 0,  NULL}
 };
 

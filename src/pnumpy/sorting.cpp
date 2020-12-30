@@ -454,6 +454,60 @@ extern "C" PyObject* lexsort64(PyObject* self, PyObject* args, PyObject* kwargs)
 
 
 //===============================================================================
+// still being worked on
+// just quicksort
+extern "C" PyObject* sort(PyObject* self, PyObject* args, PyObject* kwargs) {
+    PyArrayObject* inArrValues = NULL;
+
+    if (!PyArg_ParseTuple(args, "O!", &PyArray_Type, &inArrValues))
+    {
+        return PyErr_Format(PyExc_TypeError, "Invalid argument types and/or count for sort.");
+    }
+
+    int dtype = PyArray_TYPE(inArrValues);
+
+    // TODO: if we get TIMEDELTA, can we convert that to int64?
+    int atype = dtype_to_atop(dtype);
+    if (atype == -1 || (atype > ATOP_LONGDOUBLE && (atype != ATOP_STRING && atype != ATOP_UNICODE && atype != ATOP_HALF_FLOAT))) {
+        PyErr_Format(PyExc_ValueError, "Sort cannot handle type %d\n", dtype);
+        return NULL;
+    }
+    int ndimValue;
+    int64_t strideValue = 0;
+
+    int result1 = GetStridesAndContig(inArrValues, ndimValue, strideValue);
+
+    if (result1 != 0) {
+        if (!PyArray_ISCONTIGUOUS(inArrValues)) {
+            PyErr_Format(PyExc_ValueError, "Sort: dont know how to handle multidimensional or non-contiguous array");
+            return NULL;
+        }
+    }
+
+    // Now make a copy of the array, first allocate empty array
+    PyArrayObject* outArrValues = AllocateLikeNumpyArray(inArrValues, dtype);
+
+    if (outArrValues) {
+        // Call the atop parallel quicksort
+        // -1 indictes an error
+        int result=
+        QuickSort(atype, PyArray_BYTES(inArrValues), ArrayLength(inArrValues), strideValue, PyArray_ITEMSIZE(inArrValues), PyArray_BYTES(outArrValues), PyArray_ITEMSIZE(outArrValues) );
+
+        if (result >= 0) {
+            return (PyObject*)outArrValues;
+        }
+        else {
+            Py_DECREF(outArrValues);
+        }
+    }
+
+    PyErr_Format(PyExc_ValueError, "Sort: out of memory or cannot sort");
+    return NULL;
+
+}
+
+
+//===============================================================================
 //===============================================================================
 // checks for kwargs filter
 // if exists, and is BOOL, returns pointer and length of bool

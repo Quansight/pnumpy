@@ -22,7 +22,7 @@ int convert_dtype_to_atop[]={
      -1,                                //NPY_OBJECT = 17,
      ATOP_STRING, ATOP_UNICODE,         //NPY_STRING, NPY_UNICODE,
      ATOP_VOID,                         //NPY_VOID,
-     -1, -1, ATOP_HALF_FLOAT
+     -1, -1, ATOP_HALF_FLOAT            //NPY_DATETIME, NPY_TIMEDELTA, NPY_FLOAT
 };
 
 // Reverse conversion from atop dtype to numpy dtype
