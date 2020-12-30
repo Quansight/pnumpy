@@ -1,5 +1,6 @@
 #include "common_inc.h"
 #include "threads.h"
+#include "halffloat.h"
 #include <cmath>
 #include <algorithm>
 
@@ -28,7 +29,7 @@
 
 #endif
 
-static __inline int npy_get_msb(uint64_t unum)
+FORCE_INLINE static int npy_get_msb(uint64_t unum)
 {
     int depth_limit = 0;
     while (unum >>= 1) {
@@ -42,31 +43,70 @@ static __inline int npy_get_msb(uint64_t unum)
 #define PYA_QS_STACK 128
 #define SMALL_QUICKSORT 15
 
-#define T_LT(_X_,_Y_) (_X_ < _Y_)
 
-// Anything compared to a nan will return 0
-#define FLOAT_LT(_X_,_Y_) (_X_ < _Y_ || (_Y_ != _Y_ && _X_ == _X_))  
-
-#define INT32_LT(_X_,_Y_) (_X_ < _Y_)
-#define INT32_LT(_X_,_Y_) (_X_ < _Y_)
-#define INT32_SWAP(_X_,_Y_) { int32_t temp; temp=_X_; _X_=_Y_; _Y_=temp;}
 #define INTP_SWAP(_X_,_Y_) { auto temp=_X_; _X_=_Y_; _Y_=temp;}
 
 //#define T_SWAP(_X_, _Y_) { auto temp;  temp = _X_; _X_ = _Y_; _Y_ = temp; }
 #define T_SWAP(_X_, _Y_)  std::swap(_X_,_Y_); 
 
+// For floats anything compared to a nan will return 0
+// TODO: Add compare for HALF_FLOAT and COMPLEX
+FORCE_INLINE static bool COMPARE_LT(float X, float Y) { return (X < Y || (Y != Y && X == X)); }
+FORCE_INLINE static bool COMPARE_LT(double X, double Y) { return (X < Y || (Y != Y && X == X)); }
+FORCE_INLINE static bool COMPARE_LT(long double X, long double Y) { return (X < Y || (Y != Y && X == X)); }
+FORCE_INLINE static bool COMPARE_LT(int32_t X, int32_t Y) { return (X < Y); }
+FORCE_INLINE static bool COMPARE_LT(int64_t X, int64_t Y) { return (X < Y); }
+FORCE_INLINE static bool COMPARE_LT(uint32_t X, uint32_t Y) { return (X < Y); }
+FORCE_INLINE static bool COMPARE_LT(uint64_t X, uint64_t Y) { return (X < Y); }
+FORCE_INLINE static bool COMPARE_LT(int8_t X, int8_t Y) { return (X < Y); }
+FORCE_INLINE static bool COMPARE_LT(int16_t X, int16_t Y) { return (X < Y); }
+FORCE_INLINE static bool COMPARE_LT(uint8_t X, uint8_t Y) { return (X < Y); }
+FORCE_INLINE static bool COMPARE_LT(uint16_t X, uint16_t Y) { return (X < Y); }
 
-__inline bool COMPARE_LT(float X, float Y) { return (X < Y || (Y != Y && X == X)); }
-__inline bool COMPARE_LT(double X, double Y) { return (X < Y || (Y != Y && X == X)); }
-__inline bool COMPARE_LT(long double X, long double Y) { return (X < Y || (Y != Y && X == X)); }
-__inline bool COMPARE_LT(int32_t X, int32_t Y) { return (X < Y); }
-__inline bool COMPARE_LT(int64_t X, int64_t Y) { return (X < Y); }
-__inline bool COMPARE_LT(uint32_t X, uint32_t Y) { return (X < Y); }
-__inline bool COMPARE_LT(uint64_t X, uint64_t Y) { return (X < Y); }
-__inline bool COMPARE_LT(int8_t X, int8_t Y) { return (X < Y); }
-__inline bool COMPARE_LT(int16_t X, int16_t Y) { return (X < Y); }
-__inline bool COMPARE_LT(uint8_t X, uint8_t Y) { return (X < Y); }
-__inline bool COMPARE_LT(uint16_t X, uint16_t Y) { return (X < Y); }
+FORCE_INLINE static int
+npy_half_isnan(npy_half h)
+{
+    return ((h & 0x7c00u) == 0x7c00u) && ((h & 0x03ffu) != 0x0000u);
+}
+
+
+FORCE_INLINE static int
+npy_half_lt_nonan(npy_half h1, npy_half h2)
+{
+    if (h1 & 0x8000u) {
+        if (h2 & 0x8000u) {
+            return (h1 & 0x7fffu) > (h2 & 0x7fffu);
+        }
+        else {
+            /* Signed zeros are equal, have to check for it */
+            return (h1 != 0x8000u) || (h2 != 0x0000u);
+        }
+    }
+    else {
+        if (h2 & 0x8000u) {
+            return 0;
+        }
+        else {
+            return (h1 & 0x7fffu) < (h2 & 0x7fffu);
+        }
+    }
+}
+
+
+FORCE_INLINE static int
+HALF_LT(npy_half a, npy_half b)
+{
+    int ret;
+
+    if (npy_half_isnan(b)) {
+        ret = !npy_half_isnan(a);
+    }
+    else {
+        ret = !npy_half_isnan(a) && npy_half_lt_nonan(a, b);
+    }
+
+    return ret;
+}
 
 FORCE_INLINE static int
 STRING_LT(const char* s1, const char* s2, size_t len)
@@ -424,8 +464,9 @@ BINARY_LT(const char* s1, const char* s2, size_t len)
 //-----------------------------------------------------------------------------------------------
 template <typename T>
 /*static*/ int
-heapsort_(T* start, int64_t n)
+heapsort_(void* pVoidStart, int64_t n)
 {
+    T* start = (T*)pVoidStart;
     T     tmp, * a;
     int64_t i, j, l;
 
@@ -435,10 +476,10 @@ heapsort_(T* start, int64_t n)
     for (l = n >> 1; l > 0; --l) {
         tmp = a[l];
         for (i = l, j = l << 1; j <= n;) {
-            if (j < n&& T_LT(a[j], a[j + 1])) {
+            if (j < n&& COMPARE_LT(a[j], a[j + 1])) {
                 j += 1;
             }
-            if (T_LT(tmp, a[j])) {
+            if (COMPARE_LT(tmp, a[j])) {
                 a[i] = a[j];
                 i = j;
                 j += j;
@@ -455,10 +496,10 @@ heapsort_(T* start, int64_t n)
         a[n] = a[1];
         n -= 1;
         for (i = 1, j = 2; j <= n;) {
-            if (j < n && T_LT(a[j], a[j + 1])) {
+            if (j < n && COMPARE_LT(a[j], a[j + 1])) {
                 j++;
             }
-            if (T_LT(tmp, a[j])) {
+            if (COMPARE_LT(tmp, a[j])) {
                 a[i] = a[j];
                 i = j;
                 j += j;
@@ -487,10 +528,10 @@ aheapsort_(T* vv, UINDEX* tosort, UINDEX n)
     for (l = n >> 1; l > 0; --l) {
         tmp = a[l];
         for (i = l, j = l << 1; j <= n;) {
-            if (j < n&& T_LT(v[a[j]], v[a[j + 1]])) {
+            if (j < n&& COMPARE_LT(v[a[j]], v[a[j + 1]])) {
                 j += 1;
             }
-            if (T_LT(v[tmp], v[a[j]])) {
+            if (COMPARE_LT(v[tmp], v[a[j]])) {
                 a[i] = a[j];
                 i = j;
                 j += j;
@@ -507,62 +548,10 @@ aheapsort_(T* vv, UINDEX* tosort, UINDEX n)
         a[n] = a[1];
         n -= 1;
         for (i = 1, j = 2; j <= n;) {
-            if (j < n && T_LT(v[a[j]], v[a[j + 1]])) {
+            if (j < n && COMPARE_LT(v[a[j]], v[a[j + 1]])) {
                 j++;
             }
-            if (T_LT(v[tmp], v[a[j]])) {
-                a[i] = a[j];
-                i = j;
-                j += j;
-            }
-            else {
-                break;
-            }
-        }
-        a[i] = tmp;
-    }
-
-    return 0;
-}
-
-
-//-----------------------------------------------------------------------------------------------
-template <typename T, typename UINDEX>
-static int
-aheapsort_float(T* vv, UINDEX* tosort, UINDEX n)
-{
-    T* v = vv;
-    UINDEX* a, i, j, l, tmp;
-    /* The arrays need to be offset by one for heapsort indexing */
-    a = tosort - 1;
-
-    for (l = n >> 1; l > 0; --l) {
-        tmp = a[l];
-        for (i = l, j = l << 1; j <= n;) {
-            if (j < n&& FLOAT_LT(v[a[j]], v[a[j + 1]])) {
-                j += 1;
-            }
-            if (FLOAT_LT(v[tmp], v[a[j]])) {
-                a[i] = a[j];
-                i = j;
-                j += j;
-            }
-            else {
-                break;
-            }
-        }
-        a[i] = tmp;
-    }
-
-    for (; n > 1;) {
-        tmp = a[n];
-        a[n] = a[1];
-        n -= 1;
-        for (i = 1, j = 2; j <= n;) {
-            if (j < n && FLOAT_LT(v[a[j]], v[a[j + 1]])) {
-                j++;
-            }
-            if (FLOAT_LT(v[tmp], v[a[j]])) {
+            if (COMPARE_LT(v[tmp], v[a[j]])) {
                 a[i] = a[j];
                 i = j;
                 j += j;
@@ -579,12 +568,13 @@ aheapsort_float(T* vv, UINDEX* tosort, UINDEX n)
 
 
 
-//--------------------------------------------------------------------------------------
-// N.B. This function isn't static like the others because it's used in a couple of places in GroupBy.cpp.
+//---------------------------
+// For intergers and floats
 template <typename T>
-/*static*/ int
-quicksort_(T* start, int64_t num)
+static int
+quicksort_(void* pVoidStart, int64_t num)
 {
+    T* start = (T*)pVoidStart;
     T vp;
     T* pl = start;
     T* pr = pl + num - 1;
@@ -660,6 +650,7 @@ quicksort_(T* start, int64_t num)
 
 
 //-----------------------------------------------------------------------------------------------
+// argsort (indirect quicksort)
 template <typename T, typename UINDEX>
 static int
 aquicksort_(T* vv, UINDEX* tosort, int64_t num)
@@ -740,85 +731,6 @@ aquicksort_(T* vv, UINDEX* tosort, int64_t num)
 }
 
 
-//-----------------------------------------------------------------------------------------------
-template <typename T, typename UINDEX>
-static int
-aquicksort_float(T* vv, UINDEX* tosort, UINDEX num)
-{
-    T* v = vv;
-    T vp;
-    UINDEX* pl = tosort;
-    UINDEX* pr = tosort + num - 1;
-    UINDEX* stack[PYA_QS_STACK];
-    UINDEX** sptr = stack;
-    UINDEX* pm, * pi, * pj, * pk, vi;
-    int depth[PYA_QS_STACK];
-    int* psdepth = depth;
-    int cdepth = npy_get_msb(num) * 2;
-
-    for (;;) {
-        if (cdepth >= 0) {
-
-            while ((pr - pl) > SMALL_QUICKSORT) {
-                /* quicksort partition */
-                pm = pl + ((pr - pl) >> 1);
-                if (FLOAT_LT(v[*pm], v[*pl])) INTP_SWAP(*pm, *pl);
-                if (FLOAT_LT(v[*pr], v[*pm])) INTP_SWAP(*pr, *pm);
-                if (FLOAT_LT(v[*pm], v[*pl])) INTP_SWAP(*pm, *pl);
-                vp = v[*pm];
-                pi = pl;
-                pj = pr - 1;
-                INTP_SWAP(*pm, *pj);
-                for (;;) {
-                    do ++pi; while (FLOAT_LT(v[*pi], vp));
-                    do --pj; while (FLOAT_LT(vp, v[*pj]));
-                    if (pi >= pj) {
-                        break;
-                    }
-                    INTP_SWAP(*pi, *pj);
-                }
-                pk = pr - 1;
-                INTP_SWAP(*pi, *pk);
-                /* push largest partition on stack */
-                if (pi - pl < pr - pi) {
-                    *sptr++ = pi + 1;
-                    *sptr++ = pr;
-                    pr = pi - 1;
-                }
-                else {
-                    *sptr++ = pl;
-                    *sptr++ = pi - 1;
-                    pl = pi + 1;
-                }
-                *psdepth++ = --cdepth;
-            }
-
-            /* insertion sort */
-            for (pi = pl + 1; pi <= pr; ++pi) {
-                vi = *pi;
-                vp = v[vi];
-                pj = pi;
-                pk = pi - 1;
-                while (pj > pl&& FLOAT_LT(vp, v[*pk])) {
-                    *pj-- = *pk--;
-                }
-                *pj = vi;
-            }
-        } else {
-            aheapsort_float<T, UINDEX>(vv, pl, (UINDEX)(pr - pl + 1));
-        }
-
-        if (sptr == stack) {
-            break;
-        }
-        pr = *(--sptr);
-        pl = *(--sptr);
-        cdepth = *(--psdepth);
-    }
-
-    return 0;
-}
-
 
 //--------------------------------------------------------------------------------------
 template <typename T>
@@ -847,7 +759,7 @@ mergesort0_(T* pl, T* pr, T* pw)
         pj = pw;
         pk = pl;
         while (pj < pi && pm < pr) {
-            if (T_LT(*pm, *pj)) {
+            if (COMPARE_LT(*pm, *pj)) {
                 *pk++ = *pm++;
             }
             else {
@@ -873,7 +785,7 @@ mergesort0_(T* pl, T* pr, T* pw)
             vp = *pi;
             pj = pi;
             pk = pi - 1;
-            while (pj > pl&& T_LT(vp, *pk)) {
+            while (pj > pl&& COMPARE_LT(vp, *pk)) {
                 *pj-- = *pk--;
             }
             *pj = vp;
@@ -891,100 +803,13 @@ mergesort_(T* start, int64_t num)
 
     pl = start;
     pr = pl + num;
+
+    // TODO: Consider alloc on stack
     pw = (T*)WORKSPACE_ALLOC((num / 2) * sizeof(T));
     if (pw == NULL) {
         return -1;
     }
     mergesort0_(pl, pr, pw);
-
-    WORKSPACE_FREE(pw);
-    return 0;
-}
-
-
-
-//--------------------------------------------------------------------------------------
-template <typename T>
-static void
-mergesort0_float(T* pl, T* pr, T* pw, T* head)
-{
-    T vp, * pi, * pj, * pk, * pm;
-
-    if (pr - pl > SMALL_MERGESORT) {
-        /* merge sort */
-        pm = pl + ((pr - pl) >> 1);
-        mergesort0_float(pl, pm, pw, head);
-        mergesort0_float(pm, pr, pw, head);
-
-
-        pi = pw;
-        pj = pl;
-
-        // TD NOTE: Jan 2018 -- the memcpy improves float sorting slightly, it does not improve INT copying for some reason...
-#ifndef USE_MEMCPY
-        int64_t diff = pm - pj;
-        memcpy(pi, pj, diff * sizeof(T));
-        pi += diff;
-        pj += diff;
-#else
-        while (pj < pm) {
-            *pi++ = *pj++;
-        }
-#endif
-        pi = pw + (pm - pl);
-        pj = pw;
-        pk = pl;
-        while (pj < pi && pm < pr) {
-            if (FLOAT_LT(*pm, *pj)) {
-                *pk++ = *pm++;
-            }
-            else {
-                *pk++ = *pj++;
-            }
-        }
-
-#ifdef USE_MEMCPY
-        diff = pi - pj;
-        if (diff > 0) {
-            memcpy(pk, pj, sizeof(T) * diff);
-            pk += diff;
-            pj += diff;
-        }
-#else
-        while (pj < pi) {
-            *pk++ = *pj++;
-        }
-#endif
-    }
-    else {
-        /* insertion sort */
-        for (pi = pl + 1; pi < pr; ++pi) {
-            vp = *pi;
-            pj = pi;
-            pk = pi - 1;
-            while (pj > pl&& FLOAT_LT(vp, *pk)) {
-                *pj-- = *pk--;
-            }
-            *pj = vp;
-        }
-    }
-}
-
-
-//-----------------------------------------------------------------------------------------------
-template <typename T>
-static int
-mergesort_float(T* start, int64_t num)
-{
-    T* pl, * pr, * pw;
-
-    pl = start;
-    pr = pl + num;
-    pw = (T*)WORKSPACE_ALLOC((num / 2) * sizeof(T));
-    if (pw == NULL) {
-        return -1;
-    }
-    mergesort0_float(pl, pr, pw, start);
 
     WORKSPACE_FREE(pw);
     return 0;
@@ -1161,73 +986,6 @@ amergesort0_void(UINDEX* pl, UINDEX* pr, const char* strItem, UINDEX* pw, int64_
 
 
 //-----------------------------------------------------------------------------------------------
-template <typename T, typename UINDEX>
-static void
-// T= data type == float32/float64
-// UINDEX = int32_t or int64_t
-amergesort0_float(UINDEX* pl, UINDEX* pr, T* v, UINDEX* pw, int64_t strlen = 0)
-{
-    T vp;
-    UINDEX vi, * pi, * pj, * pk, * pm;
-
-    //PLOGGING("merging %llu bytes of data at %p\n", pr - pl, v);
-
-    if (pr - pl > SMALL_MERGESORT) {
-        /* merge sort */
-        pm = pl + ((pr - pl) >> 1);
-        amergesort0_float(pl, pm, v, pw);
-        amergesort0_float(pm, pr, v, pw);
-
-        if (COMPARE_LT(v[*pm], v[*(pm - 1)])) 
-        {
-            // MERGES DATA, memcpy
-            if ((pm - pl) >= 32) {
-                memcpy(pw, pl, (pm - pl) * sizeof(UINDEX));
-            }
-            else {
-                // Copy left side into workspace
-                pi = pw;
-                pj = pl;
-                while (pj < pm) {
-                    *pi++ = *pj++;
-                }
-            }
-
-            // merge
-            pi = pw + (pm - pl);
-            pj = pw;
-            pk = pl;
-
-            while (pj < pi && pm < pr) {
-                if (COMPARE_LT(v[*pm], v[*pj])) {
-                    *pk++ = *pm++;
-                }
-                else {
-                    *pk++ = *pj++;
-                }
-            }
-            while (pj < pi) {
-                *pk++ = *pj++;
-            }
-        }
-    }
-    else {
-        /* insertion sort */
-        for (pi = pl + 1; pi < pr; ++pi) {
-            vi = *pi;
-            vp = v[vi];
-            pj = pi;
-            pk = pi - 1;
-            while (pj > pl&& COMPARE_LT(vp, v[*pk])) {
-                *pj-- = *pk--;
-            }
-            *pj = vi;
-        }
-    }
-}
-
-
-//-----------------------------------------------------------------------------------------------
 // T= data type == int16,int32,uint32,int64.uint64
 // UINDEX = int32_t or int64_t
 template <typename T, typename UINDEX>
@@ -1246,7 +1004,7 @@ amergesort0_(UINDEX* pl, UINDEX* pr, T* v, UINDEX* pw)
         // check if already sorted
         // if the first element on the right is less than the last element on the left
         //printf("comparing %d to %d ", (int)pm[0], (int)pm[-1]);
-        if (T_LT(v[*pm], v[*(pm - 1)])) {
+        if (COMPARE_LT(v[*pm], v[*(pm - 1)])) {
             if ((pm - pl) >= 32) {
                 memcpy(pw, pl, (pm - pl) * sizeof(UINDEX));
             }
@@ -1263,7 +1021,7 @@ amergesort0_(UINDEX* pl, UINDEX* pr, T* v, UINDEX* pw)
             pj = pw;
             pk = pl;
             while (pj < pi && pm < pr) {
-                if (T_LT(v[*pm], v[*pj])) {
+                if (COMPARE_LT(v[*pm], v[*pj])) {
                     *pk++ = *pm++;
                 }
                 else {
@@ -1283,7 +1041,7 @@ amergesort0_(UINDEX* pl, UINDEX* pr, T* v, UINDEX* pw)
             vp = v[vi];
             pj = pi;
             pk = pi - 1;
-            while (pj > pl&& T_LT(vp, v[*pk])) {
+            while (pj > pl&& COMPARE_LT(vp, v[*pk])) {
                 *pj-- = *pk--;
             }
             *pj = vi;
@@ -1316,25 +1074,6 @@ amergesort_(T* v, UINDEX* tosort, UINDEX num)
     return 0;
 }
 
-
-template <typename T, typename UINDEX>
-static int
-amergesort_float(T* v, UINDEX* tosort, UINDEX num)
-{
-    UINDEX* pl, * pr, * pworkspace;
-
-    pl = tosort;
-    pr = pl + num;
-
-    pworkspace = (UINDEX*)WORKSPACE_ALLOC((num / 2) * sizeof(UINDEX));
-    if (pworkspace == NULL) {
-        return -1;
-    }
-    amergesort0_float(pl, pr, v, pworkspace);
-    WORKSPACE_FREE(pworkspace);
-
-    return 0;
-}
 
 
 //---------------------------------------------------------------------------
@@ -1410,25 +1149,6 @@ ParMergeNormal(void* pValue1, void* pToSort1, int64_t totalLen, int64_t strlen, 
     amergesort0_(pl, pr, pValue, pWorkSpace);
 }
 
-//---------------------------------------------------------------------------
-// Called to combine the result of the left and right merge
-template <typename T, typename UINDEX>
-static void
-ParMergeFloat(void* pValue1, void* pToSort1, int64_t totalLen, int64_t strlen, void* pWorkSpace1) {
-    UINDEX* pl, * pr;
-
-    UINDEX* pWorkSpace = (UINDEX*)pWorkSpace1;
-    UINDEX* pToSort = (UINDEX*)pToSort1;
-    T* pValue = (T*)pValue1;
-
-    pl = pToSort;
-    pr = pl + totalLen;
-
-    PLOGGING("float calling with %llu   %p  %p  %p  %p\n", totalLen, pl, pr, pValue, pWorkSpace);
-    amergesort0_float(pl, pr, pValue, pWorkSpace);
-}
-
-
 
 //---------------------------------------------------------------------------
 // Called to combine the result of the left and right merge
@@ -1448,34 +1168,10 @@ ParMergeMergeString(void* pValue1, void* pToSort1, int64_t totalLen, int64_t str
     pm = pl + ((pr - pl) >> 1);
 
 
-    //if (STRING_LT(pValue + (*pm) * strlen, pValue + (*pm - 1) * strlen, strlen)) {
-
-    //   // Copy the left to a temp buffer
-    //   for (pi = pWorkSpace, pj = pl; pj < pm;) {
-    //      *pi++ = *pj++;
-    //   }
-    //   pi = pWorkSpace + (pm - pl);
-    //   pj = pWorkSpace;
-    //   pk = pl;
-    //   while (pj < pi && pm < pr) {
-    //       if (STRING_LT(pValue + (*pm) * strlen, pValue + (*pj) * strlen, strlen)) {
-    //         *pk++ = *pm++;
-    //      }
-    //      else {
-    //         *pk++ = *pj++;
-    //      }
-    //   }
-    //   while (pj < pi) {
-    //      *pk++ = *pj++;
-    //   }
-    //}
     PLOGGING("Comparing %s to %s  ALSO %s\n", pValue + (*pm) * strlen, pValue + (*pm - 1) * strlen, pValue + (*pm + 1) * strlen);
 
-    // BUG BUG doing lexsort on two arrays: string, int.  Once sorted, resorting does not work.
     if ( STRING_LT(pValue + (*pm) * strlen, pValue + (*pm - 1) * strlen, strlen)) {
 
-        //printf("%lld %lld %lld %lld\n", (int64_t)pValue[*pl], (int64_t)pValue[*(pm - 1)], (int64_t)pValue[*pm], (int64_t)pValue[*(pr - 1)]);
-        //printf("%lld %lld %lld %lld %lld\n", (int64_t)*pl, (int64_t)*(pm - 2), (int64_t)*(pm - 1), (int64_t)*pm, (int64_t)*(pr - 1));
         // copy the left to workspace
         memcpy(pWorkSpace, pl, (pm - pl) * sizeof(UINDEX));
 
@@ -1525,9 +1221,6 @@ ParMergeMergeUnicode(void* pValue1, void* pToSort1, int64_t totalLen, int64_t st
 
     if (UNICODE_LT(pValue + (*pm) * strlen, pValue + (*pm - 1) * strlen, strlen)) {
 
-        //printf("%lld %lld %lld %lld\n", (int64_t)pValue[*pl], (int64_t)pValue[*(pm - 1)], (int64_t)pValue[*pm], (int64_t)pValue[*(pr - 1)]);
-        //printf("%lld %lld %lld %lld %lld\n", (int64_t)*pl, (int64_t)*(pm - 2), (int64_t)*(pm - 1), (int64_t)*pm, (int64_t)*(pr - 1));
-
         memcpy(pWorkSpace, pl, (pm - pl) * sizeof(UINDEX));
 
         // pi is end of workspace
@@ -1551,8 +1244,6 @@ ParMergeMergeUnicode(void* pValue1, void* pToSort1, int64_t totalLen, int64_t st
     }
     else {
         PLOGGING("**Already sorted unicode %lld\n", (int64_t)(*pm));
-
-
     }
 
 }
@@ -1599,7 +1290,6 @@ ParMergeMergeVoid(void* pValue1, void* pToSort1, int64_t totalLen, int64_t strle
     }
     else {
         PLOGGING("**Already sorted void %lld\n", (int64_t)(*pm));
-
     }
 
 }
@@ -1659,13 +1349,69 @@ ParMergeMerge(void* pValue1, void* pToSort1, int64_t totalLen, int64_t strlen, v
 }
 
 
+
+
+//---------------------------------------------------------------------------
+// Called to combine the result of the left and right merge
+// T is type to sort -- int32_t, Float64, etc.
+// UINDEX is the argsort index -- int32_t or int64_t often
+//
+template <typename T>
+static void
+ParInPlaceMerge(void* pValue1, int64_t totalLen, int64_t strlen, void* pWorkSpace1) {
+    T* pl, * pr;
+
+    T* pw = (T*)pWorkSpace1;
+
+    pl = (T*)pValue1;
+    pr = pl + totalLen;
+
+    T* pi, * pj, * pk, * pm;
+    pm = pl + ((pr - pl) >> 1);
+
+    PLOGGING("merging len %lld\n", totalLen);
+
+    // quickcheck to see if we have to copy
+    if (COMPARE_LT(*pm, *(pm - 1))) {
+
+        memcpy(pw, pl, (pm - pl) * strlen);
+
+        pi = pw + (pm - pl);
+        pj = pw;
+        pk = pl;
+        while (pj < pi && pm < pr) {
+            if (COMPARE_LT(*pm, *pj)) {
+                *pk++ = *pm++;
+            }
+            else {
+                *pk++ = *pj++;
+            }
+        }
+
+        while (pj < pi) {
+            *pk++ = *pj++;
+        }
+    }
+    else {
+        //printf("**Already sorted %lld\n", (int64_t)(*pm), (int64_t)*(pm - 1), (int64_t)pValue[*pm], (int64_t)pValue[*(pm - 1)]);
+    }
+
+}
+
+typedef int(*SORT_FUNCTION)(void* pValue, int64_t length);
+typedef void(*SORT_STEP_TWO)(void* pValue1, int64_t totalLen, int64_t strlen, void* pWorkSpace1);
 typedef void(*MERGE_STEP_ONE)(void* pValue, void* pToSort, int64_t num, int64_t strlen, void* pWorkSpace);
 typedef void(*MERGE_STEP_TWO)(void* pValue1, void* pToSort1, int64_t totalLen, int64_t strlen, void* pWorkSpace1);
 //--------------------------------------------------------------------
 struct MERGE_STEP_ONE_CALLBACK {
-    MERGE_STEP_ONE MergeCallbackOne;
-    MERGE_STEP_TWO MergeCallbackTwo;
-
+    union {
+        MERGE_STEP_ONE MergeCallbackOne;
+        SORT_FUNCTION  SortCallbackOne;
+    };
+    union {
+        MERGE_STEP_TWO MergeCallbackTwo;
+        SORT_STEP_TWO SortCallbackTwo;
+    };
     void* pValues;
     void* pToSort;
     int64_t ArrayLength;
@@ -1673,10 +1419,15 @@ struct MERGE_STEP_ONE_CALLBACK {
     // set to 0 if not a string, otherwise the string length
     int64_t StrLen;
 
+    // pointer to the merge workspace (usually half array length in size)
     void* pWorkSpace;
+
+    // how much was used per 1/8 chunk when allocating the workspace
     int64_t AllocChunk;
     int64_t MergeBlocks;
     int64_t TypeSizeInput;
+
+    // not valid for inplace sorting, otherwise is sizeof(int32) or sizeof(int64) depending on index size
     int64_t TypeSizeOutput;
 
     // used to synchronize parallel merges
@@ -1686,16 +1437,39 @@ struct MERGE_STEP_ONE_CALLBACK {
 } stParMergeCallback;
 
 
+//------------------------------------------------------------------------------
+// Checks to see if adjacent bit is set
+// Used when merging sorts
+static bool IsBuddyBitSet(int64_t index, int64_t* pBitMask) {
+    int64_t bitshift = 1LL << index;
+
+    // Now find the buddy bit (adjacent bit)
+    int64_t buddy = 0;
+    if (index & 1) {
+        buddy = 1LL << (index - 1);
+    }
+    else {
+        buddy = 1LL << (index + 1);
+    }
+
+    // Get back which bits were set before the OR operation
+    int64_t result = FMInterlockedOr(pBitMask, bitshift);
+
+    // Check if our buddy was already set
+    PLOGGING("index -- LEVEL 1: %lld  %lld %lld -- %s\n", index, buddy, (result & buddy), buddy == (result & buddy) ? "GOOD" : "WAIT");
+
+    return (buddy == (result & buddy));
+}
 
 //------------------------------------------------------------------------------
-//  Concurrent callback from multiple threads
+// Concurrent callback from multiple threads
+// this routine is for indirect sorting
 static int64_t ParMergeThreadCallback(struct stMATH_WORKER_ITEM* pstWorkerItem, int core, int64_t workIndex) {
     MERGE_STEP_ONE_CALLBACK* Callback = (MERGE_STEP_ONE_CALLBACK*)pstWorkerItem->WorkCallbackArg;
     int64_t didSomeWork = FALSE;
 
     int64_t index;
     int64_t workBlock;
-
 
     // As long as there is work to do
     while ((index = pstWorkerItem->GetNextWorkIndex(&workBlock)) > 0) {
@@ -1719,24 +1493,8 @@ static int64_t ParMergeThreadCallback(struct stMATH_WORKER_ITEM* pstWorkerItem, 
 
         Callback->MergeCallbackOne(Callback->pValues, pToSort1 + (pFirst * Callback->TypeSizeOutput), MergeSize, Callback->StrLen, pWorkSpace1);
 
-        int64_t bitshift = 1LL << index;
+        if (IsBuddyBitSet(index, &Callback->Level[0])) {
 
-        // Now find the buddy bit (adjacent bit)
-        int64_t buddy = 0;
-        if (index & 1) {
-            buddy = 1LL << (index - 1);
-        }
-        else {
-            buddy = 1LL << (index + 1);
-        }
-
-        // Get back which bits were set before the OR operation
-        int64_t result = FMInterlockedOr(&Callback->Level[0], bitshift);
-
-        // Check if our buddy was already set
-        PLOGGING("index -- LEVEL 1: %lld  %lld %lld -- %s\n", index, buddy, (result & buddy), buddy == (result & buddy) ? "GOOD" : "WAIT");
-
-        if (buddy == (result & buddy)) {
             // Move to next level -- 4 things to sort
             index = index / 2;
             pWorkSpace1 = (char*)Callback->pWorkSpace + (index * 2 * Callback->AllocChunk * Callback->TypeSizeOutput);
@@ -1750,24 +1508,7 @@ static int64_t ParMergeThreadCallback(struct stMATH_WORKER_ITEM* pstWorkerItem, 
             //pWorkSpace1 = (char*)Callback->pWorkSpace + (OffsetSize * Callback->TypeSizeOutput);
             Callback->MergeCallbackTwo(Callback->pValues, pToSort1 + (pFirst * Callback->TypeSizeOutput), MergeSize, Callback->StrLen, pWorkSpace1);
 
-            bitshift = 1LL << index;
-
-            // Now find the buddy bit (adjacent bit)
-            buddy = 0;
-            if (index & 1) {
-                buddy = 1LL << (index - 1);
-            }
-            else {
-                buddy = 1LL << (index + 1);
-            }
-
-            // Get back which bits were set before the OR operation
-            result = FMInterlockedOr(&Callback->Level[1], bitshift);
-
-            // Check if our buddy was already set
-            PLOGGING("index -- LEVEL 2: %lld  %lld %lld -- %s\n", index, buddy, (result & buddy), buddy == (result & buddy) ? "GOOD" : "WAIT");
-
-            if (buddy == (result & buddy)) {
+            if (IsBuddyBitSet(index, &Callback->Level[1])) {
                 index /= 2;
 
                 // Move to next level -- 2 things to sort
@@ -1782,27 +1523,90 @@ static int64_t ParMergeThreadCallback(struct stMATH_WORKER_ITEM* pstWorkerItem, 
                 PLOGGING("Level 2 %p %p,  size: %lld,  pworkspace: %p\n", Callback->pValues, pToSort1 + (pFirst * Callback->TypeSizeOutput), MergeSize, pWorkSpace1);
                 Callback->MergeCallbackTwo(Callback->pValues, pToSort1 + (pFirst * Callback->TypeSizeOutput), MergeSize, Callback->StrLen, pWorkSpace1);
 
-                bitshift = 1LL << index;
-                buddy = 0;
-                if (index & 1) {
-                    buddy = 1LL << (index - 1);
-                }
-                else {
-                    buddy = 1LL << (index + 1);
-                }
-               
-                // Get back which bits were set before the OR operation
-                result = FMInterlockedOr(&Callback->Level[2], bitshift);
-
-                PLOGGING("bitshift %lld %lld  %lld\n", index, bitshift, result);
-                if (buddy == (result & buddy)) {
+                if (IsBuddyBitSet(index, &Callback->Level[2])) {
                     // Final merge
                     PLOGGING("%d : MergeFinal index: %llu  %lld  %lld  %lld\n", core, index, 0LL, Callback->ArrayLength, 0LL);
                     stParMergeCallback.MergeCallbackTwo(Callback->pValues, Callback->pToSort, Callback->ArrayLength, Callback->StrLen, Callback->pWorkSpace);
                 }
-
             }
+        }
 
+        // Indicate we completed a block
+        didSomeWork++;
+
+        // tell others we completed this work block
+        pstWorkerItem->CompleteWorkBlock(core);
+    }
+
+    return didSomeWork;
+}
+
+
+
+//------------------------------------------------------------------------------
+// Concurrent callback from multiple threads
+// this routine is for inplace sorting
+static int64_t ParMergeInPlaceThreadCallback(struct stMATH_WORKER_ITEM* pstWorkerItem, int core, int64_t workIndex) {
+    MERGE_STEP_ONE_CALLBACK* Callback = (MERGE_STEP_ONE_CALLBACK*)pstWorkerItem->WorkCallbackArg;
+    int64_t didSomeWork = FALSE;
+
+    int64_t index;
+    int64_t workBlock;
+
+    // As long as there is work to do
+    while ((index = pstWorkerItem->GetNextWorkIndex(&workBlock)) > 0) {
+        // First index is 1 so we subtract
+        index--;
+
+        // the very first index starts at 0
+        int64_t pFirst = Callback->EndPositions[index];
+        int64_t pSecond = Callback->EndPositions[index + 1];
+
+        PLOGGING("[%d] DoWork start loop -- %lld  index: %lld   pFirst: %lld   pSecond: %lld\n", core, workIndex, index, pFirst, pSecond);
+
+        int64_t MergeSize = (pSecond - pFirst);
+        PLOGGING("%d : MergeOne index: %llu  %lld  %lld  %lld\n", core, index, pFirst, MergeSize, OffsetSize);
+
+        // Workspace uses half the size
+        //char* pWorkSpace1 = (char*)pWorkSpace + (offsetAdjToSort / 2);
+        char* pWorkSpace1 = (char*)Callback->pWorkSpace + (index * Callback->AllocChunk * Callback->TypeSizeInput);
+
+        Callback->SortCallbackOne((char*)(Callback->pValues) + (pFirst * Callback->TypeSizeInput), MergeSize);
+
+        if (IsBuddyBitSet(index, &Callback->Level[0])) {
+            // Move to next level -- 4 things to sort
+            index = index / 2;
+            pWorkSpace1 = (char*)Callback->pWorkSpace + (index * 2 * Callback->AllocChunk * Callback->TypeSizeInput);
+
+            pFirst = Callback->EndPositions[index * 2];
+            pSecond = Callback->EndPositions[index * 2 + 2];
+            MergeSize = (pSecond - pFirst);
+
+            PLOGGING("size:%lld  first: %lld  second: %lld   expected: %lld\n", MergeSize, pFirst, pSecond, pFirst + (MergeSize >> 1));
+
+            //pWorkSpace1 = (char*)Callback->pWorkSpace + (OffsetSize * Callback->TypeSizeInput);
+            // int64_t totalLen, int64_t strlen, void* pWorkSpace1);
+            Callback->SortCallbackTwo((char*)(Callback->pValues) + (pFirst * Callback->TypeSizeInput), MergeSize, Callback->StrLen, pWorkSpace1);
+
+            if (IsBuddyBitSet(index, &Callback->Level[1])) {
+                index /= 2;
+
+                // Move to next level -- 2 things to sort
+                pWorkSpace1 = (char*)Callback->pWorkSpace + (index * 4 * Callback->AllocChunk * Callback->TypeSizeInput);
+
+                pFirst = Callback->EndPositions[index * 4];
+                pSecond = Callback->EndPositions[index * 4 + 4];
+                MergeSize = (pSecond - pFirst);
+
+                PLOGGING("%d : MergeThree index: %llu  %lld  %lld\n", core, index, pFirst, MergeSize);
+                Callback->SortCallbackTwo((char*)(Callback->pValues) + (pFirst * Callback->TypeSizeInput), MergeSize, Callback->StrLen, pWorkSpace1);
+
+                if (IsBuddyBitSet(index, &Callback->Level[2])) {
+                    // Final merge
+                    PLOGGING("%d : MergeFinal index: %llu  %lld  %lld  %lld\n", core, index, 0LL, Callback->ArrayLength, 0LL);
+                    stParMergeCallback.SortCallbackTwo(Callback->pValues, Callback->ArrayLength, Callback->StrLen, Callback->pWorkSpace);
+                }
+            }
         }
 
         // Indicate we completed a block
@@ -1858,9 +1662,6 @@ single_amergesort(
     }
 
     switch (sortType) {
-    case PAR_SORT_TYPE::Float:
-        amergesort0_float(pToSort, pToSort + arrayLength, pValues, pWorkSpace);
-        break;
     case PAR_SORT_TYPE::String:
         amergesort0_string(pToSort, pToSort + arrayLength, (const char*)pValues, pWorkSpace, strlen);
         break;
@@ -1989,9 +1790,6 @@ par_amergesort(
             MERGE_STEP_ONE mergeStepOne = NULL;
 
             switch (sortType) {
-            case PAR_SORT_TYPE::Float:
-                mergeStepOne = ParMergeFloat<T, UINDEX>;
-                break;
             case PAR_SORT_TYPE::String:
                 mergeStepOne = ParMergeString<UINDEX>;
                 break;
@@ -2092,69 +1890,133 @@ par_amergesort(
 
 
 
+//------------------------------------------------------------------------
+// parallel version
+// if strlen==0, then not string (int or float)
+// If the array is large enough, a parallel quick sort is invoked
+// Returns -1 on failure
+template <typename T>
+static int
+par_quicksort(
+    void*           pValues,
+    int64_t         arrayLength,
+    int64_t         strides,
+    int64_t         itemSize,
+    SORT_FUNCTION   pSortFunction)
+{
+    // If size is large, go parallel
+    if (arrayLength >= CMathWorker::WORK_ITEM_BIG) {
+
+        PLOGGING("Parallel version  %p  %p  %p\n", pToSort, pToSort + arrayLength, pValues);
+        // Divide into 8 jobs
+        // Allocate all memory up front
+        // Allocate enough for 8 
+        int64_t allocChunk = (arrayLength / 16) + 1;
+        void* pWorkSpace = NULL;
+
+        // Allocate half the size since the workspace is only needed for left
+        uint64_t allocSize = allocChunk * 8 * itemSize;
+        pWorkSpace = WORKSPACE_ALLOC(allocSize);
+
+        if (pWorkSpace == NULL) {
+            return -1;
+        }
+
+
+        stMATH_WORKER_ITEM* pWorkItem = THREADER->GetWorkItem(arrayLength);
+
+        if (pWorkItem == NULL) {
+
+            // Threading not allowed for this work item, call it directly from main thread
+            pSortFunction(pValues, arrayLength);
+        }
+        else {
+
+            pWorkItem->DoWorkCallback = ParMergeInPlaceThreadCallback;
+            pWorkItem->WorkCallbackArg = &stParMergeCallback;
+
+            // First pass is a quicksort in place
+            stParMergeCallback.SortCallbackOne = pSortFunction;
+
+            // second pass is a mergesort in place
+            stParMergeCallback.SortCallbackTwo = ParInPlaceMerge<T>;
+
+            stParMergeCallback.pValues = pValues;
+            stParMergeCallback.pToSort = NULL;
+            stParMergeCallback.ArrayLength = arrayLength;
+            stParMergeCallback.StrLen = itemSize;
+            stParMergeCallback.AllocChunk = allocChunk;
+            stParMergeCallback.pWorkSpace = pWorkSpace;
+            //stParMergeCallback.TypeSizeInput = sizeof(T);
+            stParMergeCallback.TypeSizeInput = itemSize;
+
+            stParMergeCallback.TypeSizeOutput = 0;
+
+            //NOTE set this value to 2,4 or 8
+            stParMergeCallback.MergeBlocks = 8;
+
+            for (int i = 0; i < 3; i++) {
+                stParMergeCallback.Level[i] = 0;
+            }
+
+            // We use an 8 way merge, we need the size breakdown
+            stParMergeCallback.EndPositions[8] = arrayLength;
+            stParMergeCallback.EndPositions[4] = arrayLength / 2;
+            stParMergeCallback.EndPositions[6] = stParMergeCallback.EndPositions[4] + (arrayLength - stParMergeCallback.EndPositions[4]) / 2;
+            stParMergeCallback.EndPositions[2] = 0 + (stParMergeCallback.EndPositions[4] - 0) / 2;
+            stParMergeCallback.EndPositions[7] = stParMergeCallback.EndPositions[6] + (arrayLength - stParMergeCallback.EndPositions[6]) / 2;
+            stParMergeCallback.EndPositions[5] = stParMergeCallback.EndPositions[4] + (stParMergeCallback.EndPositions[6] - stParMergeCallback.EndPositions[4]) / 2;
+            stParMergeCallback.EndPositions[3] = stParMergeCallback.EndPositions[2] + (stParMergeCallback.EndPositions[4] - stParMergeCallback.EndPositions[2]) / 2;
+            stParMergeCallback.EndPositions[1] = 0 + (stParMergeCallback.EndPositions[2] - 0) / 2;
+            stParMergeCallback.EndPositions[0] = 0;
+
+            // This will notify the worker threads of a new work item
+            // Default thead wakeup to 7
+            THREADER->WorkMain(pWorkItem, stParMergeCallback.MergeBlocks, 7, 1, FALSE);
+
+        }
+
+        // Free temp memory used
+        WORKSPACE_FREE(pWorkSpace);
+        return 0;
+    }
+    else {
+
+        // single threaded sort
+        return
+            pSortFunction(
+                pValues,
+                arrayLength);
+    }
+}
+
+
 
 //-----------------------------------------------------------------------------------------------
 // Sorts in place
 // TODO: Make multithreaded like
 template <typename T>
-static int
+static SORT_FUNCTION
 SortInPlace(void* pDataIn1, int64_t arraySize1, SORT_MODE mode) {
 
-    int result = 0;
-
     switch (mode) {
     case SORT_MODE::SORT_MODE_QSORT:
-        result = quicksort_((T*)pDataIn1, arraySize1);
-        break;
+        return quicksort_<T>;
 
-    case SORT_MODE::SORT_MODE_MERGE:
-        result = mergesort_((T*)pDataIn1, arraySize1);
-        break;
+    //case SORT_MODE::SORT_MODE_MERGE:
+    //    result = mergesort_<T>;
+    //    break;
 
     case SORT_MODE::SORT_MODE_HEAP:
-        result = heapsort_<T>((T*)pDataIn1, arraySize1);
-        break;
+        return  heapsort_<T>;
 
     }
 
-    if (result != 0) {
-        LOGGING("**Error sorting.  size %llu   mode %d\n", arraySize1, mode);
-    }
-
-    return result;
+    return NULL;
 }
 
 
 
-//-----------------------------------------------------------------------------------------------
-// Sorts in place
-template <typename T>
-static int
-SortInPlaceFloat(void* pDataIn1, int64_t arraySize1, SORT_MODE mode) {
-
-    int result = 0;
-
-    switch (mode) {
-    case SORT_MODE::SORT_MODE_QSORT:
-        result = quicksort_((T*)pDataIn1, arraySize1);
-        break;
-
-    case SORT_MODE::SORT_MODE_MERGE:
-        result = mergesort_float((T*)pDataIn1, arraySize1);
-        break;
-
-    case SORT_MODE::SORT_MODE_HEAP:
-        result = heapsort_<T>((T*)pDataIn1, arraySize1);
-        break;
-
-    }
-
-    if (result != 0) {
-        LOGGING("**Error sorting.  size %llu   mode %d\n", (int64_t)arraySize1, mode);
-    }
-
-    return result;
-}
 
 //-----------------------------------------------------------------------------------------------
 template <typename T, typename UINDEX>
@@ -2190,34 +2052,6 @@ SortIndex(
 }
 
 
-//-----------------------------------------------------------------------------------------------
-template <typename T, typename UINDEX>
-static int
-SortIndexFloat(int64_t* pCutOffs, int64_t cutOffLength, void* pDataIn1, UINDEX* toSort, UINDEX arraySize1, SORT_MODE mode) {
-
-    int result = 0;
-
-    switch (mode) {
-    case SORT_MODE::SORT_MODE_QSORT:
-        result = aquicksort_float<T, UINDEX>((T*)pDataIn1, (UINDEX*)toSort, arraySize1);
-        break;
-
-    case SORT_MODE::SORT_MODE_MERGE:
-        result = par_amergesort<T, UINDEX>(pCutOffs, cutOffLength, (T*)pDataIn1, (UINDEX*)toSort, arraySize1, 0, PAR_SORT_TYPE::Float);
-        break;
-
-    case SORT_MODE::SORT_MODE_HEAP:
-        result = aheapsort_float<T, UINDEX>((T*)pDataIn1, (UINDEX*)toSort, arraySize1);
-        break;
-
-    }
-
-    if (result != 0) {
-        LOGGING("**Error sorting.  size %llu   mode %d\n", (int64_t)arraySize1, mode);
-    }
-
-    return result;
-}
 
 
 //-----------------------------------------------------------------------------------------------
@@ -2323,13 +2157,13 @@ static void SortIndex(
         SortIndex<uint64_t, UINDEX>(pCutOffs, cutOffLength, pDataIn1, pDataOut1, arraySize1, mode);
         break;
     case ATOP_FLOAT:
-        SortIndexFloat<float, UINDEX>(pCutOffs, cutOffLength, pDataIn1, pDataOut1, arraySize1, mode);
+        SortIndex<float, UINDEX>(pCutOffs, cutOffLength, pDataIn1, pDataOut1, arraySize1, mode);
         break;
     case ATOP_DOUBLE:
-        SortIndexFloat<double, UINDEX>(pCutOffs, cutOffLength, pDataIn1, pDataOut1, arraySize1, mode);
+        SortIndex<double, UINDEX>(pCutOffs, cutOffLength, pDataIn1, pDataOut1, arraySize1, mode);
         break;
     case ATOP_LONGDOUBLE:
-        SortIndexFloat<long double, UINDEX>(pCutOffs, cutOffLength, pDataIn1, pDataOut1, arraySize1, mode);
+        SortIndex<long double, UINDEX>(pCutOffs, cutOffLength, pDataIn1, pDataOut1, arraySize1, mode);
         break;
     default:
         LOGGING("SortIndex does not understand type %d\n", arrayType1);
@@ -2337,6 +2171,7 @@ static void SortIndex(
 
 }
 
+// Stub for lexsort to return int32
 extern "C" void SortIndex32(
     int64_t * pCutOffs,
     int64_t     cutOffLength,
@@ -2350,6 +2185,7 @@ extern "C" void SortIndex32(
     return SortIndex<int32_t>(pCutOffs, cutOffLength, pDataIn1, (int32_t)arraySize1, pDataOut1, mode, arrayType1, strlen);
 }
 
+// Stub for lexsort to return int64
 extern "C" void SortIndex64(
     int64_t * pCutOffs,
     int64_t     cutOffLength,
@@ -2359,113 +2195,100 @@ extern "C" void SortIndex64(
     SORT_MODE   mode,
     int         arrayType1,
     int64_t     strlen) {
-    return SortIndex<int64_t>(pCutOffs, cutOffLength, pDataIn1, arraySize1, pDataOut1, mode, arrayType1, strlen);
 
+    return SortIndex<int64_t>(pCutOffs, cutOffLength, pDataIn1, arraySize1, pDataOut1, mode, arrayType1, strlen);
 }
 
 
 
 //================================================================================================
 //===============================================================================
-extern "C" BOOL SortArray(void* pDataIn1, int64_t arraySize1, int32_t arrayType1, SORT_MODE mode) {
-    switch (arrayType1) {
+// TODO: Build table ahead of time
+//
+static SORT_FUNCTION SortArray(void* pDataIn1, int64_t arraySize1, int32_t atype, SORT_MODE mode) {
+    switch (atype) {
     case ATOP_STRING:
-        SortInPlace<char>(pDataIn1, arraySize1, mode);
-        break;
+        return SortInPlace<char>(pDataIn1, arraySize1, mode);
     case ATOP_BOOL:
-        SortInPlace<bool>(pDataIn1, arraySize1, mode);
-        break;
+        return SortInPlace<bool>(pDataIn1, arraySize1, mode);
     case ATOP_INT8:
-        SortInPlace<int8_t>(pDataIn1, arraySize1, mode);
-        break;
+        return SortInPlace<int8_t>(pDataIn1, arraySize1, mode);
     case ATOP_INT16:
-        SortInPlace<int16_t>(pDataIn1, arraySize1, mode);
-        break;
+        return SortInPlace<int16_t>(pDataIn1, arraySize1, mode);
     case ATOP_INT32:
-        SortInPlace<int32_t>(pDataIn1, arraySize1, mode);
-        break;
+        return SortInPlace<int32_t>(pDataIn1, arraySize1, mode);
     case ATOP_INT64:
-        SortInPlace<int64_t>(pDataIn1, arraySize1, mode);
-        break;
+        return SortInPlace<int64_t>(pDataIn1, arraySize1, mode);
     case ATOP_UINT8:
-        SortInPlace<uint8_t>(pDataIn1, arraySize1, mode);
-        break;
+        return SortInPlace<uint8_t>(pDataIn1, arraySize1, mode);
     case ATOP_UINT16:
-        SortInPlace<uint16_t>(pDataIn1, arraySize1, mode);
-        break;
+        return SortInPlace<uint16_t>(pDataIn1, arraySize1, mode);
     case ATOP_UINT32:
-        SortInPlace<uint32_t>(pDataIn1, arraySize1, mode);
-        break;
+        return SortInPlace<uint32_t>(pDataIn1, arraySize1, mode);
     case ATOP_UINT64:
-        SortInPlace<uint64_t>(pDataIn1, arraySize1, mode);
-        break;
+        return SortInPlace<uint64_t>(pDataIn1, arraySize1, mode);
     case ATOP_FLOAT:
-        SortInPlaceFloat<float>(pDataIn1, arraySize1, mode);
-        break;
+        return SortInPlace<float>(pDataIn1, arraySize1, mode);
     case ATOP_DOUBLE:
-        SortInPlaceFloat<double>(pDataIn1, arraySize1, mode);
-        break;
+        return SortInPlace<double>(pDataIn1, arraySize1, mode);
     case ATOP_LONGDOUBLE:
-        SortInPlaceFloat<long double>(pDataIn1, arraySize1, mode);
-        break;
+        return SortInPlace<long double>(pDataIn1, arraySize1, mode);
     default:
-        LOGGING("SortArray does not understand type %d\n", arrayType1);
-        return FALSE;
+        LOGGING("SortArray does not understand type %d\n", atype);
+        return NULL;
         break;
     }
-    return TRUE;
+    return NULL;
 }
 
+//===============================================================================
 
+extern "C" int QuickSort(
+    int atype,
+    void* pDataIn1,
+    int64_t arraySize1,
+    int64_t strides,
+    int64_t itemSize) {
 
-//
-//template <typename UINDEX>
-//void LexSort(UINDEX* pDataOut, int64_t* pCutOffs, int64_t cutOffLength)
-//
-//{
-//
-//    // BUG? what if we have index= and cutoffs= ??
-//    if (pCutOffs) {
-//        LOGGING("Have cutoffs %lld\n", cutOffLength);
-//
-//        // For cutoffs, prep the indexes with 0:n for each partition
-//        UINDEX* pCounter = pDataOut;
-//
-//        int64_t startPos = 0;
-//        for (int64_t j = 0; j < cutOffLength; j++) {
-//
-//            int64_t endPos = pCutOffs[j];
-//            int64_t partitionLength = endPos - startPos;
-//            for (UINDEX i = 0; i < partitionLength; i++) {
-//                *pCounter++ = i;
-//            }
-//            startPos = endPos;
-//        }
-//    }
-//    else {
-//
-//        // If the user did not provide a start index, we make one
-//        if (index == NULL) {
-//            THREADER->DoMultiThreadedChunkWork(arraySize1, ARangeCallback<UINDEX>, pDataOut);
-//        }
-//    }
-//
-//    // When multiple arrays are passed, we sort in order of how it is passed
-//    // Thus, the last array is the last sort, and therefore determines the primary sort order
-//    for (UINDEX i = 0; i < mlp.tupleSize; i++) {
-//        // For each array...
-//        // TODO!! Convert DTYPE
-//        if (sizeof(UINDEX) == 4) {
-//            SortIndex32(pCutOffs, cutOffLength, mlp.aInfo[i].pData, arraySize1, pDataOut, SORT_MODE::SORT_MODE_MERGE, mlp.aInfo[i].NumpyDType, mlp.aInfo[i].ItemSize);
-//        }
-//        else {
-//            SortIndex64(pCutOffs, cutOffLength, mlp.aInfo[i].pData, arraySize1, pDataOut, SORT_MODE::SORT_MODE_MERGE, mlp.aInfo[i].NumpyDType, mlp.aInfo[i].ItemSize);
-//        }
-//    }
-//
-//}
+    SORT_FUNCTION pSortFunction=
+        SortArray(pDataIn1, arraySize1, atype, SORT_MODE::SORT_MODE_QSORT);
 
+    if (pSortFunction) {
+        switch (atype) {
+        case ATOP_BOOL:
+            return par_quicksort<bool>(pDataIn1, arraySize1, strides, itemSize, pSortFunction);
+        case ATOP_INT8:
+            return par_quicksort<int8_t>(pDataIn1, arraySize1, strides, itemSize, pSortFunction);
+        case ATOP_INT16:
+            return par_quicksort<int16_t>(pDataIn1, arraySize1, strides, itemSize, pSortFunction);
+        case ATOP_INT32:
+            return par_quicksort<int32_t>(pDataIn1, arraySize1, strides, itemSize, pSortFunction);
+        case ATOP_INT64:
+            return par_quicksort<int64_t>(pDataIn1, arraySize1, strides, itemSize, pSortFunction);
+        case ATOP_UINT8:
+            return par_quicksort<uint8_t>(pDataIn1, arraySize1, strides, itemSize, pSortFunction);
+        case ATOP_UINT16:
+            return par_quicksort<uint16_t>(pDataIn1, arraySize1, strides, itemSize, pSortFunction);
+        case ATOP_UINT32:
+            return par_quicksort<uint32_t>(pDataIn1, arraySize1, strides, itemSize, pSortFunction);
+        case ATOP_UINT64:
+            return par_quicksort<uint64_t>(pDataIn1, arraySize1, strides, itemSize, pSortFunction);
+        case ATOP_FLOAT:
+            return par_quicksort<float>(pDataIn1, arraySize1, strides, itemSize, pSortFunction);
+        case ATOP_DOUBLE:
+            return par_quicksort<double>(pDataIn1, arraySize1, strides, itemSize, pSortFunction);
+        case ATOP_LONGDOUBLE:
+            return par_quicksort<long double>(pDataIn1, arraySize1, strides, itemSize, pSortFunction);
+        //case ATOP_STRING:
+        //    return par_quicksort<char>(pDataIn1, arraySize1, strides, itemSize, pSortFunction);
+        default:
+            LOGGING("SortArray does not understand type %d\n", atype);
+            return 0;
+        }
+    }
+    return 0;
 
+}
 
 
 //===============================================================================
