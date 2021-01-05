@@ -684,8 +684,6 @@ mergesort0string_(char* pl, char* pr, char* pw, int64_t strLen)
 {
     char * pi, * pj, * pk, * pm;
 
-    printf("str1: %s   strlast: %s\n", pl, pr);
-
     if (((pr - pl) / strLen) > SMALL_MERGESORT) {
         /* merge sort */
         pm = pl +  strLen * (((pr - pl)/strLen) >> 1);
@@ -719,47 +717,21 @@ mergesort0string_(char* pl, char* pr, char* pw, int64_t strLen)
         }
     }
     else {
-        if (strLen <= 1024) {
-            printf("sorting len:%lld   pl: %p   pr: %p\n", strLen, pl, pr);
-            char vp[1024];
 
-            /* insertion sort */
-            for (pi = pl + strLen; pi < pr; pi += strLen) {
-                // Copy into vp, a temp buffer
-                STRING_COPY(vp, pi, strLen);
-                printf("Copy %s\n", vp);
-                pj = pi;
-                pk = pi - strLen;
-                while (pj > pl && STRING_LT((T*)vp, (T*)pk, strLen)) {
-                    STRING_COPY(pj, pk, strLen);
-                    printf("inner copy %s\n", pj);
-
-                    pj -= strLen;
-                    pk -= strLen;
-                }
-                STRING_COPY(pj, vp, strLen);
+        /* insertion sort */
+        for (pi = pl + strLen; pi < pr; pi += strLen) {
+            // Copy into vp, a temp buffer
+            STRING_COPY(pw, pi, strLen);
+            pj = pi;
+            pk = pi - strLen;
+            while (pj > pl&& STRING_LT((T*)pw, (T*)pk, strLen)) {
+                STRING_COPY(pj, pk, strLen);
+                pj -= strLen;
+                pk -= strLen;
             }
-
+            STRING_COPY(pj, pw, strLen);
         }
-        else {
-            char* vp = POSSIBLY_STACK_ALLOC(strLen);
 
-            /* insertion sort */
-            for (pi = pl + strLen; pi < pr; pi += strLen) {
-                // Copy into vp, a temp buffer
-                STRING_COPY(vp, pi, strLen);
-                pj = pi;
-                pk = pi - strLen;
-                while (pj > pl&& STRING_LT((T*)vp, (T*)pk, strLen)) {
-                    STRING_COPY(pj, pk, strLen);
-                    pj -= strLen;
-                    pk -= strLen;
-                }
-                STRING_COPY(pj, vp, strLen);
-            }
-
-            POSSIBLY_STACK_FREE(strLen, vp);
-        }
     }
 }
 
@@ -798,13 +770,13 @@ mergesortstring_(void* start, int64_t length, int64_t strLen)
 
     // Consider alloc on stack
     const int64_t allocSize = (length / 2) * strLen;
-    pw = POSSIBLY_STACK_ALLOC_TYPE(char*, allocSize);
+    pw = (char*)WORKSPACE_ALLOC(allocSize);
     if (pw == NULL) {
         return -1;
     }
     mergesort0string_<T>(pl, pr, pw, strLen);
 
-    POSSIBLY_STACK_FREE(allocSize, pw);
+    WORKSPACE_FREE(pw);
     return 0;
 }
 
