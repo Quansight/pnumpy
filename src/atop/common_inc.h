@@ -374,15 +374,6 @@ extern int32_t gBooleanLUT32[16];
 extern int64_t gBooleanLUT64Inverse[256];
 extern int32_t gBooleanLUT32Inverse[16];
 
-
-enum SCALAR_MODE {
-    NO_SCALARS = 0,
-    FIRST_ARG_SCALAR = 1,
-    SECOND_ARG_SCALAR = 2,
-    BOTH_SCALAR = 3   // not used
-};
-
-
 typedef void(*UNARY_FUNC)(void* pDataIn, void* pDataOut, int64_t len, int64_t strideIn, int64_t strideOut);
 // Pass in two vectors and return one vector
 // Used for operations like C = A + B
@@ -418,13 +409,16 @@ void FmFree(void* _Block);
 #define WORKSPACE_ALLOC FmAlloc
 #define WORKSPACE_FREE FmFree
 
-#define MAX_STACK_ALLOC (1024 * 1024)
+// Default stack size in linux is 320KB
+#define MAX_STACK_ALLOC (1024)
 
 // For small buffers that can be allocated on the stack
 #if defined(_WIN32) && !defined(__GNUC__)
 #define POSSIBLY_STACK_ALLOC(_alloc_size_) _alloc_size_ > MAX_STACK_ALLOC ? (char*)WORKSPACE_ALLOC(_alloc_size_) : (char*)_malloca(_alloc_size_);
+#define POSSIBLY_STACK_ALLOC_TYPE(_TYPE_, _alloc_size_) _alloc_size_ > MAX_STACK_ALLOC ? (_TYPE_)WORKSPACE_ALLOC(_alloc_size_) : (_TYPE_)_malloca(_alloc_size_);
 #else
 #define POSSIBLY_STACK_ALLOC(_alloc_size_) _alloc_size_ > MAX_STACK_ALLOC ? (char*)WORKSPACE_ALLOC(_alloc_size_) : (char*)alloca(_alloc_size_);
+#define POSSIBLY_STACK_ALLOC_TYPE(_TYPE_, _alloc_size_) _alloc_size_ > MAX_STACK_ALLOC ? (_TYPE_)WORKSPACE_ALLOC(_alloc_size_) : (_TYPE_)alloca(_alloc_size_);
 #endif
 #define POSSIBLY_STACK_FREE(_alloc_size_, _mem_ptr_) if (_alloc_size_ > MAX_STACK_ALLOC) WORKSPACE_FREE(_mem_ptr_);
 
@@ -507,7 +501,8 @@ extern "C" int64_t GroupIndex64(
     int64_t       base_index,
     int64_t       strlen);
 
-extern "C" int QuickSort(
+extern "C" int Sort(
+    SORT_MODE sortmode,
     int atype,
     void* pDataIn,
     int64_t arrayLength,

@@ -161,6 +161,17 @@ PyObject* is_sorted(PyObject* self, PyObject* args) {
 
 }
 
+// Return NULL on failure
+static PyObject* GetKwarg(PyTypeObject* pType, PyObject* kwargs, const char* name) {
+    if (kwargs && PyDict_Check(kwargs)) {
+        // Borrows a reference
+        PyObject* object=PyDict_GetItemString(kwargs, name);
+        if (PyObject_TypeCheck(object, pType))
+            return object;
+        // wrong type, possible error
+    }
+    return NULL;
+}
 
 //===============================================================================
 // checks for kwargs cutoff
@@ -168,28 +179,59 @@ PyObject* is_sorted(PyObject* self, PyObject* args) {
 // cutoffLength of -1 indicates an error
 int64_t* GetCutOffs(PyObject* kwargs, int64_t& cutoffLength) {
     // Check for cutoffs kwarg to see if going into parallel mode
-    if (kwargs && PyDict_Check(kwargs)) {
-        PyArrayObject* pCutOffs = NULL;
-        // Borrowed reference
-        // Returns NULL if key not present
-        pCutOffs = (PyArrayObject*)PyDict_GetItemString(kwargs, "cutoffs");
+    PyArrayObject* pCutOffs = NULL;
+    // Borrowed reference
+    // Returns NULL if key not present
+    pCutOffs = (PyArrayObject*)GetKwarg(pPyArray_Type, kwargs, "cutoffs");
 
-        if (pCutOffs != NULL && PyArray_Check(pCutOffs)) {
-            switch (PyArray_TYPE(pCutOffs)) {
-            CASE_NPY_INT64:
-                cutoffLength = ArrayLength(pCutOffs);
-                return (int64_t*)PyArray_BYTES(pCutOffs);
-            default:
-                printf("Bad cutoff dtype... make sure int64_t\n");
-                cutoffLength = -1;
-                return NULL;
-            }
+    if (pCutOffs != NULL) {
+        switch (PyArray_TYPE(pCutOffs)) {
+        CASE_NPY_INT64:
+            cutoffLength = ArrayLength(pCutOffs);
+            return (int64_t*)PyArray_BYTES(pCutOffs);
+        default:
+            printf("Bad cutoff dtype... make sure int64_t\n");
+            cutoffLength = -1;
+            return NULL;
         }
     }
     cutoffLength = 0;
     return NULL;
 }
 
+//===============================================================================
+// checks for kwargs 'kind'
+// 'quicksort', 'mergesort', 'stable', 'heapsort'
+int64_t GetKind(PyObject* kwargs) {
+    // Check for kind kwarg to see if going into parallel mode
+    PyObject* pKind = NULL;
+    // Borrowed reference
+    // Returns NULL if key not present
+    pKind = GetKwarg( &PyUnicode_Type, kwargs, "kind");
+    // Check for cutoffs kwarg to see if going into parallel mode
+    if (pKind) {
+        PyObject* pString = PyUnicode_AsASCIIString(pKind);
+        SORT_MODE retval = SORT_MODE::SORT_MODE_QSORT;
+
+        if (PyUnicode_CompareWithASCIIString(pKind, "quick") == 0) {
+            retval = SORT_MODE::SORT_MODE_QSORT;
+        } else
+        if (PyUnicode_CompareWithASCIIString(pKind, "merge") == 0) {
+            retval = SORT_MODE::SORT_MODE_MERGE;
+        } else
+        if (PyUnicode_CompareWithASCIIString(pKind, "heap") == 0) {
+            retval = SORT_MODE::SORT_MODE_HEAP;
+        } else
+        if (PyUnicode_CompareWithASCIIString(pKind, "stable") == 0) {
+            retval = SORT_MODE::SORT_MODE_MERGE;
+        }
+
+        Py_DecRef(pString);
+        return retval;
+    }
+    // default to quicksort
+    return SORT_MODE::SORT_MODE_QSORT;
+}
 
 
 // index must be int32_t or int64_t
@@ -456,9 +498,20 @@ extern "C" PyObject* lexsort64(PyObject* self, PyObject* args, PyObject* kwargs)
 //===============================================================================
 // still being worked on
 // just quicksort
+// np.sort(a, axis=-1, kind=None, order=None)
+//    if axis is None:
+//        # flatten returns(1, N) for np.matrix, so always use the last axis
+//        a = asanyarray(a).flatten()
+//        axis = -1
+//    else:
+//        a = asanyarray(a).copy(order = "K")
+//    a.sort(axis = axis, kind = kind, order = order)
+//    return a
+// Have to monkeypath and hook np.sort?()
 extern "C" PyObject* sort(PyObject* self, PyObject* args, PyObject* kwargs) {
     PyArrayObject* inArrValues = NULL;
 
+    // only 3 keywords... axis, kind, order
     if (!PyArg_ParseTuple(args, "O!", &PyArray_Type, &inArrValues))
     {
         return PyErr_Format(PyExc_TypeError, "Invalid argument types and/or count for sort.");
@@ -490,8 +543,10 @@ extern "C" PyObject* sort(PyObject* self, PyObject* args, PyObject* kwargs) {
     if (outArrValues) {
         // Call the atop parallel quicksort
         // -1 indictes an error
+        //SORT_MODE sortmode = SORT_MODE::SORT_MODE_MERGE;
+        SORT_MODE sortmode = (SORT_MODE)GetKind(kwargs);
         int result=
-        QuickSort(atype, PyArray_BYTES(inArrValues), ArrayLength(inArrValues), strideValue, PyArray_ITEMSIZE(inArrValues), PyArray_BYTES(outArrValues), PyArray_ITEMSIZE(outArrValues) );
+        Sort(sortmode, atype, PyArray_BYTES(inArrValues), ArrayLength(inArrValues), strideValue, PyArray_ITEMSIZE(inArrValues), PyArray_BYTES(outArrValues), PyArray_ITEMSIZE(outArrValues) );
 
         if (result >= 0) {
             return (PyObject*)outArrValues;
