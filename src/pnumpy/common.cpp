@@ -185,10 +185,23 @@ PyArrayObject* AllocateLikeNumpyArray(PyArrayObject* inArr, int numpyType) {
     // allocate a new one based on the old one but override the type.
     // TODO: How to handle the case where either the prototype array is a string array xor numpyType is a string type?
     //       (For the latter, we don't have the target itemsize available here, so we don't know how to allocate the array.)
-    PyArray_Descr* const descr = PyArray_DescrFromType(numpyType);
+    PyArray_Descr* descr = NULL;
+
+    if (numpyType == NPY_STRING || numpyType == NPY_UNICODE || numpyType == NPY_VOID) {
+        descr = PyArray_DescrFromObject((PyObject*)inArr, NULL);
+    }
+
+    if (!descr) {
+        descr = PyArray_DescrFromType(numpyType);
+    }
+
     if (!descr) {
         return nullptr;
     }
+
+    // new code for strings
+    //descr->elsize = PyArray_ITEMSIZE(inArr);
+    
     PyArrayObject* returnObject = (PyArrayObject*)PyArray_NewLikeArray(inArr, NPY_KEEPORDER, descr, 1);
 
     if (!returnObject) {
