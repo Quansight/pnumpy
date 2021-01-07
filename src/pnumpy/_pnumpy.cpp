@@ -227,11 +227,63 @@ struct stUFunc {
     int32_t                 MinElementsToThread;
 };
 
+typedef void (*PyVFuncGenericFunction)(void* pDest, void* pSrc, npy_intp length, void* fromarr, void* toarr);
+
+struct stConvertFunc {
+    PyVFuncGenericFunction  pOldFunc;
+
+    // the maximum threads to deploy
+    int32_t                 MaxThreads;
+
+    // the minimum number of elements in the array before threading allowed
+    int32_t                 MinElementsToThread;
+};
+
 // global lookup tables for math opcode enum + dtype enum
 stUFunc  g_UFuncLUT[BINARY_OPERATION::BINARY_LAST][ATOP_LAST];
 stUFunc  g_CompFuncLUT[COMP_OPERATION::CMP_LAST][ATOP_LAST];
 stUFunc  g_UnaryFuncLUT[UNARY_OPERATION::UNARY_LAST][ATOP_LAST];
 stUFunc  g_TrigFuncLUT[TRIG_OPERATION::TRIG_LAST][ATOP_LAST];
+
+// conversion not currently used
+stConvertFunc g_ConvertFuncLUT[ATOP_LAST][ATOP_LAST];
+
+
+typedef int (*SortFunc)(void *, npy_intp, void *);
+typedef int (*SortFuncStub)(void*, npy_intp, void*, int sortkind, int atype);
+
+struct stSortFunc {
+    SortFunc  pOldFunc;
+
+    // the maximum threads to deploy
+    int32_t                 MaxThreads;
+
+    // the minimum number of elements in the array before threading allowed
+    int32_t                 MinElementsToThread;
+};
+
+// 3 sort functions
+//SortFunc g_UFuncSortLUT[NPY_NSORTS][ATOP_LAST];
+stSortFunc g_SortFuncLUT[NPY_NSORTS][ATOP_LAST];
+
+
+typedef int (*ArgSortFunc)(void*, npy_intp*, npy_intp, void*);
+typedef int (*ArgSortFuncStub)(void*, npy_intp*, npy_intp, void*, int sortkind, int atype);
+
+struct stArgSortFunc {
+    ArgSortFunc  pOldFunc;
+
+    // the maximum threads to deploy
+    int32_t                 MaxThreads;
+
+    // the minimum number of elements in the array before threading allowed
+    int32_t                 MinElementsToThread;
+};
+
+// 3 sort functions
+//SortFunc g_UFuncSortLUT[NPY_NSORTS][ATOP_LAST];
+stArgSortFunc g_ArgSortFuncLUT[NPY_NSORTS][ATOP_LAST];
+
 
 // set to 0 to disable
 stSettings g_Settings = { 1, 0, 0, 0, 0 };
@@ -819,7 +871,6 @@ static void AtopUnaryMathFunction(char** args, const npy_intp* dimensions, const
 };
 
 
-
 static void AtopTrigMathFunction(char** args, const npy_intp* dimensions, const npy_intp* steps, void* innerloop, int funcop, int atype) {
     if (!g_Settings.LedgerEnabled) {
         npy_intp n = dimensions[0];
@@ -880,9 +931,40 @@ static void AtopTrigMathFunction(char** args, const npy_intp* dimensions, const 
 
 };
 
+
+// PyArray_DESCR(inArrValues)->f.
+//NPY_NO_EXPORT int
+//PyArray_RegisterCastFunc(PyArray_Descr* descr, int totype,
+//PyArray_VectorUnaryFunc* castfunc)
+// typedef void (PyArray_VectorUnaryFunc)(void *, void *, npy_intp, void *,void*);
+//npycast_##From##_##To(void* from_, void* to_, npy_intp n, PyArrayObject* fromarr, PyArrayObject* toarr)
+// For scalar, fromarr can be NULL
+static void AtopConvertMathFunction(void* pDest, void* pSrc, npy_intp length, void* fromarr, void* toarr, int fromtype, int totype) {
+    stConvertFunc* pConvert = &g_ConvertFuncLUT[fromtype][totype];
+
+    PyArrayObject* pSrcObject = (PyArrayObject*)fromarr;
+
+    LOGGING("Convert called %d %d   src:%p\n", fromtype, totype, pSrcObject);
+    return pConvert->pOldFunc(pDest, pSrc, length, fromarr, toarr);
+}
+
+static int AtopSortMathFunction(void* pSrc, npy_intp length, void* pArrayObject, int sortkind, int atype) {
+    LOGGING("sort called %d %d   src:%p  dest:%p\n", sortkind, atype, pSrc, pArrayObject);
+    stSortFunc* pSortFunc = &g_SortFuncLUT[sortkind][atype];
+    return pSortFunc->pOldFunc(pSrc, length, pArrayObject);
+}
+
+static int AtopArgSortMathFunction(void* pValue, npy_intp* pInt64Buffer, npy_intp length, void* pArrayObject, int sortkind, int atype) {
+    LOGGING("argsort called %d %d   src:%p\n", sortkind, atype, pValue);
+    stArgSortFunc* pArgSortFunc = &g_ArgSortFuncLUT[sortkind][atype];
+    return pArgSortFunc->pOldFunc(pValue, pInt64Buffer, length, pArrayObject);
+
+}
+
 // the inclusion of this file is because there is no callback argument
 #include "stubs.h"
 
+// to be deleted below (served as example)
 template <class T>
 void add_T(T **args, npy_intp const *dimensions, npy_intp const *steps,
           void *innerloopdata) {
@@ -995,6 +1077,32 @@ stUFunc* GetFromDict(const char* ufunc_name, int dtype) {
     return NULL;
 }
 
+typedef int (*COPY_INTO)(PyArrayObject*, PyArrayObject*);
+COPY_INTO gOriginalCopyInto=NULL;
+extern "C"
+int MyCopyInto(PyArrayObject*dest, PyArrayObject*src) {
+    printf("mycopyinto %p %p\n", dest, src);
+    return gOriginalCopyInto(dest, src);
+}
+COPY_INTO gOriginalMoveInto = NULL;
+extern "C"
+int MyMoveInto(PyArrayObject * dest, PyArrayObject * src) {
+    printf("mymoveinto %p %p\n", dest, src);
+    return gOriginalMoveInto(dest, src);
+}
+
+// PyArray_GetCastFunc
+typedef PyArray_VectorUnaryFunc* (*GETCASTFUNC)(PyArray_Descr* from, int totype);
+GETCASTFUNC gOriginalCastFunc = NULL;
+extern "C"
+PyArray_VectorUnaryFunc* MyCastFunc(PyArray_Descr * from, int totype) {
+    printf("MyCastFunc %p \n", from);
+    return gOriginalCastFunc(from, totype);
+}
+
+//#define PyArray_CopyInto \
+//        (*(int (*)(PyArrayObject *, PyArrayObject *)) \
+//         PyArray_API[82])
 
 extern "C"
 PyObject* newinit(PyObject* self, PyObject* args, PyObject* kwargs) {
@@ -1064,6 +1172,7 @@ PyObject* newinit(PyObject* self, PyObject* args, PyObject* kwargs) {
                     //printf("ufunc %s %d  to  %d  atype:%d  dtype:%d\n", ufunc_name, signature[2], out_dtype, atype, dtype);
 
                     // Check for problem with two int32 depending on OS
+                    // Consider calling PyArray_IsSameEnum
                     if (signature[0] >= 5 && signature[0] <= 10) {
                         if (out_dtype >= 5 && out_dtype <= 10) {
                             out_dtype = signature[0];
@@ -1258,6 +1367,86 @@ PyObject* newinit(PyObject* self, PyObject* args, PyObject* kwargs) {
             }
         }
 
+        // Conversion routines
+        int64_t num_dtypes = sizeof(dtypes) / sizeof(int);
+        for (int j = 0; j < num_dtypes; j++) {
+            int atypeSrc = convert_dtype_to_atop[dtypes[j]];
+            int srcdtype = dtypes[j];
+            npy_intp  dims[1] = { 10 };
+            PyArrayObject* pTemp=  AllocateNumpyArray(1, dims, srcdtype);
+            //PyArray_Descr* pSrcDtype = PyArray_DescrFromType(srcdtype);
+            PyArray_Descr* pSrcDtype = PyArray_DESCR(pTemp);
+
+            if (pSrcDtype) {
+
+                //
+                // typedef enum {
+                //    NPY_QUICKSORT = 0,
+                //        NPY_HEAPSORT = 1,
+                //        NPY_MERGESORT = 2,
+                //        NPY_STABLESORT = 2,
+                //} NPY_SORTKIND;
+                // typedef int (PyArray_SortFunc)(void *, npy_intp, void *);
+
+                for (int k = 0; k < 3; k++) {
+                    stSortFunc* pSort = &g_SortFuncLUT[k][atypeSrc];
+
+                    if (pSrcDtype->f->sort[k] != g_UFuncSortLUT[k][atypeSrc]) {
+                        LOGGING("Sort func %d  kind: %d\n", srcdtype, k);
+                        pSort->pOldFunc = pSrcDtype->f->sort[k];
+                        pSort->MaxThreads = 7;
+                        pSrcDtype->f->sort[k] = g_UFuncSortLUT[k][atypeSrc];
+                    }
+                }
+
+                for (int k = 0; k < 3; k++) {
+                    stArgSortFunc* pArgSort = &g_ArgSortFuncLUT[k][atypeSrc];
+
+                    if (pSrcDtype->f->argsort[k] != g_UFuncArgSortLUT[k][atypeSrc]) {
+                        LOGGING("ArgSort func %d  kind: %d\n", srcdtype, k);
+                        pArgSort->pOldFunc = pSrcDtype->f->argsort[k];
+                        pArgSort->MaxThreads = 7;
+                        pSrcDtype->f->argsort[k] = g_UFuncArgSortLUT[k][atypeSrc];
+                    }
+                }
+
+                //pSrcDtype->f.sort[NPY_MERGESORT] = NULL;
+
+
+                //for (int k = 0; k < num_dtypes; k++) {
+                //    PyArray_VectorUnaryFunc* castfunc;
+                //    int destdtype = dtypes[k];
+                //    castfunc = PyArray_GetCastFunc(pSrcDtype, destdtype);
+                //    if (castfunc) {
+                //        int atypeDest = convert_dtype_to_atop[destdtype];
+                //        PyVFuncGenericFunction pvf = g_UFuncConvertLUT[atypeSrc][atypeDest];
+                //        stConvertFunc* pConvert = &g_ConvertFuncLUT[atypeSrc][atypeDest];
+                //        pConvert->pOldFunc = castfunc;
+                //        pConvert->MaxThreads = 3;
+                //        // do not reregister
+                //        if (castfunc != pvf) {
+                //            // this routine does not work
+                //            //int result = PyArray_RegisterCastFunc(pSrcDtype, destdtype, pvf);
+                //            //printf("Got cast for %d to %d ---- %p %p\n", srcdtype, destdtype, castfunc, pSrcDtype->f->cast[destdtype]);
+                //            //pSrcDtype->f->fill = 
+                //            //pSrcDtype->f->getitem = NULL;
+                //            //pSrcDtype->f->castdict = NULL;
+                //            //pSrcDtype->f->cancastto = NULL;
+                //            //if (result != 0) {
+                //            //    printf("Register cast fail for %d to %d\n", srcdtype, destdtype);
+                //            //}
+                //        }
+                //        else {
+                //            printf("Fail register cast for %d to %d\n", srcdtype, destdtype);
+
+                //        }
+                //    }
+                //}
+            }
+            //Py_DECREF(pSrcDtype);
+            
+            //Py_DECREF(arr);
+        }
         RETURN_NONE;
     }
 
