@@ -765,38 +765,36 @@ PyObject* PyArray_PTakeFrom(PyArrayObject* self0, PyObject* indices0, int axis,
         }
     }
 
-    max_item = PyArray_DIMS(self)[axis];
-    nelem = chunk;
-    itemsize = PyArray_ITEMSIZE(obj);
-    chunk = chunk * itemsize;
-    char* src = (char*)PyArray_DATA(self);
-    char* dest = (char*)PyArray_DATA(obj);
-    needs_refcounting = PyDataType_REFCHK(PyArray_DESCR(self));
-    npy_intp* indices_data = (npy_intp*)PyArray_DATA(indices);
+    {
 
-    if ((max_item == 0) && (PyArray_SIZE(obj) != 0)) {
-        /* Index error, since that is the usual error for raise mode */
-        PyErr_SetString(PyExc_IndexError,
-            "cannot do a non-empty take from an empty axes.");
-        goto fail;
+        max_item = PyArray_DIMS(self)[axis];
+        nelem = chunk;
+        itemsize = PyArray_ITEMSIZE(obj);
+        chunk = chunk * itemsize;
+        char* src = (char*)PyArray_DATA(self);
+        char* dest = (char*)PyArray_DATA(obj);
+        needs_refcounting = PyDataType_REFCHK(PyArray_DESCR(self));
+        npy_intp* indices_data = (npy_intp*)PyArray_DATA(indices);
+
+        if (!((max_item == 0) && (PyArray_SIZE(obj) != 0))) {
+
+            if (!npy_fasttake(
+                dest, src, indices_data, n, m, max_item, nelem, chunk,
+                clipmode, itemsize, needs_refcounting, dtype, axis) < 0) {
+
+                Py_XDECREF(indices);
+                Py_XDECREF(self);
+                if (out != NULL && out != obj) {
+                    Py_INCREF(out);
+                    PyArray_ResolveWritebackIfCopy(obj);
+                    Py_DECREF(obj);
+                    obj = out;
+                }
+                // success
+                return (PyObject*)obj;
+            }
+        }
     }
-
-    if (npy_fasttake(
-        dest, src, indices_data, n, m, max_item, nelem, chunk,
-        clipmode, itemsize, needs_refcounting, dtype, axis) < 0) {
-        goto fail;
-    }
-
-    Py_XDECREF(indices);
-    Py_XDECREF(self);
-    if (out != NULL && out != obj) {
-        Py_INCREF(out);
-        PyArray_ResolveWritebackIfCopy(obj);
-        Py_DECREF(obj);
-        obj = out;
-    }
-    return (PyObject*)obj;
-
 fail:
     PyArray_DiscardWritebackIfCopy(obj);
     Py_XDECREF(obj);
