@@ -109,6 +109,8 @@ setup(
                      'src/pnumpy/conversions.cpp',
                      'src/pnumpy/recycler.cpp',
                      'src/pnumpy/sorting.cpp',
+                     'src/pnumpy/arange.cpp',
+                     'src/pnumpy/item_selection.cpp',
                      'src/atop/atop.cpp',
                      'src/atop/threads.cpp',
                      'src/atop/recarray.cpp',

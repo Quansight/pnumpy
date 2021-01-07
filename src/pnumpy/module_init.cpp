@@ -100,7 +100,7 @@ static PyModuleDef moduledef = {
    NULL                                  // freefunc
 };
 
-extern "C" PyMODINIT_FUNC PyInit__pnumpy(void) {
+PyMODINIT_FUNC PyInit__pnumpy(void) {
     PyObject *module;
 
     module = PyModule_Create(&moduledef);

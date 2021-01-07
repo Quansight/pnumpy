@@ -2,7 +2,14 @@
 
 #define LOGGING(...)
 
-
+// TODO: look at casting in ndarraytypes.h, convert_datatype.c
+//NPY_NO_EXPORT PyArray_VectorUnaryFunc*
+//PyArray_GetCastFunc(PyArray_Descr* descr, int type_num)
+//{
+//    PyArray_VectorUnaryFunc* castfunc = NULL;
+//
+//    if (type_num < NPY_NTYPES_ABI_COMPATIBLE) {
+//        castfunc = descr->f->cast[type_num];
 
 //-----------------------------------
 // Converts (in parallel) a numpy recarray (void type)
@@ -92,5 +99,4 @@ recarray_to_colmajor(PyObject* self, PyObject* args) {
 
     RETURN_NONE;
 }
-
 

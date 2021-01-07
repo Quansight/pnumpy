@@ -520,6 +520,11 @@ extern "C" PyObject* sort(PyObject* self, PyObject* args, PyObject* kwargs) {
     int dtype = PyArray_TYPE(inArrValues);
 
     // TODO: if we get TIMEDELTA, can we convert that to int64?
+    // TODO: for object ...PyArray_CompareFunc *cmp = PyArray_DESCR(arr)->f->compare;
+    // PyArray_CompareFunc *cmp, PyArrayObject *py_arr
+    // cmp(arr + (*pi) * len, arr + (*(pi + 1)) * len, py_arr) <= 0
+    // To change a descr type function
+    // PyArray_DESCR(mps[j])->f->argsort[NPY_STABLESORT]
     int atype = dtype_to_atop(dtype);
     if (atype == -1 || (atype > ATOP_LONGDOUBLE && (atype != ATOP_STRING && atype != ATOP_UNICODE && atype != ATOP_HALF_FLOAT))) {
         PyErr_Format(PyExc_ValueError, "Sort cannot handle type %d\n", dtype);
