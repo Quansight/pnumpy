@@ -238,6 +238,7 @@ class BenchUtil:
         Set the number of worker threads used by pnumpy; if set to zero/None,
         disables threading.
         """
+        pnumpy.initialize()
         if num_threads is not None and num_threads > 0:
             pnumpy.thread_enable()
             pnumpy.thread_setworkers(num_threads)
