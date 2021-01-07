@@ -25,15 +25,15 @@ See the [full documentation](https://quansight.github.io/numpy-threading-extensi
 To use the project:
 
 ```python
-    import pnumpy
-    pnumpy.initialize()
+import pnumpy
+pnumpy.initialize()
 ```
 
 ## Development
 
-To run all the tests run::
+To run all the tests run:
 
 ```
-    python -m pip install pytest
-    python -m pytest tests
+python -m pip install pytest
+python -m pytest tests
 ```
