@@ -56,7 +56,7 @@ int convert_atop_to_itemsize[] = {
 // Helper function, converts numpy dtype to atop type
 // return -1 on failure
 int dtype_to_atop(int dtype) {
-    if (dtype >= 0 && dtype < sizeof(convert_dtype_to_atop)) {
+    if (dtype >= 0 && dtype < (int)sizeof(convert_dtype_to_atop)) {
         return convert_dtype_to_atop[dtype];
     }
     return -1;
