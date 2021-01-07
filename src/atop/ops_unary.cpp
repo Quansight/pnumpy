@@ -765,8 +765,7 @@ static inline void UnaryInfFastFloat(MathFunctionPtr MATH_OP, void* pDataIn, voi
         float* pDataInX = (float*)pSrc1Fast;
         int8_t* pDataOutX = (int8_t*)pDestFast;
         while (pDataOutX < pEnd) {
-            *pDataOutX++ = MATH_OP(*pDataInX);
-            pDataInX++;
+            *pDataOutX++ = MATH_OP(*pDataInX++);
         }
         return;
     }
@@ -777,52 +776,6 @@ static inline void UnaryInfFastFloat(MathFunctionPtr MATH_OP, void* pDataIn, voi
         pOut = STRIDE_NEXT(bool, pOut, strideOut);
         pIn = STRIDE_NEXT(T, pIn, strideIn);
     }
-
-
-    //T* pIn = (T*)pDataIn;
-    //bool* pOut = (bool*)pDataOut;
-    //bool* pLastOut = (bool*)((char*)pOut + (strideOut * len));
-
-    //int64_t chunkSize = sizeof(U256) / sizeof(T);
-
-    //if (sizeof(bool) == strideOut && sizeof(T) == strideIn && len >= chunkSize) {
-    //    bool* pEnd = &pOut[chunkSize * (len / chunkSize)];
-    //    int64_t* pEnd_i64 = (int64_t*)pEnd;
-
-    //    U256* pIn1_256 = (U256*)pDataIn;
-    //    int64_t* pOut_i64 = (int64_t*)pDataOut;
-
-    //    // Positive infinity is represented by the bit pattern 7F800000
-    //    // Negative infinity is represented by the bit pattern FF800000
-    //    uint32_t posinf = 0x7F800000;
-    //    uint32_t neginf = 0xFF800000;
-    //    const __m256 m_infinitecomp1 = _mm256_castsi256_ps(_mm256_set1_epi32(posinf));
-    //    const __m256 m_infinitecomp2 = _mm256_castsi256_ps(_mm256_set1_epi32(neginf));
-
-    //    while (pOut_i64 < pEnd_i64) {
-    //        U256 m0 = LOADU(pIn1_256);
-    //        pIn1_256++;
-
-    //        // TODO: to make this faster look at float32 compare
-    //        __m256 m1 = _mm256_cmp_ps(m0, m_infinitecomp1, _CMP_EQ_OQ);
-    //        __m256 m2 = _mm256_cmp_ps(m0, m_infinitecomp2, _CMP_EQ_OQ);
-    //        m1 = _mm256_castsi256_ps(_mm256_or_si256(_mm256_castps_si256(m1), _mm256_castps_si256(m2)));
-
-    //        int32_t bitmask = _mm256_movemask_ps(m1);
-    //        *pOut_i64++ = gBooleanLUT64[bitmask & 255];
-    //    }
-
-    //    // update thin pointers to last location of wide pointers
-    //    pIn = (T*)pIn1_256;
-    //    pOut = (bool*)pOut_i64;
-    //}
-
-    //// Slow loop, handle 1 at a time
-    //while (pOut != pLastOut) {
-    //    *pOut = MATH_OP(*pIn);
-    //    pOut = STRIDE_NEXT(bool, pOut, strideOut);
-    //    pIn = STRIDE_NEXT(T, pIn, strideIn);
-    //}
 }
 
 
@@ -837,6 +790,7 @@ static inline void UnaryInfFastDouble(MathFunctionPtr MATH_OP, void* pDataIn, vo
     bool* pLastOut = (bool*)((char*)pOut + (strideOut * len));
 
     int64_t chunkSize = sizeof(U256) / sizeof(T);
+
     if (sizeof(bool) == strideOut && sizeof(T) == strideIn && len >= chunkSize) {
         bool* pEnd = &pOut[chunkSize * (len / chunkSize)];
         int32_t* pEnd_i32 = (int32_t*)pEnd;
@@ -844,16 +798,15 @@ static inline void UnaryInfFastDouble(MathFunctionPtr MATH_OP, void* pDataIn, vo
         U256* pIn1_256 = (U256*)pDataIn;
         int32_t* pOut_i32 = (int32_t*)pDataOut;
 
-
         // Positive infinity is represented by the bit pattern 7FF0000000000000
         // Negative infinity is represented by the bit pattern FFF0000000000000
         uint64_t posinf = 0x7FF0000000000000;
         uint64_t neginf = 0xFFF0000000000000;
-        const __m256d m_infinitecomp1 = _mm256_set1_pd(*(double*)posinf);
-        const __m256d m_infinitecomp2 = _mm256_set1_pd(*(double*)neginf);
+        const __m256d m_infinitecomp1 = _mm256_set1_pd(*(double*)&posinf);
+        const __m256d m_infinitecomp2 = _mm256_set1_pd(*(double*)&neginf);
 
         while (pOut_i32 < pEnd_i32) {
-            U256 m0 = LOADU(pIn1_256);
+            U256 m0 = _mm256_loadu_pd((double*)pIn1_256);
             pIn1_256++;
 
             __m256d m1 = _mm256_cmp_pd(m0, m_infinitecomp1, _CMP_EQ_OQ);
@@ -883,7 +836,6 @@ static inline void UnaryInfFastDouble(MathFunctionPtr MATH_OP, void* pDataIn, vo
 // MathOp operation to perform
 template<typename T, typename U256, typename MathFunctionPtr>
 static inline void UnaryNotFiniteFastFloat(MathFunctionPtr MATH_OP, void* pDataIn, void* pDataOut, int64_t len, int64_t strideIn, int64_t strideOut) {
-    printf("not finite\n");
     T* pIn = (T*)pDataIn;
     bool* pOut = (bool*)pDataOut;
     bool* pLastOut = (bool*)((char*)pOut + (strideOut * len));
