@@ -722,8 +722,168 @@ static inline void UnaryFiniteFastDouble(MathFunctionPtr MATH_OP, void* pDataIn,
 // T = data type as input
 // MathOp operation to perform
 template<typename T, typename U256, typename MathFunctionPtr>
-static inline void UnaryNotFiniteFastFloat(MathFunctionPtr MATH_OP, void* pDataIn, void* pDataOut, int64_t len, int64_t strideIn, int64_t strideOut) {
+static inline void UnaryInfFastFloat(MathFunctionPtr MATH_OP, void* pDataIn, void* pDataOut, int64_t len, int64_t strideIn, int64_t strideOut) {
 
+    T* pIn = (T*)pDataIn;
+    bool* pOut = (bool*)pDataOut;
+    bool* pLastOut = (bool*)((char*)pOut + (strideOut * len));
+
+    // Loops unrolled 4 times, 4 * 8 = 32
+    int64_t chunkSize = 32; // sizeof(U256) / sizeof(T);
+
+    if (sizeof(bool) == strideOut && sizeof(T) == strideIn) {
+        // Positive infinity is represented by the bit pattern 7F800000
+        // Negative infinity is represented by the bit pattern FF800000
+        uint32_t posinf = 0x7F800000;
+        uint32_t neginf = 0xFF800000;
+        const __m256 m_infinitecomp1 = _mm256_castsi256_ps(_mm256_set1_epi32(posinf));
+        const __m256 m_infinitecomp2 = _mm256_castsi256_ps(_mm256_set1_epi32(neginf));
+
+        const __m256* pSrc1Fast = (const __m256*)pDataIn;
+        __m256i* pDestFast = (__m256i*)pDataOut;
+        int8_t* pEnd = (int8_t*)pDataOut + len;
+
+        __m256i* pDestFastEnd = &pDestFast[len / 32];
+        while (pDestFast != pDestFastEnd) {
+            // the shuffle will move all 8 comparisons together
+            __m256 m0 = _mm256_loadu_ps((const float*)(pSrc1Fast + 0));
+            __m256i m10 = _mm256_or_si256(_mm256_castps_si256(_mm256_cmp_ps(m0, m_infinitecomp1, _CMP_EQ_OQ)), _mm256_castps_si256(_mm256_cmp_ps(m0, m_infinitecomp2, _CMP_EQ_OQ)));
+            m0 = _mm256_loadu_ps((const float*)(pSrc1Fast + 1));
+            __m256i m11 = _mm256_or_si256(_mm256_castps_si256(_mm256_cmp_ps(m0, m_infinitecomp1, _CMP_EQ_OQ)), _mm256_castps_si256(_mm256_cmp_ps(m0, m_infinitecomp2, _CMP_EQ_OQ)));
+            m10 = _mm256_packs_epi32(m10, m11);
+            m0 = _mm256_loadu_ps((const float*)(pSrc1Fast + 2));
+            __m256i m12 = _mm256_or_si256(_mm256_castps_si256(_mm256_cmp_ps(m0, m_infinitecomp1, _CMP_EQ_OQ)), _mm256_castps_si256(_mm256_cmp_ps(m0, m_infinitecomp2, _CMP_EQ_OQ)));
+            m0 = _mm256_loadu_ps((const float*)(pSrc1Fast + 3));
+            __m256i m13 = _mm256_or_si256(_mm256_castps_si256(_mm256_cmp_ps(m0, m_infinitecomp1, _CMP_EQ_OQ)), _mm256_castps_si256(_mm256_cmp_ps(m0, m_infinitecomp2, _CMP_EQ_OQ)));
+            m12 = _mm256_packs_epi32(m12, m13);
+            m10 = _mm256_packs_epi16(m10, m12);
+            STOREU(pDestFast, _mm256_and_si256(_mm256_permutevar8x32_epi32(m10, g_permute), g_ones));
+            pSrc1Fast += 4;
+            pDestFast++;
+        }
+
+        float* pDataInX = (float*)pSrc1Fast;
+        int8_t* pDataOutX = (int8_t*)pDestFast;
+        while (pDataOutX < pEnd) {
+            *pDataOutX++ = MATH_OP(*pDataInX);
+            pDataInX++;
+        }
+        return;
+    }
+
+    // Slow loop, handle 1 at a time
+    while (pOut != pLastOut) {
+        *pOut = MATH_OP(*pIn);
+        pOut = STRIDE_NEXT(bool, pOut, strideOut);
+        pIn = STRIDE_NEXT(T, pIn, strideIn);
+    }
+
+
+    //T* pIn = (T*)pDataIn;
+    //bool* pOut = (bool*)pDataOut;
+    //bool* pLastOut = (bool*)((char*)pOut + (strideOut * len));
+
+    //int64_t chunkSize = sizeof(U256) / sizeof(T);
+
+    //if (sizeof(bool) == strideOut && sizeof(T) == strideIn && len >= chunkSize) {
+    //    bool* pEnd = &pOut[chunkSize * (len / chunkSize)];
+    //    int64_t* pEnd_i64 = (int64_t*)pEnd;
+
+    //    U256* pIn1_256 = (U256*)pDataIn;
+    //    int64_t* pOut_i64 = (int64_t*)pDataOut;
+
+    //    // Positive infinity is represented by the bit pattern 7F800000
+    //    // Negative infinity is represented by the bit pattern FF800000
+    //    uint32_t posinf = 0x7F800000;
+    //    uint32_t neginf = 0xFF800000;
+    //    const __m256 m_infinitecomp1 = _mm256_castsi256_ps(_mm256_set1_epi32(posinf));
+    //    const __m256 m_infinitecomp2 = _mm256_castsi256_ps(_mm256_set1_epi32(neginf));
+
+    //    while (pOut_i64 < pEnd_i64) {
+    //        U256 m0 = LOADU(pIn1_256);
+    //        pIn1_256++;
+
+    //        // TODO: to make this faster look at float32 compare
+    //        __m256 m1 = _mm256_cmp_ps(m0, m_infinitecomp1, _CMP_EQ_OQ);
+    //        __m256 m2 = _mm256_cmp_ps(m0, m_infinitecomp2, _CMP_EQ_OQ);
+    //        m1 = _mm256_castsi256_ps(_mm256_or_si256(_mm256_castps_si256(m1), _mm256_castps_si256(m2)));
+
+    //        int32_t bitmask = _mm256_movemask_ps(m1);
+    //        *pOut_i64++ = gBooleanLUT64[bitmask & 255];
+    //    }
+
+    //    // update thin pointers to last location of wide pointers
+    //    pIn = (T*)pIn1_256;
+    //    pOut = (bool*)pOut_i64;
+    //}
+
+    //// Slow loop, handle 1 at a time
+    //while (pOut != pLastOut) {
+    //    *pOut = MATH_OP(*pIn);
+    //    pOut = STRIDE_NEXT(bool, pOut, strideOut);
+    //    pIn = STRIDE_NEXT(T, pIn, strideIn);
+    //}
+}
+
+
+//-------------------------------------------------------------------
+// T = data type as input
+// MathOp operation to perform
+template<typename T, typename U256, typename MathFunctionPtr>
+static inline void UnaryInfFastDouble(MathFunctionPtr MATH_OP, void* pDataIn, void* pDataOut, int64_t len, int64_t strideIn, int64_t strideOut) {
+
+    T* pIn = (T*)pDataIn;
+    bool* pOut = (bool*)pDataOut;
+    bool* pLastOut = (bool*)((char*)pOut + (strideOut * len));
+
+    int64_t chunkSize = sizeof(U256) / sizeof(T);
+    if (sizeof(bool) == strideOut && sizeof(T) == strideIn && len >= chunkSize) {
+        bool* pEnd = &pOut[chunkSize * (len / chunkSize)];
+        int32_t* pEnd_i32 = (int32_t*)pEnd;
+
+        U256* pIn1_256 = (U256*)pDataIn;
+        int32_t* pOut_i32 = (int32_t*)pDataOut;
+
+
+        // Positive infinity is represented by the bit pattern 7FF0000000000000
+        // Negative infinity is represented by the bit pattern FFF0000000000000
+        uint64_t posinf = 0x7FF0000000000000;
+        uint64_t neginf = 0xFFF0000000000000;
+        const __m256d m_infinitecomp1 = _mm256_set1_pd(*(double*)posinf);
+        const __m256d m_infinitecomp2 = _mm256_set1_pd(*(double*)neginf);
+
+        while (pOut_i32 < pEnd_i32) {
+            U256 m0 = LOADU(pIn1_256);
+            pIn1_256++;
+
+            __m256d m1 = _mm256_cmp_pd(m0, m_infinitecomp1, _CMP_EQ_OQ);
+            __m256d m2 = _mm256_cmp_pd(m0, m_infinitecomp2, _CMP_EQ_OQ);
+            m1 = _mm256_castsi256_pd(_mm256_or_si256(_mm256_castpd_si256(m1), _mm256_castpd_si256(m2)));
+
+            int32_t bitmask = _mm256_movemask_pd(m1);
+            *pOut_i32++ = gBooleanLUT32[bitmask & 15];
+        }
+
+        // update thin pointers to last location of wide pointers
+        pIn = (T*)pIn1_256;
+        pOut = (bool*)pOut_i32;
+    }
+
+    // Slow loop, handle 1 at a time
+    while (pOut != pLastOut) {
+        *pOut = MATH_OP(*pIn);
+        pOut = STRIDE_NEXT(bool, pOut, strideOut);
+        pIn = STRIDE_NEXT(T, pIn, strideIn);
+    }
+}
+
+
+//-------------------------------------------------------------------
+// T = data type as input
+// MathOp operation to perform
+template<typename T, typename U256, typename MathFunctionPtr>
+static inline void UnaryNotFiniteFastFloat(MathFunctionPtr MATH_OP, void* pDataIn, void* pDataOut, int64_t len, int64_t strideIn, int64_t strideOut) {
+    printf("not finite\n");
     T* pIn = (T*)pDataIn;
     bool* pOut = (bool*)pDataOut;
     bool* pLastOut = (bool*)((char*)pOut + (strideOut * len));
@@ -1117,6 +1277,13 @@ template<typename T, typename U256> static inline void UnaryOpFast_FINITEF64(voi
     return UnaryFiniteFastDouble<T, U256, const bool(*)(T)>(ISFINITE_OP<T>, pDataIn1, pDataOut, len, strideIn, strideOut);
 }
 
+template<typename T, typename U256> static inline void UnaryOpFast_INF32(void* pDataIn1, void* pDataOut, int64_t len, int64_t strideIn, int64_t strideOut) {
+    return UnaryInfFastFloat<T, U256, const bool(*)(T)>(ISINF_OP<T>, pDataIn1, pDataOut, len, strideIn, strideOut);
+}
+template<typename T, typename U256> static inline void UnaryOpFast_INF64(void* pDataIn1, void* pDataOut, int64_t len, int64_t strideIn, int64_t strideOut) {
+    return UnaryInfFastDouble<T, U256, const bool(*)(T)>(ISINF_OP<T>, pDataIn1, pDataOut, len, strideIn, strideOut);
+}
+
 template<typename T, typename U256> static inline void UnaryOpFast_NOTFINITEF32(void* pDataIn1, void* pDataOut, int64_t len, int64_t strideIn, int64_t strideOut) {
     return UnaryNotFiniteFastFloat<T, U256, const bool(*)(T)>(ISNOTFINITE_OP<T>, pDataIn1, pDataOut, len, strideIn, strideOut);
 }
@@ -1238,7 +1405,16 @@ UNARY_FUNC GetUnaryOpSlow(int func, int atopInType1, int* wantedOutType) {
         //case ATOP_UINT8:      return UnaryOpSlow_ISNOTINVALID<uint8_t>;
         //case ATOP_INT16:      return UnaryOpSlow_ISNOTINVALID<int16_t>;
         //case ATOP_UINT16:     return UnaryOpSlow_ISNOTINVALID<uint16_t>;
-        default: return UnaryOpSlow_FillTrue;
+        case ATOP_INT32:
+        case ATOP_UINT32:
+        case ATOP_INT64:
+        case ATOP_UINT64:
+        case ATOP_BOOL:
+        case ATOP_INT8:
+        case ATOP_UINT8:
+        case ATOP_INT16:
+        case ATOP_UINT16:
+            return UnaryOpSlow_FillTrue;
         }
         break;
 
@@ -1250,16 +1426,25 @@ UNARY_FUNC GetUnaryOpSlow(int func, int atopInType1, int* wantedOutType) {
         case ATOP_FLOAT:  return UnaryOpSlow_ISNOTFINITE<float>;
         case ATOP_DOUBLE: return UnaryOpSlow_ISNOTFINITE<double>;
         case ATOP_LONGDOUBLE: return UnaryOpSlow_ISNOTFINITE<long double>;
-        case ATOP_INT32:      return UnaryOpSlow_ISINVALID<int32_t>;
-        case ATOP_UINT32:     return UnaryOpSlow_ISINVALID<uint32_t>;
-        case ATOP_INT64:      return UnaryOpSlow_ISINVALID<int64_t>;
-        case ATOP_UINT64:     return UnaryOpSlow_ISINVALID<uint64_t>;
+        //case ATOP_INT32:      return UnaryOpSlow_ISINVALID<int32_t>;
+        //case ATOP_UINT32:     return UnaryOpSlow_ISINVALID<uint32_t>;
+        //case ATOP_INT64:      return UnaryOpSlow_ISINVALID<int64_t>;
+        //case ATOP_UINT64:     return UnaryOpSlow_ISINVALID<uint64_t>;
+        //case ATOP_BOOL:
+        //case ATOP_INT8:       return UnaryOpSlow_ISINVALID<int8_t>;
+        //case ATOP_UINT8:      return UnaryOpSlow_ISINVALID<uint8_t>;
+        //case ATOP_INT16:      return UnaryOpSlow_ISINVALID<int16_t>;
+        //case ATOP_UINT16:     return UnaryOpSlow_ISINVALID<uint16_t>;
+        case ATOP_INT32:
+        case ATOP_UINT32:
+        case ATOP_INT64:
+        case ATOP_UINT64:
         case ATOP_BOOL:
-        case ATOP_INT8:       return UnaryOpSlow_ISINVALID<int8_t>;
-        case ATOP_UINT8:      return UnaryOpSlow_ISINVALID<uint8_t>;
-        case ATOP_INT16:      return UnaryOpSlow_ISINVALID<int16_t>;
-        case ATOP_UINT16:     return UnaryOpSlow_ISINVALID<uint16_t>;
-        default: return UnaryOpSlow_FillTrue;
+        case ATOP_INT8:
+        case ATOP_UINT8:
+        case ATOP_INT16:
+        case ATOP_UINT16:
+            return UnaryOpSlow_FillTrue;
         }
         break;
 
@@ -1271,15 +1456,6 @@ UNARY_FUNC GetUnaryOpSlow(int func, int atopInType1, int* wantedOutType) {
         case ATOP_FLOAT:  return UnaryOpSlow_ISNAN<float>;
         case ATOP_DOUBLE: return UnaryOpSlow_ISNAN<double>;
         case ATOP_LONGDOUBLE: return UnaryOpSlow_ISNAN<long double>;
-        case ATOP_INT32:      return UnaryOpSlow_ISINVALID<int32_t>;
-        case ATOP_UINT32:     return UnaryOpSlow_ISINVALID<uint32_t>;
-        case ATOP_INT64:      return UnaryOpSlow_ISINVALID<int64_t>;
-        case ATOP_UINT64:     return UnaryOpSlow_ISINVALID<uint64_t>;
-        case ATOP_BOOL:
-        case ATOP_INT8:       return UnaryOpSlow_ISINVALID<int8_t>;
-        case ATOP_UINT8:      return UnaryOpSlow_ISINVALID<uint8_t>;
-        case ATOP_INT16:      return UnaryOpSlow_ISINVALID<int16_t>;
-        case ATOP_UINT16:     return UnaryOpSlow_ISINVALID<uint16_t>;
         // For when we have an invalid integer
         //case ATOP_INT32:      return UnaryOpSlow_ISINVALID<int32_t>;
         //case ATOP_UINT32:     return UnaryOpSlow_ISINVALID<uint32_t>;
@@ -1290,7 +1466,16 @@ UNARY_FUNC GetUnaryOpSlow(int func, int atopInType1, int* wantedOutType) {
         //case ATOP_UINT8:      return UnaryOpSlow_ISINVALID<uint8_t>;
         //case ATOP_INT16:      return UnaryOpSlow_ISINVALID<int16_t>;
         //case ATOP_UINT16:     return UnaryOpSlow_ISINVALID<uint16_t>;
-        default: return UnaryOpSlow_FillFalse;
+        case ATOP_INT32:
+        case ATOP_UINT32:
+        case ATOP_INT64:
+        case ATOP_UINT64:
+        case ATOP_BOOL:
+        case ATOP_INT8:
+        case ATOP_UINT8:
+        case ATOP_INT16:
+        case ATOP_UINT16:
+            return UnaryOpSlow_FillFalse;
         }
         break;
 
@@ -1312,7 +1497,6 @@ UNARY_FUNC GetUnaryOpSlow(int func, int atopInType1, int* wantedOutType) {
         case ATOP_INT16:      return UnaryOpSlow_ISINVALIDORZERO<int16_t>;
         case ATOP_UINT16:     return UnaryOpSlow_ISINVALIDORZERO<uint16_t>;
 
-        default: return UnaryOpSlow_FillFalse;
         }
         break;
 
@@ -1323,36 +1507,63 @@ UNARY_FUNC GetUnaryOpSlow(int func, int atopInType1, int* wantedOutType) {
         case ATOP_FLOAT:  return UnaryOpSlow_ISNOTNAN<float>;
         case ATOP_DOUBLE: return UnaryOpSlow_ISNOTNAN<double>;
         case ATOP_LONGDOUBLE: return UnaryOpSlow_ISNOTNAN<long double>;
-        case ATOP_INT32:      return UnaryOpSlow_ISNOTINVALID<int32_t>;
-        case ATOP_UINT32:     return UnaryOpSlow_ISNOTINVALID<uint32_t>;
-        case ATOP_INT64:      return UnaryOpSlow_ISNOTINVALID<int64_t>;
-        case ATOP_UINT64:     return UnaryOpSlow_ISNOTINVALID<uint64_t>;
+        //case ATOP_INT32:      return UnaryOpSlow_ISNOTINVALID<int32_t>;
+        //case ATOP_UINT32:     return UnaryOpSlow_ISNOTINVALID<uint32_t>;
+        //case ATOP_INT64:      return UnaryOpSlow_ISNOTINVALID<int64_t>;
+        //case ATOP_UINT64:     return UnaryOpSlow_ISNOTINVALID<uint64_t>;
+        //case ATOP_BOOL:
+        //case ATOP_INT8:       return UnaryOpSlow_ISNOTINVALID<int8_t>;
+        //case ATOP_UINT8:      return UnaryOpSlow_ISNOTINVALID<uint8_t>;
+        //case ATOP_INT16:      return UnaryOpSlow_ISNOTINVALID<int16_t>;
+        //case ATOP_UINT16:     return UnaryOpSlow_ISNOTINVALID<uint16_t>;
+        case ATOP_INT32:
+        case ATOP_UINT32:
+        case ATOP_INT64:
+        case ATOP_UINT64:
         case ATOP_BOOL:
-        case ATOP_INT8:       return UnaryOpSlow_ISNOTINVALID<int8_t>;
-        case ATOP_UINT8:      return UnaryOpSlow_ISNOTINVALID<uint8_t>;
-        case ATOP_INT16:      return UnaryOpSlow_ISNOTINVALID<int16_t>;
-        case ATOP_UINT16:     return UnaryOpSlow_ISNOTINVALID<uint16_t>;
-        default: return UnaryOpSlow_FillTrue;
+        case ATOP_INT8:
+        case ATOP_UINT8:
+        case ATOP_INT16:
+        case ATOP_UINT16:
+            return UnaryOpSlow_FillTrue;
         }
         break;
     case UNARY_OPERATION::ISINF:
         *wantedOutType = ATOP_BOOL;
         // Can only handle when output type is bool or not defined
         switch (atopInType1) {
-        case ATOP_FLOAT:  return UnaryOpSlow_ISINF<float>;
-        case ATOP_DOUBLE: return UnaryOpSlow_ISINF<double>;
-        case ATOP_LONGDOUBLE: return UnaryOpSlow_ISINF<long double>;
-        default: return UnaryOpSlow_FillFalse;
+        //case ATOP_FLOAT:  return UnaryOpSlow_ISINF<float>;
+        //case ATOP_DOUBLE: return UnaryOpSlow_ISINF<double>;
+        //case ATOP_LONGDOUBLE: return UnaryOpSlow_ISINF<long double>;
+        case ATOP_INT32:     
+        case ATOP_UINT32:    
+        case ATOP_INT64:     
+        case ATOP_UINT64:    
+        case ATOP_BOOL:
+        case ATOP_INT8:      
+        case ATOP_UINT8:     
+        case ATOP_INT16:     
+        case ATOP_UINT16:    
+            return UnaryOpSlow_FillFalse;
         }
         break;
     case UNARY_OPERATION::ISNOTINF:
         *wantedOutType = ATOP_BOOL;
         // Can only handle when output type is bool or not defined
         switch (atopInType1) {
-        case ATOP_FLOAT:  return UnaryOpSlow_ISNOTINF<float>;
-        case ATOP_DOUBLE: return UnaryOpSlow_ISNOTINF<double>;
-        case ATOP_LONGDOUBLE: return UnaryOpSlow_ISNOTINF<long double>;
-        default: return UnaryOpSlow_FillTrue;
+        //case ATOP_FLOAT:  return UnaryOpSlow_ISNOTINF<float>;
+        //case ATOP_DOUBLE: return UnaryOpSlow_ISNOTINF<double>;
+        //case ATOP_LONGDOUBLE: return UnaryOpSlow_ISNOTINF<long double>;
+        case ATOP_INT32:
+        case ATOP_UINT32:
+        case ATOP_INT64:
+        case ATOP_UINT64:
+        case ATOP_BOOL:
+        case ATOP_INT8:
+        case ATOP_UINT8:
+        case ATOP_INT16:
+        case ATOP_UINT16:
+            return UnaryOpSlow_FillTrue;
         }
         break;
     case UNARY_OPERATION::ISNORMAL:
@@ -1362,7 +1573,16 @@ UNARY_FUNC GetUnaryOpSlow(int func, int atopInType1, int* wantedOutType) {
         case ATOP_FLOAT:  return UnaryOpSlow_ISNORMAL<float>;
         case ATOP_DOUBLE: return UnaryOpSlow_ISNORMAL<double>;
         case ATOP_LONGDOUBLE: return UnaryOpSlow_ISNORMAL<long double>;
-        default: return UnaryOpSlow_FillTrue;
+        case ATOP_INT32:
+        case ATOP_UINT32:
+        case ATOP_INT64:
+        case ATOP_UINT64:
+        case ATOP_BOOL:
+        case ATOP_INT8:
+        case ATOP_UINT8:
+        case ATOP_INT16:
+        case ATOP_UINT16:
+            return UnaryOpSlow_FillTrue;
         }
         break;
     case UNARY_OPERATION::ISNOTNORMAL:
@@ -1372,7 +1592,16 @@ UNARY_FUNC GetUnaryOpSlow(int func, int atopInType1, int* wantedOutType) {
         case ATOP_FLOAT:  return UnaryOpSlow_ISNOTNORMAL<float>;
         case ATOP_DOUBLE: return UnaryOpSlow_ISNOTNORMAL<double>;
         case ATOP_LONGDOUBLE: return UnaryOpSlow_ISNOTNORMAL<long double>;
-        default: return UnaryOpSlow_FillFalse;
+        case ATOP_INT32:
+        case ATOP_UINT32:
+        case ATOP_INT64:
+        case ATOP_UINT64:
+        case ATOP_BOOL:
+        case ATOP_INT8:
+        case ATOP_UINT8:
+        case ATOP_INT16:
+        case ATOP_UINT16:
+            return UnaryOpSlow_FillFalse;
         }
         break;
 
@@ -1488,6 +1717,14 @@ UNARY_FUNC GetUnaryOpFast(int func, int atopInType1, int* wantedOutType) {
         switch (atopInType1) {
         case ATOP_FLOAT:  return UnaryOpFast_FINITEF32<float, __m256>;
         case ATOP_DOUBLE: return UnaryOpFast_FINITEF64<double, __m256d>;
+        }
+        break;
+
+    case UNARY_OPERATION::ISINF:
+        *wantedOutType = ATOP_BOOL;
+        switch (atopInType1) {
+        case ATOP_FLOAT:  return UnaryOpFast_INF32<float, __m256>;
+        case ATOP_DOUBLE: return UnaryOpFast_INF64<double, __m256d>;
         }
         break;
 
