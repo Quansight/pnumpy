@@ -205,7 +205,7 @@ for name in dir(np):
 
 class BenchUtil:
     @staticmethod
-    def set_atop_thread_count(ufunc_name: str, elem_type: np.dtype, num_threads: Optional[int]) -> None:
+    def set_atop_thread_count(ufunc_name: str, elem_type: np.dtype, enabled: bool, num_threads: Optional[int]) -> None:
         """
         Set the number of worker threads used by atop for a given `ufunc_name`
         and `elem_type` to `num_threads`. If num_threads is set to zero/None,
@@ -221,17 +221,19 @@ class BenchUtil:
         if isinstance(elem_type, (str, type)):
             elem_type = np.dtype(elem_type)
 
-        if num_threads and num_threads > 0:
+        if enabled:
             pnumpy.atop_enable()
+
             # Current implementation in atop requires the number of threads to be set
             # after calling atop_enable(), otherwise setting the number of worker threads
             # doesn't have any effect.
             if not pnumpy.atop_setworkers(ufunc_name, elem_type.num, num_threads):
                 # TODO: Call failed, should probably raise an exception or at least log it.
                 pass
+
         else:
             pnumpy.atop_disable()
-
+            
     @staticmethod
     def set_pnumpy_thread_count(num_threads: Optional[int]) -> None:
         """
@@ -294,14 +296,15 @@ for _ufunc_name in ufuncs:
             """
             return self.target_ufunc
 
-        def setup(self, rank, input_dtype: str, nthreads: int, atop):
+        def setup(self, rank, input_dtype: str, nthreads: int, atop: bool):
             np.seterr(all='ignore')
 
             # Configure threading layer.
             BenchUtil.set_pnumpy_thread_count(nthreads)
             BenchUtil.set_atop_thread_count(self.ufunc_obj.__name__,
                                             np.dtype(input_dtype),
-                                            nthreads if atop else None,
+                                            atop,
+                                            nthreads,
                                            )
 
             try:
@@ -351,7 +354,7 @@ for _ufunc_name in ufuncs:
             # Disable threading / revert to 'off' state.
             BenchUtil.set_pnumpy_thread_count(None)
             BenchUtil.set_atop_thread_count(self.ufunc_obj.__name__,
-                                            np.dtype(input_dtype), None)
+                                            np.dtype(input_dtype), False, None)
 
             # TODO: Undo the np.seterr(all='ignore') call made in the setup()
             # function.
@@ -433,7 +436,7 @@ class BitwiseOps:
         # Configure threading layer.
         BenchUtil.set_pnumpy_thread_count(nthreads)
         for _ufunc_name in self._ufunc_names:
-            BenchUtil.set_atop_thread_count(_ufunc_name, np.dtype(input_dtype), (nthreads if atop else None))
+            BenchUtil.set_atop_thread_count(_ufunc_name, np.dtype(input_dtype), atop, nthreads)
 
         # Get the shape of the array to create based on the rank parameter.
         if rank == 1:
@@ -449,7 +452,7 @@ class BitwiseOps:
         # Disable threading / revert to 'off' state.
         BenchUtil.set_pnumpy_thread_count(None)
         for _ufunc_name in self._ufunc_names:
-            BenchUtil.set_atop_thread_count(_ufunc_name, np.dtype(input_dtype), None)
+            BenchUtil.set_atop_thread_count(_ufunc_name, np.dtype(input_dtype), False, None)
 
     def time_nonzero(self, _dummy1, _dummy2, _dummy3, _dummy4):
         # TODO: Does this need to switch between np and pnumpy/pn?
@@ -478,7 +481,7 @@ class CustomInplace:
         BenchUtil.set_pnumpy_thread_count(None)
         for _ufunc_name in self._ufunc_names:
             for _ufunc_dtype in self._ufunc_dtypes:
-                BenchUtil.set_atop_thread_count(_ufunc_name, np.dtype(_ufunc_dtype), None)
+                BenchUtil.set_atop_thread_count(_ufunc_name, np.dtype(_ufunc_dtype), False, None)
 
         self.c = np.ones(30_000_000, dtype=np.int8)
         self.i = np.ones(3_000_000, dtype=np.int32)
@@ -493,7 +496,7 @@ class CustomInplace:
         BenchUtil.set_pnumpy_thread_count(None)
         for _ufunc_name in self._ufunc_names:
             for _ufunc_dtype in self._ufunc_dtypes:
-                BenchUtil.set_atop_thread_count(_ufunc_name, np.dtype(_ufunc_dtype), None)
+                BenchUtil.set_atop_thread_count(_ufunc_name, np.dtype(_ufunc_dtype), False, None)
 
     def time_char_or(self):
         np.bitwise_or(self.c, 0, out=self.c)
@@ -536,7 +539,7 @@ class CustomScalar:
         BenchUtil.set_pnumpy_thread_count(None)
         for _ufunc_name in self._ufunc_names:
             for _ufunc_dtype in self.params:
-                BenchUtil.set_atop_thread_count(_ufunc_name, np.dtype(_ufunc_dtype), None)
+                BenchUtil.set_atop_thread_count(_ufunc_name, np.dtype(_ufunc_dtype), False, None)
 
         self.d = np.ones(7_000_000, dtype=dtype)
 
@@ -545,7 +548,7 @@ class CustomScalar:
         BenchUtil.set_pnumpy_thread_count(None)
         for _ufunc_name in self._ufunc_names:
             for _ufunc_dtype in self.params:
-                BenchUtil.set_atop_thread_count(_ufunc_name, np.dtype(_ufunc_dtype), None)
+                BenchUtil.set_atop_thread_count(_ufunc_name, np.dtype(_ufunc_dtype), False, None)
 
     def time_add_scalar2(self, dtype):
         np.add(self.d, 1)
