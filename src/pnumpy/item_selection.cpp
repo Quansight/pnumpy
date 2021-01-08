@@ -459,8 +459,23 @@ solve_may_share_memory(PyArrayObject* a, PyArrayObject* b)
     get_array_memory_extents(a, &start1, &end1, &size1);
     get_array_memory_extents(b, &start2, &end2, &size2);
 
+    // TODO: Come up with better logic
+    // This logic does not look correct.
     if (!(start1 < end2 && start2 < end1 && start1 < end1 && start2 < end2)) {
         /* Memory extents don't overlap */
+        return MEM_OVERLAP_NO;
+    }
+    if (start1 > end1) {
+        npy_uintp temp = start1;
+        start1 = end1;
+        end1 = temp;
+    }
+    if (start2 > end2) {
+        npy_uintp temp = start2;
+        start2 = end2;
+        end2 = temp;
+    }
+    if ((end1 < start2) || (start1 > end2)) {
         return MEM_OVERLAP_NO;
     }
 
@@ -778,9 +793,9 @@ PyObject* PyArray_PTakeFrom(PyArrayObject* self0, PyObject* indices0, int axis,
 
         if (!((max_item == 0) && (PyArray_SIZE(obj) != 0))) {
 
-            if (!npy_fasttake(
+            if (npy_fasttake(
                 dest, src, indices_data, n, m, max_item, nelem, chunk,
-                clipmode, itemsize, needs_refcounting, dtype, axis) < 0) {
+                clipmode, itemsize, needs_refcounting, dtype, axis) >= 0) {
 
                 Py_XDECREF(indices);
                 Py_XDECREF(self);
