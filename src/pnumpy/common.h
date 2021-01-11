@@ -40,7 +40,10 @@ enum OP_CATEGORY:int32_t {
     OPCAT_UNARY = 1,
     OPCAT_COMPARE = 2,
     OPCAT_TRIG = 3,
-    OPCAT_LAST = 4,
+    OPCAT_CONVERT = 4,
+    OPCAT_SORT = 5,
+    OPCAT_ARGSORT = 6,
+    OPCAT_LAST = 7,
 };
 
 struct stOpCategory {
@@ -91,6 +94,7 @@ extern int GetStridesAndContig(PyArrayObject* inArray, int& ndim, int64_t& strid
 extern stOpCategory gOpCategory[OPCAT_LAST];
 
 extern void LedgerRecord(int32_t op_category, int64_t start_time, int64_t end_time, char** args, const npy_intp* dimensions, const npy_intp* steps, void* innerloop, int funcop, int atype);
+extern void LedgerRecord2(int32_t op_category, int64_t start_time, int64_t end_time, int atype, int64_t length);
 extern void LedgerInit();
 extern int64_t CalcArrayLength(int ndim, npy_intp* dims);
 extern int64_t ArrayLength(PyArrayObject* inArr);

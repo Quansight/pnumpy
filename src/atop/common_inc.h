@@ -440,9 +440,9 @@ extern "C" void RecArrayToColMajor(
 //=====================================================================
 // Sorting
 enum SORT_MODE {
-    SORT_MODE_QSORT = 1,
+    SORT_MODE_QSORT = 0,
+    SORT_MODE_HEAP = 1,
     SORT_MODE_MERGE = 2,
-    SORT_MODE_HEAP = 3
 };
 
 extern "C" int64_t IsSorted(void* pDataIn1,int64_t arraySize1, int32_t arrayType1, int64_t itemSize);
