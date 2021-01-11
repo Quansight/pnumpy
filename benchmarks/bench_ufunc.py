@@ -263,9 +263,6 @@ for _ufunc_name in ufuncs:
         __slots__ = ('args', 'f', 'out')
 
         params = (
-            # array rank
-            [1, 2],
-
             # dtype
             # Parameterizing by dtype lets us easily see if some ufunc isn't being optimized for a
             # specific dtype, and to compare the performance of the ufunc across dtypes
@@ -282,11 +279,14 @@ for _ufunc_name in ufuncs:
             [0, 2, 4],
 
             # atop enabled?
-            [False, True]
+            [False, True],
+
+            # array rank
+            [1, 2],
 
             # TODO: Add parameter for array pooling ("recycling") on/off?
         )
-        param_names = ['rank', 'input_dtype', 'nthreads', 'atop']
+        param_names = ['input_dtype', 'nthreads', 'atop', 'rank']
         timeout = 10
 
         @property
@@ -296,7 +296,7 @@ for _ufunc_name in ufuncs:
             """
             return self.target_ufunc
 
-        def setup(self, rank, input_dtype: str, nthreads: int, atop: bool):
+        def setup(self, input_dtype: str, nthreads: int, atop: bool, rank: int):
             np.seterr(all='ignore')
 
             # Configure threading layer.
@@ -350,7 +350,7 @@ for _ufunc_name in ufuncs:
 
             self.args = arg
 
-        def teardown(self, rank, input_dtype, nthreads, atop):
+        def teardown(self, input_dtype, nthreads, atop, rank):
             # Disable threading / revert to 'off' state.
             BenchUtil.set_pnumpy_thread_count(None)
             BenchUtil.set_atop_thread_count(self.ufunc_obj.__name__,
@@ -389,9 +389,6 @@ class BitwiseOps:
 
     # TODO: Define parameters for dtype, threads, array rank, array_pooling.
     params = (
-        # array rank
-        [1, 2],
-
         # dtype
         # Parameterizing by dtype lets us easily see if some ufunc isn't being optimized for a
         # specific dtype, and to compare the performance of the ufunc across dtypes
@@ -408,15 +405,18 @@ class BitwiseOps:
         [0, 2, 4],
 
         # atop enabled?
-        [False, True]
+        [False, True],
+
+        # array rank
+        [1, 2],
 
         # TODO: Add parameter for array pooling ("recycling") on/off?
     )
-    param_names = ['rank', 'input_dtype', 'nthreads', 'atop']
+    param_names = ['input_dtype', 'nthreads', 'atop', 'rank']
     timeout = 10
 
 
-    def setup(self, rank, input_dtype: str, nthreads: int, atop):
+    def setup(self, input_dtype: str, nthreads: int, atop, rank: int):
         # TODO: Increase array size; perhaps also add a parameter to vary the
         #       array size; may also want to cache the created arrays (and
         #       maybe clean them up / purge the cache during fixture teardown).
@@ -448,7 +448,7 @@ class BitwiseOps:
 
         self.b = get_shaped_ones(b_shape, dtype=input_dtype)
 
-    def teardown(self, rank, input_dtype, nthreads, atop):
+    def teardown(self, input_dtype, nthreads, atop, rank):
         # Disable threading / revert to 'off' state.
         BenchUtil.set_pnumpy_thread_count(None)
         for _ufunc_name in self._ufunc_names:
