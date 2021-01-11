@@ -168,13 +168,27 @@ static stUFuncToAtop gTrigMapping[] = {
     {"log1p",         TRIG_OPERATION::LOG1P},
 };
 
+static stUFuncToAtop gConvertMapping[] = {
+    {"convert",           TRIG_OPERATION::SIN},
+};
+
+static stUFuncToAtop gSortMapping[] = {
+    {"sort",           TRIG_OPERATION::SIN},
+};
+
+static stUFuncToAtop gArgSortMapping[] = {
+    {"argsort",           TRIG_OPERATION::SIN},
+};
 
 // Global table lookup to get to all loops, used by ledger
 stOpCategory gOpCategory[OP_CATEGORY::OPCAT_LAST] = {
     {"Binary", sizeof(gBinaryMapping) / sizeof(stUFuncToAtop), OP_CATEGORY::OPCAT_BINARY, gBinaryMapping},
     {"Unary", sizeof(gUnaryMapping) / sizeof(stUFuncToAtop), OP_CATEGORY::OPCAT_UNARY, gUnaryMapping},
     {"Compare", sizeof(gCompareMapping) / sizeof(stUFuncToAtop), OP_CATEGORY::OPCAT_COMPARE, gCompareMapping},
-    {"TrigLog", sizeof(gTrigMapping) / sizeof(stUFuncToAtop), OP_CATEGORY::OPCAT_TRIG, gTrigMapping}
+    {"TrigLog", sizeof(gTrigMapping) / sizeof(stUFuncToAtop), OP_CATEGORY::OPCAT_TRIG, gTrigMapping},
+    {"Convert", sizeof(gConvertMapping) / sizeof(stUFuncToAtop), OP_CATEGORY::OPCAT_CONVERT, gConvertMapping},
+    {"Sort", sizeof(gSortMapping) / sizeof(stUFuncToAtop), OP_CATEGORY::OPCAT_SORT, gSortMapping},
+    {"ArgSort", sizeof(gArgSortMapping) / sizeof(stUFuncToAtop), OP_CATEGORY::OPCAT_ARGSORT, gArgSortMapping},
 };
 
 // Python dictionary keeping track of all functions we hook
@@ -293,7 +307,7 @@ stSettings g_Settings = { 1, 0, 0, 0, 0 };
 
 // Macro used just after ufunc call returns
 #define LEDGER_END(_cat_) g_Settings.LedgerEnabled = 1; LedgerRecord(_cat_, ledgerStartTime, (int64_t)__rdtsc(), args, dimensions, steps, innerloop, funcop, atype);
-
+#define LEDGER_END2(_cat_) g_Settings.LedgerEnabled = 1; LedgerRecord2(_cat_, ledgerStartTime, (int64_t)__rdtsc(), atype, length);
 
 //------------------------------------------------------------------------------
 //  Concurrent callback from multiple threads
@@ -741,8 +755,8 @@ static void AtopBinaryMathFunction(char** args, const npy_intp* dimensions, cons
 };
 
 
-// For binary math functions like add, sbutract, multiply.
-// 2 inputs and 1 output
+//=============================================================
+// All simple compare functions that we hook hit this routine
 static void AtopCompareMathFunction(char** args, const npy_intp* dimensions, const npy_intp* steps, void* innerloop, int funcop, int atype) {
     if (!g_Settings.LedgerEnabled) {
         // LOGGING("comparison called with %d %d   funcp: %p  len: %lld\n", funcop, atype, g_CompFuncLUT[funcop][atype].pOldFunc, (long long)dimensions[0]);
@@ -808,6 +822,8 @@ static void AtopCompareMathFunction(char** args, const npy_intp* dimensions, con
 
 
 
+//=============================================================
+// All simple unary math functions that we hook hit this routine
 // For unary math functions like abs, sqrt
 // 1 input and 1 output
 static void AtopUnaryMathFunction(char** args, const npy_intp* dimensions, const npy_intp* steps, void* innerloop, int funcop, int atype) {
@@ -871,6 +887,9 @@ static void AtopUnaryMathFunction(char** args, const npy_intp* dimensions, const
 };
 
 
+//=============================================================
+// All trig and log like function that we hook hit this routine
+//
 static void AtopTrigMathFunction(char** args, const npy_intp* dimensions, const npy_intp* steps, void* innerloop, int funcop, int atype) {
     if (!g_Settings.LedgerEnabled) {
         npy_intp n = dimensions[0];
@@ -932,13 +951,8 @@ static void AtopTrigMathFunction(char** args, const npy_intp* dimensions, const 
 };
 
 
-// PyArray_DESCR(inArrValues)->f.
-//NPY_NO_EXPORT int
-//PyArray_RegisterCastFunc(PyArray_Descr* descr, int totype,
-//PyArray_VectorUnaryFunc* castfunc)
-// typedef void (PyArray_VectorUnaryFunc)(void *, void *, npy_intp, void *,void*);
-//npycast_##From##_##To(void* from_, void* to_, npy_intp n, PyArrayObject* fromarr, PyArrayObject* toarr)
-// For scalar, fromarr can be NULL
+//=============================================================
+// This routine is not hoooked yet.  Waiting for get dtype_transfer function
 static void AtopConvertMathFunction(void* pDest, void* pSrc, npy_intp length, void* fromarr, void* toarr, int fromtype, int totype) {
     stConvertFunc* pConvert = &g_ConvertFuncLUT[fromtype][totype];
 
@@ -948,17 +962,75 @@ static void AtopConvertMathFunction(void* pDest, void* pSrc, npy_intp length, vo
     return pConvert->pOldFunc(pDest, pSrc, length, fromarr, toarr);
 }
 
-static int AtopSortMathFunction(void* pSrc, npy_intp length, void* pArrayObject, int sortkind, int atype) {
-    LOGGING("sort called %d %d   src:%p  dest:%p\n", sortkind, atype, pSrc, pArrayObject);
-    stSortFunc* pSortFunc = &g_SortFuncLUT[sortkind][atype];
-    return pSortFunc->pOldFunc(pSrc, length, pArrayObject);
+//=============================================================
+// All sort like functions that we hook hit this routine
+static int AtopSortMathFunction(void* pDest, npy_intp length, void* pArrayObject, int sortkind, int atype) {
+    //if (!pArrayObject)
+    //    printf("pArrayObject is null!\n");
+    LOGGING("sort called %d %d   dest:%p  dest:%p\n", sortkind, atype, pDest, PyArray_BYTES((PyArrayObject*)pArrayObject));
+    if (!g_Settings.LedgerEnabled) {
+        stSortFunc* pSortFunc = &g_SortFuncLUT[sortkind][atype];
+
+        if (g_Settings.AtopEnabled) {
+            PyArrayObject* pSrcObject = (PyArrayObject*)pArrayObject;
+
+            if (PyArray_NDIM(pSrcObject) == 1) {
+                if (sortkind < NPY_NSORTS) {
+                    int itemsize = convert_atop_to_itemsize[atype];
+
+                    // Make sure we can handle this
+                    if (PyArray_ITEMSIZE(pSrcObject) == itemsize && PyArray_STRIDE(pSrcObject, 1) ==itemsize) {
+                        SORT_MODE sortmode = (SORT_MODE)sortkind;
+                        int result =
+                            Sort(sortmode, atype, PyArray_BYTES(pSrcObject), ArrayLength(pSrcObject), PyArray_STRIDE(pSrcObject, 1), PyArray_ITEMSIZE(pSrcObject), pDest, PyArray_ITEMSIZE(pSrcObject));
+
+                        LOGGING("result is %d  %d   len: %lld\n", result, atype, length);
+                        if (result >= 0)
+                            return result;
+                    } 
+                }
+            }
+        }
+        LOGGING("punting sort! %d\n", sortkind);
+        // punt to old routine
+        return pSortFunc->pOldFunc(pDest, length, pArrayObject);
+    }
+    // Ledger is on, turn it off and call back to ourselves to time it    
+    LEDGER_START();
+    int result = AtopSortMathFunction(pDest, length, pArrayObject, sortkind, atype);
+    LEDGER_END2(OP_CATEGORY::OPCAT_SORT);
+    return result;
 }
 
+//=============================================================
+// All argsort like functions that we hook hit this routine
 static int AtopArgSortMathFunction(void* pValue, npy_intp* pInt64Buffer, npy_intp length, void* pArrayObject, int sortkind, int atype) {
     LOGGING("argsort called %d %d   src:%p\n", sortkind, atype, pValue);
-    stArgSortFunc* pArgSortFunc = &g_ArgSortFuncLUT[sortkind][atype];
-    return pArgSortFunc->pOldFunc(pValue, pInt64Buffer, length, pArrayObject);
+    if (!g_Settings.LedgerEnabled) {
+        stArgSortFunc* pArgSortFunc = &g_ArgSortFuncLUT[sortkind][atype];
+        if (g_Settings.AtopEnabled) {
+            PyArrayObject* pSrcObject = (PyArrayObject*)pArrayObject;
 
+            if (PyArray_NDIM(pSrcObject) == 1) {
+                int itemsize = convert_atop_to_itemsize[atype];
+
+                // Make sure we can handle this
+                if (PyArray_ITEMSIZE(pSrcObject) == itemsize && PyArray_STRIDE(pSrcObject, 1) == itemsize) {
+                    SORT_MODE sortmode = (SORT_MODE)sortkind;
+                    // TODO put our hook here
+
+                }
+
+            }
+        }
+        // punt to old routine
+        return pArgSortFunc->pOldFunc(pValue, pInt64Buffer, length, pArrayObject);
+    }
+    // Ledger is on, turn it off and call back to ourselves to time it    
+    LEDGER_START();
+    int result = AtopArgSortMathFunction(pValue, pInt64Buffer, length, pArrayObject, sortkind, atype);
+    LEDGER_END2(OP_CATEGORY::OPCAT_ARGSORT);
+    return result;
 }
 
 // the inclusion of this file is because there is no callback argument

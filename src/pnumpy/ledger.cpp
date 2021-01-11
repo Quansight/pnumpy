@@ -248,4 +248,27 @@ void LedgerRecord(int32_t op_category, int64_t start_time, int64_t end_time, cha
        
 }
 
+void LedgerRecord2(int32_t op_category, int64_t start_time, int64_t end_time, int atype, int64_t length) {
+    int64_t deltaTime = end_time - start_time;
+
+    stOpCategory* pstOpCategory = &gOpCategory[op_category];
+
+    // Get the next slot in the ring buffer
+    stLEDGER_ITEM* pEntry = g_LedgerRing.GetNextEntry();
+
+    pEntry->ArrayGroup = op_category;
+    pEntry->ArrayOp = 0;
+    pEntry->AType = atype;
+
+    const char* strCatName = pstOpCategory->StrName;
+
+    pEntry->StrCatName = strCatName;
+    pEntry->StrOpName = "ledger2";
+    pEntry->ArrayLength1 = length;
+    pEntry->ArrayLength2 = 0;
+
+    // temporary for debugging print out results
+    printf("%lld \tlen: %lld   %s,  %s,  %s\n", (long long)deltaTime, (long long)length, pEntry->StrOpName, gStrAtopTypes[atype], strCatName);
+
+}
 

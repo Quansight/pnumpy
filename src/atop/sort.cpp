@@ -46,8 +46,8 @@ FORCE_INLINE static int npy_get_msb(uint64_t unum)
 
 #define INTP_SWAP(_X_,_Y_) { auto temp=_X_; _X_=_Y_; _Y_=temp;}
 
-//#define T_SWAP(_X_, _Y_) { auto temp;  temp = _X_; _X_ = _Y_; _Y_ = temp; }
-#define T_SWAP(_X_, _Y_) std::swap(_X_,_Y_); 
+#define T_SWAP(_X_, _Y_) { auto temp= _X_; _X_ = _Y_; _Y_ = temp; }
+//#define T_SWAP(_X_, _Y_) std::swap(_X_,_Y_); 
 
 FORCE_INLINE static void STRING_SWAP(void* _X_, void* _Y_, int64_t len) {
     char* pSrc = (char*)_X_;
@@ -83,8 +83,14 @@ FORCE_INLINE static void STRING_COPY(void* _X_, void* _Y_, int64_t len) {
     }
 }
 
-// For floats anything compared to a nan will return 0
+// NOTE: For MSVS compiler DO NOT use /fp:fast (floating point fast as X==X will not work on Nans)
+//A signalling NaN (NANS) is represented by any bit pattern
+//between 7F800001 and 7FBFFFFF or between FF800001 and FFBFFFFF
+//A quiet NaN(NANQ) is represented by any bit pattern
+//between 7FC00000 and 7FFFFFFF or between FFC00000 and FFFFFFFF
+// For floats anything compared to a nan will return 0/false
 // TODO: Add compare for COMPLEX
+//#define COMPARE_LT(X,Y) ((X) < (Y) || ((Y) != (Y) && (X) == (X)))
 FORCE_INLINE static bool COMPARE_LT(float X, float Y) { return (X < Y || (Y != Y && X == X)); }
 FORCE_INLINE static bool COMPARE_LT(double X, double Y) { return (X < Y || (Y != Y && X == X)); }
 FORCE_INLINE static bool COMPARE_LT(long double X, long double Y) { return (X < Y || (Y != Y && X == X)); }
@@ -1724,7 +1730,7 @@ par_sort(
     // If size is large, go parallel
     if (arrayLength >= CMathWorker::WORK_ITEM_BIG) {
 
-        PLOGGING("Parallel version  %p  %p  %p\n", pToSort, pToSort + arrayLength, pValues);
+        LOGGING("Parallel version  %p  %p  %p\n", pSortFunction, pOut , pValues);
 
         stMATH_WORKER_ITEM* pWorkItem = THREADER->GetWorkItem(arrayLength);
 

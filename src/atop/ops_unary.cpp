@@ -196,6 +196,8 @@ template<typename T> static const inline T INVERT_OP_BOOL(int8_t x) { return x ^
 
 template<typename T> static const inline bool NOT_OP(T x) { return (bool)(x == (T)0); }
 
+// TODO: the smaller loop routines need to use the same mask and compares as the larger loop
+// code instead of call std:: versions
 template<typename T> static const inline bool ISNOTNAN_OP(T x) { return !std::isnan(x); }
 template<typename T> static const inline bool ISNAN_OP(T x) { return std::isnan(x); }
 template<typename T> static const inline bool ISFINITE_OP(T x) { return std::isfinite(x); }
@@ -745,6 +747,8 @@ static inline void UnaryInfFastFloat(MathFunctionPtr MATH_OP, void* pDataIn, voi
 
         __m256i* pDestFastEnd = &pDestFast[len / 32];
         while (pDestFast != pDestFastEnd) {
+            // TODO: A inline function can be used to take 32bytes*4 (4 AVX256 math registers or 128 bytes or 32 float32) and
+            //       write 32 bools in one STOREU.  The algorithm is the same using shuffle + permute
             // the shuffle will move all 8 comparisons together
             __m256 m0 = _mm256_loadu_ps((const float*)(pSrc1Fast + 0));
             __m256i m10 = _mm256_or_si256(_mm256_castps_si256(_mm256_cmp_ps(m0, m_infinitecomp1, _CMP_EQ_OQ)), _mm256_castps_si256(_mm256_cmp_ps(m0, m_infinitecomp2, _CMP_EQ_OQ)));
