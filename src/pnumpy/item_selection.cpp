@@ -1791,6 +1791,7 @@ _new_argsortlike(PyArrayObject* op, int axis, PyArray_ArgSortFunc* argsort,
     }
 
     if (needidxbuffer) {
+        // TJD: This is allocating int64 buffer
         idxbuffer = (npy_intp*)npy_alloc_cache(N * sizeof(npy_intp));
         if (idxbuffer == NULL) {
             ret = -1;
@@ -1833,6 +1834,7 @@ _new_argsortlike(PyArrayObject* op, int axis, PyArray_ArgSortFunc* argsort,
             idxptr = idxbuffer;
         }
 
+        // TJD: This code is like an arange
         iptr = idxptr;
         for (i = 0; i < N; ++i) {
             *iptr++ = i;

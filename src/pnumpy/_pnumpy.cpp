@@ -1011,16 +1011,27 @@ static int AtopArgSortMathFunction(void* pValue, npy_intp* pInt64Buffer, npy_int
         if (g_Settings.AtopEnabled) {
             PyArrayObject* pSrcObject = (PyArrayObject*)pArrayObject;
 
-            if (PyArray_NDIM(pSrcObject) == 1) {
+            int dtype = PyArray_TYPE(pSrcObject);
+
+            if (dtype <= NPY_UNICODE && dtype != NPY_OBJECT) {
+
                 int itemsize = convert_atop_to_itemsize[atype];
+                SORT_MODE sortmode = (SORT_MODE)sortkind;
 
-                // Make sure we can handle this
-                if (PyArray_ITEMSIZE(pSrcObject) == itemsize && PyArray_STRIDE(pSrcObject, 1) == itemsize) {
-                    SORT_MODE sortmode = (SORT_MODE)sortkind;
-                    // TODO put our hook here
+                // todo check sizeof npy_intp
+                int result=
+                SortIndex64(
+                    NULL, // pCutOffs,
+                    0,    //cutOffLength,
+                    pValue,
+                    length,
+                    (int64_t*)pInt64Buffer,
+                    sortmode,
+                    atype,
+                    PyArray_ITEMSIZE(pSrcObject));
 
-                }
-
+                LOGGING("!!called argsort with result %d\n", result);
+                if (result >= 0) return result;
             }
         }
         // punt to old routine
@@ -1482,9 +1493,8 @@ PyObject* newinit(PyObject* self, PyObject* args, PyObject* kwargs) {
                     }
                 }
 
-                //pSrcDtype->f.sort[NPY_MERGESORT] = NULL;
 
-
+                // TODO: Future hook for conversions
                 //for (int k = 0; k < num_dtypes; k++) {
                 //    PyArray_VectorUnaryFunc* castfunc;
                 //    int destdtype = dtypes[k];

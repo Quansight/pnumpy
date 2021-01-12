@@ -26,8 +26,17 @@ def recarray_to_colmajor(item, parallel=True):
     if item.dtype.char == 'V':
         # warnings.warn(f"Converting numpy record array. Performance may suffer.")
         # flip row-major to column-major
+        list_types = [*item.dtype.fields.values()]
+        success = True
+        for t in list_types:
+            val = t[0].char
+            # if the record type has an object or another record type, we cannot handle
+            if val == 'O' or val =='V':
+                success = False
+                break;
+
         d={}
-        if parallel:
+        if successs and parallel:
             offsets=[]
             arrays=np.empty(len(item.dtype.fields), dtype='O')
             arrlen = len(item)
@@ -48,6 +57,7 @@ def recarray_to_colmajor(item, parallel=True):
             for name in item.dtype.names:
                 d[name] = item[:][name].copy()
         return d
+
     warnings.warn(f"The array passed was not a numpy record array.")
     return item
 

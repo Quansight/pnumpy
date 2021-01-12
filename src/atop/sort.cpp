@@ -38,14 +38,39 @@ FORCE_INLINE static int npy_get_msb(uint64_t unum)
     return depth_limit;
 }
 
-#define SMALL_MERGESORT 16
+// Reverse mem copy to help with cache
+FORCE_INLINE static void MEMCPYR(void* pDestV, void *pSrcV, int64_t length) {
+    memcpy(pDestV, pSrcV, length);
 
+    // reverse copy below, but it's slower
+    //char* pDest = (char*)pDestV;
+    //char* pSrc = (char*)pSrcV;
+    //if (length >= 32) {
+    //    char* pDestEnd = pDest + length;
+    //    char* pSrcEnd = pSrc + length;
+    //    do  {
+    //        pDestEnd -= 32;
+    //        pSrcEnd -= 32;
+    //        __m256i m0 = _mm256_loadu_si256((const __m256i*)pSrcEnd);
+    //        _mm256_storeu_si256((__m256i*)pDestEnd, m0);
+    //        length -= 32;
+    //    } while (length > 32);
+    //    // write first two bytes
+    //    __m256i m0 = _mm256_loadu_si256((const __m256i*)pSrc);
+    //    _mm256_storeu_si256((__m256i*)pDest, m0);
+    //}
+    //else {
+    //    while (length--) {
+    //        *pDest = *pSrc;
+    //        pDest++; pSrc++;
+    //    }
+    //}
+}
+
+#define SMALL_MERGESORT 16
 #define PYA_QS_STACK 128
 #define SMALL_QUICKSORT 15
-
-
 #define INTP_SWAP(_X_,_Y_) { auto temp=_X_; _X_=_Y_; _Y_=temp;}
-
 #define T_SWAP(_X_, _Y_) { auto temp= _X_; _X_ = _Y_; _Y_ = temp; }
 //#define T_SWAP(_X_, _Y_) std::swap(_X_,_Y_); 
 
@@ -649,7 +674,7 @@ mergesort0_(T* pl, T* pr, T* pw)
         mergesort0_(pm, pr, pw);
 
         if (COMPARE_LT(*pm, *(pm - 1))) {
-            memcpy(pw, pl, (pm - pl) * sizeof(T));
+            MEMCPYR(pw, pl, (pm - pl) * sizeof(T));
 
                 pi = pw + (pm - pl);
                 pj = pw;
@@ -698,7 +723,7 @@ mergesort0string_(char* pl, char* pr, char* pw, int64_t strLen)
 
         if (STRING_LT((T*)pm, (T*)(pm - strLen), strLen)) {
             // copy front (pl) to worksapce
-            memcpy(pw, pl, pm - pl);
+            MEMCPYR(pw, pl, pm - pl);
 
             pi = pw + (pm - pl);
             pj = pw;
@@ -805,17 +830,7 @@ amergesort0_string(UINDEX* pl, UINDEX* pr, const char* strItem, UINDEX* pw, int6
 
         if (STRING_LT((DATATYPE)(strItem + (*pm) * strLen), (DATATYPE)(strItem + (*(pm - 1)) * strLen), strLen)) {
 
-            if ((pm - pl) >= 32) {
-                memcpy(pw, pl, (pm - pl) * sizeof(UINDEX));
-            }
-            else {
-                // Copy left side into workspace
-                pi = pw;
-                pj = pl;
-                while (pj < pm) {
-                    *pi++ = *pj++;
-                }
-            }
+            MEMCPYR(pw, pl, (pm - pl) * sizeof(UINDEX));
 
             pi = pw + (pm - pl);
             pj = pw;
@@ -871,7 +886,7 @@ amergesort0_(UINDEX* pl, UINDEX* pr, T* v, UINDEX* pw)
         //printf("comparing %d to %d ", (int)pm[0], (int)pm[-1]);
         if (COMPARE_LT(v[*pm], v[*(pm - 1)])) {
             if ((pm - pl) >= 32) {
-                memcpy(pw, pl, (pm - pl) * sizeof(UINDEX));
+                MEMCPYR(pw, pl, (pm - pl) * sizeof(UINDEX));
             }
             else {
                 // Copy left side into workspace
@@ -995,7 +1010,7 @@ ParMergeMergeString(void* pValue1, void* pToSort1, int64_t totalLen, int64_t str
     if ( STRING_LT((DATATYPE)(pValue + (*pm) * strlen), (DATATYPE)(pValue + (*pm - 1) * strlen), strlen)) {
 
         // copy the left to workspace
-        memcpy(pWorkSpace, pl, (pm - pl) * sizeof(UINDEX));
+        MEMCPYR(pWorkSpace, pl, (pm - pl) * sizeof(UINDEX));
 
         // pi is end of workspace
         pi = pWorkSpace + (pm - pl);
@@ -1049,7 +1064,7 @@ ParMergeMerge(void* pValue1, void* pToSort1, int64_t totalLen, int64_t strlen, v
     // quickcheck to see if we have to copy
     if (COMPARE_LT(pValue[*pm], pValue[*(pm - 1)])) {
 
-        memcpy(pWorkSpace, pl, (pm - pl) * sizeof(UINDEX));
+        MEMCPYR(pWorkSpace, pl, (pm - pl) * sizeof(UINDEX));
 
         // pi is end of workspace
         pi = pWorkSpace + (pm - pl);
@@ -1101,7 +1116,7 @@ ParInPlaceMerge(void* pValue1, int64_t totalLen, int64_t strlen, void* pWorkSpac
     // quickcheck to see if we have to copy
     if (COMPARE_LT(*pm, *(pm - 1))) {
 
-        memcpy(pw, pl, (pm - pl) * strlen);
+        MEMCPYR(pw, pl, (pm - pl) * strlen);
 
         pi = pw + (pm - pl);
         pj = pw;
@@ -1209,7 +1224,7 @@ CopyData(
     int64_t         stridesOut) {
 
     if (stridesIn == stridesOut) {
-        memcpy(pOut, pValues, arrayLength * itemSize);
+        MEMCPYR(pOut, pValues, arrayLength * itemSize);
     }
     else {
         // TODO: Check for string?
@@ -1249,7 +1264,7 @@ CopyData(
                 break;
             default:
                 while (pDataOut != pDataLast) {
-                    memcpy(pDataOut, pDataIn, itemSize);
+                    MEMCPYR(pDataOut, pDataIn, itemSize);
                     pDataOut = STRIDE_NEXT(char, pDataOut, stridesOut);
                     pDataIn = STRIDE_NEXT(char, pDataIn, stridesIn);
                 }
@@ -1262,7 +1277,7 @@ CopyData(
             char* pDataOut = (char*)pOut;
             char* pDataLast = STRIDE_NEXT(char, pDataOut, stridesOut * arrayLength);
             while (pDataOut != pDataLast) {
-                memcpy(pDataOut, pDataIn, itemSize);
+                MEMCPYR(pDataOut, pDataIn, itemSize);
                 pDataOut = STRIDE_NEXT(char, pDataOut, stridesOut);
                 pDataIn = STRIDE_NEXT(char, pDataIn, stridesIn);
             }
@@ -1950,7 +1965,7 @@ SortIndexVoid(int64_t* pCutOffs, int64_t cutOffLength, const char* pDataIn1, UIN
 // caller must allocate the pDataOut1 as int64_t with size arraySize1
 // UINDEX = int32_t or int64_t
 template <typename UINDEX>
-static void SortIndex(
+static int SortIndex(
     int64_t*   pCutOffs,
     int64_t    cutOffLength,
     void*      pDataIn1,
@@ -1962,56 +1977,42 @@ static void SortIndex(
 
     switch (arrayType1) {
     case ATOP_UNICODE:
-        SortIndexUnicode<UINDEX>(pCutOffs, cutOffLength, (const char*)pDataIn1, pDataOut1, arraySize1, mode, strlen);
-        break;
+        return SortIndexUnicode<UINDEX>(pCutOffs, cutOffLength, (const char*)pDataIn1, pDataOut1, arraySize1, mode, strlen);
     case ATOP_VOID:
-        SortIndexVoid<UINDEX>(pCutOffs, cutOffLength, (const char*)pDataIn1, pDataOut1, arraySize1, mode, strlen);
-        break;
+        return SortIndexVoid<UINDEX>(pCutOffs, cutOffLength, (const char*)pDataIn1, pDataOut1, arraySize1, mode, strlen);
     case ATOP_STRING:
         SortIndexString<UINDEX>(pCutOffs, cutOffLength, (const char*)pDataIn1, pDataOut1, arraySize1, mode, strlen);
-        break;
     case ATOP_BOOL:
     case ATOP_INT8:
-        SortIndex<int8_t, UINDEX>(pCutOffs, cutOffLength, pDataIn1, pDataOut1, arraySize1, mode);
-        break;
+        return SortIndex<int8_t, UINDEX>(pCutOffs, cutOffLength, pDataIn1, pDataOut1, arraySize1, mode);
     case ATOP_INT16:
-        SortIndex<int16_t, UINDEX>(pCutOffs, cutOffLength, pDataIn1, pDataOut1, arraySize1, mode);
-        break;
+        return SortIndex<int16_t, UINDEX>(pCutOffs, cutOffLength, pDataIn1, pDataOut1, arraySize1, mode);
     case ATOP_INT32:
-        SortIndex<int32_t, UINDEX>(pCutOffs, cutOffLength, pDataIn1, pDataOut1, arraySize1, mode);
-        break;
+        return SortIndex<int32_t, UINDEX>(pCutOffs, cutOffLength, pDataIn1, pDataOut1, arraySize1, mode);
     case ATOP_INT64:
-        SortIndex<int64_t, UINDEX>(pCutOffs, cutOffLength, pDataIn1, pDataOut1, arraySize1, mode);
-        break;
+        return SortIndex<int64_t, UINDEX>(pCutOffs, cutOffLength, pDataIn1, pDataOut1, arraySize1, mode);
     case ATOP_UINT8:
-        SortIndex<uint8_t, UINDEX>(pCutOffs, cutOffLength, pDataIn1, pDataOut1, arraySize1, mode);
-        break;
+        return SortIndex<uint8_t, UINDEX>(pCutOffs, cutOffLength, pDataIn1, pDataOut1, arraySize1, mode);
     case ATOP_UINT16:
-        SortIndex<uint16_t, UINDEX>(pCutOffs, cutOffLength, pDataIn1, pDataOut1, arraySize1, mode);
-        break;
+        return SortIndex<uint16_t, UINDEX>(pCutOffs, cutOffLength, pDataIn1, pDataOut1, arraySize1, mode);
     case ATOP_UINT32:
-        SortIndex<uint32_t, UINDEX>(pCutOffs, cutOffLength, pDataIn1, pDataOut1, arraySize1, mode);
-        break;
+        return SortIndex<uint32_t, UINDEX>(pCutOffs, cutOffLength, pDataIn1, pDataOut1, arraySize1, mode);
     case ATOP_UINT64:
-        SortIndex<uint64_t, UINDEX>(pCutOffs, cutOffLength, pDataIn1, pDataOut1, arraySize1, mode);
-        break;
+        return SortIndex<uint64_t, UINDEX>(pCutOffs, cutOffLength, pDataIn1, pDataOut1, arraySize1, mode);
     case ATOP_FLOAT:
-        SortIndex<float, UINDEX>(pCutOffs, cutOffLength, pDataIn1, pDataOut1, arraySize1, mode);
-        break;
+        return SortIndex<float, UINDEX>(pCutOffs, cutOffLength, pDataIn1, pDataOut1, arraySize1, mode);
     case ATOP_DOUBLE:
-        SortIndex<double, UINDEX>(pCutOffs, cutOffLength, pDataIn1, pDataOut1, arraySize1, mode);
-        break;
+        return SortIndex<double, UINDEX>(pCutOffs, cutOffLength, pDataIn1, pDataOut1, arraySize1, mode);
     case ATOP_LONGDOUBLE:
-        SortIndex<long double, UINDEX>(pCutOffs, cutOffLength, pDataIn1, pDataOut1, arraySize1, mode);
-        break;
+        return SortIndex<long double, UINDEX>(pCutOffs, cutOffLength, pDataIn1, pDataOut1, arraySize1, mode);
     default:
         LOGGING("SortIndex does not understand type %d\n", arrayType1);
     }
-
+    return -1;
 }
 
 // Stub for lexsort to return int32
-extern "C" void SortIndex32(
+extern "C" int SortIndex32(
     int64_t * pCutOffs,
     int64_t     cutOffLength,
     void* pDataIn1,
@@ -2025,7 +2026,7 @@ extern "C" void SortIndex32(
 }
 
 // Stub for lexsort to return int64
-extern "C" void SortIndex64(
+extern "C" int SortIndex64(
     int64_t * pCutOffs,
     int64_t     cutOffLength,
     void* pDataIn1,
