@@ -1018,13 +1018,14 @@ static int AtopArgSortMathFunction(void* pValue, npy_intp* pInt64Buffer, npy_int
                 int itemsize = convert_atop_to_itemsize[atype];
                 SORT_MODE sortmode = (SORT_MODE)sortkind;
 
+                // todo check sizeof npy_intp
                 int result=
                 SortIndex64(
                     NULL, // pCutOffs,
                     0,    //cutOffLength,
                     pValue,
                     length,
-                    pInt64Buffer,
+                    (int64_t*)pInt64Buffer,
                     sortmode,
                     atype,
                     PyArray_ITEMSIZE(pSrcObject));
