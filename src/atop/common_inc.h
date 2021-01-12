@@ -446,7 +446,7 @@ enum SORT_MODE {
 };
 
 extern "C" int64_t IsSorted(void* pDataIn1,int64_t arraySize1, int32_t arrayType1, int64_t itemSize);
-extern "C" void SortIndex32(
+extern "C" int SortIndex32(
     int64_t *   pCutOffs,
     int64_t     cutOffLength,
     void*       pDataIn1,
@@ -456,7 +456,7 @@ extern "C" void SortIndex32(
     int         arrayType1,
     int64_t     strlen);
 
-extern "C" void SortIndex64(
+extern "C" int SortIndex64(
     int64_t * pCutOffs,
     int64_t     cutOffLength,
     void*       pDataIn1,

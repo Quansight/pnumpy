@@ -250,7 +250,6 @@ void LedgerRecord(int32_t op_category, int64_t start_time, int64_t end_time, cha
 
 void LedgerRecord2(int32_t op_category, int64_t start_time, int64_t end_time, int atype, int64_t length) {
     int64_t deltaTime = end_time - start_time;
-
     stOpCategory* pstOpCategory = &gOpCategory[op_category];
 
     // Get the next slot in the ring buffer
