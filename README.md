@@ -1,10 +1,10 @@
 # PNumPy
 Parallel NumPy is a new multithreaded package which seamlessly speeds up NumPy for large arrays (> 64,000 elements).
-Most importantly, there is *no change required for your NumPy code*.
+Most importantly, there is *no change required to your existing NumPy code*.
 
-The first release speeds up NumPy binary and unary ufuncs such **add, multiply, isnan, abs, and many more**.
+This first release speeds up NumPy binary and unary ufuncs such **add, multiply, isnan, abs, sin, log, sum, min and many more**.
 Sped up functions also include: **sort, argsort, lexsort, boolean indexing, and fancy indexing**.
-Every month more routines will be sped up. Coming soon: **astype, where, putmask, searchsorted**.
+In the near future we will speed up: **astype, where, putmask, arange, searchsorted**.
 
 [![CI Status](https://github.com/Quansight/numpy-threading-extensions/workflows/tox/badge.svg)](https://github.com/Quansight/numpy-threading-extensions/actions)
 
@@ -30,7 +30,7 @@ To use the project:
 import pnumpy as pn
 ```
 
-Parallel NumPy will automatically speed up various numpy functions silently below the covers.
+Parallel NumPy will automatically speed up various numpy functions silently under the hood.
 To see the improvements yourself run
 ```
 pn.benchmark()
