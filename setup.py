@@ -19,9 +19,8 @@ from setuptools import setup
 import numpy as np
 
 # Enable code coverage for C code: we can't use CFLAGS=-coverage in tox.ini, since that may mess with compiling
-# dependencies (e.g. numpy). Therefore we set SETUPPY_CFLAGS=-coverage in tox.ini and copy it to CFLAGS here (after
-# deps have been safely installed).
-if 'TOX_ENV_NAME' in os.environ and os.environ.get('SETUP_PY_EXT_COVERAGE') == 'yes' and platform.system() == 'Linux':
+# dependencies (e.g. numpy). Therefore we set SETUP_PY_EXT_COVERAGE after deps have been safely installed).
+if os.environ.get('SETUP_PY_EXT_COVERAGE') == 'yes' and platform.system() == 'Linux':
     CFLAGS = os.environ['CFLAGS'] = '-fprofile-arcs -ftest-coverage -DNPY_NO_DEPRECATED_API=NPY_1_7_API_VERSION'
     LFLAGS = os.environ['LFLAGS'] = '-lgcov'
 else:
@@ -59,7 +58,7 @@ setup(
     long_description_content_type="text/markdown",
     author='Quansight',
     author_email='info@quansight.com',
-    url='https://github.com/Quansight/numpy-threading-extensions',
+    url='https://quansight.github.io/numpy-threading-extensions/stable/index.html',
     packages=find_packages('src'),
     package_dir={'': 'src'},
     py_modules=[splitext(basename(path))[0] for path in glob('src/*.py')],
