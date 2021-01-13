@@ -214,4 +214,7 @@ extern "C" void RecArrayToColMajor(
         ConvertRecArray(pStartOffset, startRow, totalRows, pstOffset, numArrays, itemSize);
     }
 }
+#if defined(__clang__)
+#pragma clang attribute pop
+#endif
 
