@@ -36,11 +36,24 @@ from pnumpy._pnumpy import ledger_enable, ledger_disable, ledger_isenabled, ledg
 from pnumpy._pnumpy import recycler_enable, recycler_disable, recycler_isenabled, recycler_info
 from pnumpy._pnumpy import getitem, lexsort32, lexsort64
 
+from .sort import sort, lexsort, argsort, argmin, argmax, searchsorted
 from .benchmark import benchmark, benchmark_func
 from .recarray import recarray_to_colmajor
 import numpy as np
 
 def init():
+    """
+    Called at load time to start the atop and threading engines.
+    
+    Parameters
+    ----------
+    None
+
+    See Also
+    --------
+
+    """
+    
     import platform
     from numpy.core._multiarray_umath import __cpu_features__ as cpu
     if not cpu['AVX2']:
@@ -54,86 +67,57 @@ def init():
         _pnumpy.initialize()
 
 def initialize():
-    init()
-
-def lexsort(*args, **kwargs):
     """
-    Perform an indirect stable sort using a sequence of keys.
-
-    Given multiple sorting keys, which can be interpreted as columns in a
-    spreadsheet, lexsort returns an array of integer indices that describes
-    the sort order by multiple columns. The last key in the sequence is used
-    for the primary sort order, the second-to-last key for the secondary sort
-    order, and so on. The keys argument must be a sequence of objects that
-    can be converted to arrays of the same shape. If a 2D array is provided
-    for the keys argument, it's rows are interpreted as the sorting keys and
-    sorting is according to the last row, second last row etc.
+    To be deprecated.  Call init() instead.
 
     Parameters
     ----------
-    keys : (k, N) array or tuple containing k (N,)-shaped sequences
-        The `k` different "columns" to be sorted.  The last column (or row if
-        `keys` is a 2D array) is the primary sort key.
-    axis : int, optional
-        Axis to be indirectly sorted.  By default, sort over the last axis.
+    None
+    """
+    init()
+
+def enable():
+    """
+    Call to enable the atop engine, use threads, and hook numpy functions.
+
+    Parameters
+    ----------
+    None
 
     Returns
     -------
-    indices : (N,) ndarray of ints
-        Array of indices that sort the keys along the specified axis.
-
-    Threading
-    ---------
-    Up to 8 threads
+    None
 
     See Also
     --------
-    argsort : Indirect sort.
-    ndarray.sort : In-place sort.
-    sort : Return a sorted copy of an array.
-
-    Examples
-    --------
-    Sort names: first by surname, then by name.
-
-    >>> surnames =    ('Hertz',    'Galilei', 'Hertz')
-    >>> first_names = ('Heinrich', 'Galileo', 'Gustav')
-    >>> ind = np.lexsort((first_names, surnames))
-    >>> ind
-    array([1, 2, 0])
-
-    >>> [surnames[i] + ", " + first_names[i] for i in ind]
-    ['Galilei, Galileo', 'Hertz, Gustav', 'Hertz, Heinrich']
-
-    Sort two columns of numbers:
-
-    >>> a = [1,5,1,4,3,4,4] # First column
-    >>> b = [9,4,0,4,0,2,1] # Second column
-    >>> ind = np.lexsort((b,a)) # Sort by a, then by b
-    >>> ind
-    array([2, 0, 4, 6, 5, 3, 1])
-
-    >>> [(a[i],b[i]) for i in ind]
-    [(1, 0), (1, 9), (3, 0), (4, 1), (4, 2), (4, 4), (5, 4)]
-
-    Note that sorting is first according to the elements of ``a``.
-    Secondary sorting is according to the elements of ``b``.
-
-    A normal ``argsort`` would have yielded:
-
-    >>> [(a[i],b[i]) for i in np.argsort(a)]
-    [(1, 9), (1, 0), (3, 0), (4, 4), (4, 2), (4, 1), (5, 4)]
-
-    Structured arrays are sorted lexically by ``argsort``:
-
-    >>> x = np.array([(1,9), (5,4), (1,0), (4,4), (3,0), (4,2), (4,1)],
-    ...              dtype=np.dtype([('x', int), ('y', int)]))
-
-    >>> np.argsort(x) # or np.argsort(x, order=('x', 'y'))
-    array([2, 0, 4, 6, 5, 3, 1])
+    pn.disable
+    pn.atop_info
     """
+    atop_enable()
+    thread_enable()
 
-    try:
-        return lexsort32(*args, **kwargs)
-    except Exception:
-        return np.lexsort(*args, **kwargs)
+def disable():
+    """
+    Call to disable the atop engine, stop any threads, and unhook numpy functions.
+
+    Parameters
+    ----------
+    None
+
+    Returns
+    -------
+    None
+
+    See Also
+    --------
+    pn.enable
+    pn.atop_info
+    """
+    atop_disable()
+    thread_disable()
+
+
+# start the engine by default
+# TODO: check environment variable
+init()
+
