@@ -35,6 +35,7 @@ To see the improvements yourself run
 ```
 pn.benchmark()
 ```
+![plot](./doc_src/images/bench4graph.PNG)
 
 To get a partial list of functions sped up run
 ```
