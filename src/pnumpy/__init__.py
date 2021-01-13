@@ -42,6 +42,9 @@ from .benchmark import benchmark, benchmark_func
 from .recarray import recarray_to_colmajor
 import numpy as np
 
+# to be removed
+def initialize():
+    init()
 
 # start the engine by default
 # TODO: check environment variable
