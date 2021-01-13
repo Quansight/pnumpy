@@ -74,3 +74,5 @@ docs/_build
 
 # Editor tmp files
 .*.swp
+/.vs/VSWorkspaceState.json
+/.vs/ProjectSettings.json
