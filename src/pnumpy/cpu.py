@@ -8,7 +8,7 @@ from pnumpy._pnumpy import atop_enable, atop_disable, atop_isenabled, atop_info,
 from pnumpy._pnumpy import thread_enable, thread_disable, thread_isenabled, thread_getworkers, thread_setworkers, thread_zigzag
 
 __all__ = [
-    'cpu_count_linux', 'init', 'enable', 'disable']
+    'cpu_count_linux', 'init', 'initialize', 'enable', 'disable']
 
 # NOTE: code adapted from psinfo
 
@@ -107,6 +107,16 @@ def init():
         _pnumpy.initialize()
     else:
         _pnumpy.initialize()
+
+def initialize():
+    """
+    To be deprecated.  Call init() instead.
+
+    Parameters
+    ----------
+    None
+    """
+    init()
 
 def enable():
     """
