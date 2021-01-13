@@ -41,82 +41,11 @@ from pnumpy._pnumpy import ledger_enable, ledger_disable, ledger_isenabled, ledg
 from pnumpy._pnumpy import recycler_enable, recycler_disable, recycler_isenabled, recycler_info
 from pnumpy._pnumpy import getitem, lexsort32, lexsort64
 
+from .cpu import cpu_count_linux, init, enable, disable
 from .sort import sort, lexsort, argsort, argmin, argmax, searchsorted
 from .benchmark import benchmark, benchmark_func
 from .recarray import recarray_to_colmajor
 import numpy as np
-
-def init():
-    """
-    Called at load time to start the atop and threading engines.
-    
-    Parameters
-    ----------
-    None
-
-    See Also
-    --------
-
-    """
-    
-    import platform
-    if platform.system() == 'Linux':
-        from .cpu import cpu_count_linux
-        logical,physical = cpu_count_linux()
-        _pnumpy.initialize()
-    else:
-        _pnumpy.initialize()
-
-def initialize():
-    """
-    To be deprecated.  Call init() instead.
-
-    Parameters
-    ----------
-    None
-    """
-    init()
-
-def enable():
-    """
-    Call to enable the atop engine, use threads, and hook numpy functions.
-
-    Parameters
-    ----------
-    None
-
-    Returns
-    -------
-    None
-
-    See Also
-    --------
-    pn.disable
-    pn.atop_info
-    """
-    atop_enable()
-    thread_enable()
-
-def disable():
-    """
-    Call to disable the atop engine, stop any threads, and unhook numpy functions.
-
-    Parameters
-    ----------
-    None
-
-    Returns
-    -------
-    None
-
-    See Also
-    --------
-    pn.enable
-    pn.atop_info
-    """
-    atop_disable()
-    thread_disable()
-
 
 # start the engine by default
 # TODO: check environment variable

@@ -2,8 +2,13 @@ import os
 import sys
 import re
 import glob
+
+import pnumpy._pnumpy as _pnumpy
+from pnumpy._pnumpy import atop_enable, atop_disable, atop_isenabled, atop_info, atop_setworkers, cpustring 
+from pnumpy._pnumpy import thread_enable, thread_disable, thread_isenabled, thread_getworkers, thread_setworkers, thread_zigzag
+
 __all__ = [
-    'cpu_count_linux']
+    'cpu_count_linux', 'init', 'initialize', 'enable', 'disable']
 
 # NOTE: code adapted from psinfo
 
@@ -81,4 +86,75 @@ def cpu_count_linux():
             # mimic os.cpu_count()
             num=None
     return num, cpu_physical_linux()
+
+def init():
+    """
+    Called at load time to start the atop and threading engines.
+    
+    Parameters
+    ----------
+    None
+
+    See Also
+    --------
+    pn.enable
+    pn.disable
+    """
+    
+    import platform
+    if platform.system() == 'Linux':
+        logical,physical = cpu_count_linux()
+        _pnumpy.initialize()
+    else:
+        _pnumpy.initialize()
+
+def initialize():
+    """
+    To be deprecated.  Call init() instead.
+
+    Parameters
+    ----------
+    None
+    """
+    init()
+
+def enable():
+    """
+    Call to enable the atop engine, use threads, and hook numpy functions.
+
+    Parameters
+    ----------
+    None
+
+    Returns
+    -------
+    None
+
+    See Also
+    --------
+    pn.disable
+    pn.atop_info
+    """
+    atop_enable()
+    thread_enable()
+
+def disable():
+    """
+    Call to disable the atop engine, stop any threads, and unhook numpy functions.
+
+    Parameters
+    ----------
+    None
+
+    Returns
+    -------
+    None
+
+    See Also
+    --------
+    pn.enable
+    pn.atop_info
+    """
+    atop_disable()
+    thread_disable()
 
