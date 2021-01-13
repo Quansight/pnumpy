@@ -974,12 +974,14 @@ static int AtopSortMathFunction(void* pDest, npy_intp length, void* pArrayObject
         if (g_Settings.AtopEnabled) {
             PyArrayObject* pSrcObject = (PyArrayObject*)pArrayObject;
 
-            if (PyArray_NDIM(pSrcObject) == 1) {
+            int dtype = PyArray_TYPE(pSrcObject);
+
+            if (dtype <= NPY_UNICODE && dtype != NPY_OBJECT && PyArray_NDIM(pSrcObject) == 1) {
                 if (sortkind < NPY_NSORTS) {
                     int itemsize = convert_atop_to_itemsize[atype];
 
                     // Make sure we can handle this
-                    if (PyArray_ITEMSIZE(pSrcObject) == itemsize && PyArray_STRIDE(pSrcObject, 1) ==itemsize) {
+                    if (PyArray_ITEMSIZE(pSrcObject) == itemsize && PyArray_STRIDE(pSrcObject, 0) ==itemsize) {
                         SORT_MODE sortmode = (SORT_MODE)sortkind;
                         int result =
                             Sort(sortmode, atype, PyArray_BYTES(pSrcObject), ArrayLength(pSrcObject), PyArray_STRIDE(pSrcObject, 1), PyArray_ITEMSIZE(pSrcObject), pDest, PyArray_ITEMSIZE(pSrcObject));

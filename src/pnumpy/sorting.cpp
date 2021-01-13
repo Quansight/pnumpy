@@ -166,9 +166,11 @@ static PyObject* GetKwarg(PyTypeObject* pType, PyObject* kwargs, const char* nam
     if (kwargs && PyDict_Check(kwargs)) {
         // Borrows a reference
         PyObject* object=PyDict_GetItemString(kwargs, name);
-        if (PyObject_TypeCheck(object, pType))
-            return object;
-        // wrong type, possible error
+        if (object) {
+            if (PyObject_TypeCheck(object, pType))
+                return object;
+            // wrong type, possible error
+        }
     }
     return NULL;
 }
@@ -199,10 +201,19 @@ int64_t* GetCutOffs(PyObject* kwargs, int64_t& cutoffLength) {
     return NULL;
 }
 
+
+// -1 if not found or -2 for error
+int CheckFirstLetter(PyObject* pString, const char* onechar) {
+    PyObject* pOneChar = PyUnicode_FromString(onechar);
+    int result = (int)PyUnicode_Find(pString, pOneChar, 0, 1, 1);
+    Py_DecRef(pOneChar);
+    return result;
+}
+
 //===============================================================================
 // checks for kwargs 'kind'
 // 'quicksort', 'mergesort', 'stable', 'heapsort'
-int64_t GetKind(PyObject* kwargs) {
+int64_t GetKind(PyObject* kwargs, SORT_MODE defval) {
     // Check for kind kwarg to see if going into parallel mode
     PyObject* pKind = NULL;
     // Borrowed reference
@@ -210,23 +221,20 @@ int64_t GetKind(PyObject* kwargs) {
     pKind = GetKwarg( &PyUnicode_Type, kwargs, "kind");
     // Check for cutoffs kwarg to see if going into parallel mode
     if (pKind) {
-        PyObject* pString = PyUnicode_AsASCIIString(pKind);
-        SORT_MODE retval = SORT_MODE::SORT_MODE_QSORT;
+        SORT_MODE retval = defval;
 
-        if (PyUnicode_CompareWithASCIIString(pKind, "quick") == 0) {
+        if (CheckFirstLetter(pKind, "q") >= 0) {
             retval = SORT_MODE::SORT_MODE_QSORT;
         } else
-        if (PyUnicode_CompareWithASCIIString(pKind, "merge") == 0) {
+        if (CheckFirstLetter(pKind, "m") >= 0) {
             retval = SORT_MODE::SORT_MODE_MERGE;
         } else
-        if (PyUnicode_CompareWithASCIIString(pKind, "heap") == 0) {
+        if (CheckFirstLetter(pKind, "h") >= 0) {
             retval = SORT_MODE::SORT_MODE_HEAP;
         } else
-        if (PyUnicode_CompareWithASCIIString(pKind, "stable") == 0) {
+        if (CheckFirstLetter(pKind, "s") >= 0) {
             retval = SORT_MODE::SORT_MODE_MERGE;
         }
-
-        Py_DecRef(pString);
         return retval;
     }
     // default to quicksort
@@ -368,6 +376,7 @@ PyObject* lexsort(PyObject* self, PyObject* args, PyObject* kwargs) {
 
         int64_t    cutOffLength = 0;
         int64_t* pCutOffs = GetCutOffs(kwargs, cutOffLength);
+        SORT_MODE sortmode = (SORT_MODE)GetKind(kwargs, SORT_MODE_MERGE);
 
         if (pCutOffs && pCutOffs[cutOffLength - 1] != arraySize1) {
             PyErr_Format(PyExc_ValueError, "LexSort last cutoff length does not match array length %lld", arraySize1);
@@ -463,10 +472,10 @@ PyObject* lexsort(PyObject* self, PyObject* args, PyObject* kwargs) {
                 int atype = dtype_to_atop(mlp.aInfo[i].NumpyDType);
                 // For each array...
                 if (sizeof(UINDEX) == 4) {
-                    SortIndex32(pCutOffs, cutOffLength, mlp.aInfo[i].pData, arraySize1, (int32_t*)pDataOut, SORT_MODE::SORT_MODE_MERGE, atype, mlp.aInfo[i].ItemSize);
+                    SortIndex32(pCutOffs, cutOffLength, mlp.aInfo[i].pData, arraySize1, (int32_t*)pDataOut, sortmode, atype, mlp.aInfo[i].ItemSize);
                 }
                 else {
-                    SortIndex64(pCutOffs, cutOffLength, mlp.aInfo[i].pData, arraySize1, (int64_t*)pDataOut, SORT_MODE::SORT_MODE_MERGE, atype, mlp.aInfo[i].ItemSize);
+                    SortIndex64(pCutOffs, cutOffLength, mlp.aInfo[i].pData, arraySize1, (int64_t*)pDataOut, sortmode, atype, mlp.aInfo[i].ItemSize);
                 }
             }
 
@@ -549,7 +558,7 @@ extern "C" PyObject* sort(PyObject* self, PyObject* args, PyObject* kwargs) {
         // Call the atop parallel quicksort
         // -1 indictes an error
         //SORT_MODE sortmode = SORT_MODE::SORT_MODE_MERGE;
-        SORT_MODE sortmode = (SORT_MODE)GetKind(kwargs);
+        SORT_MODE sortmode = (SORT_MODE)GetKind(kwargs, SORT_MODE_QSORT);
         int result=
         Sort(sortmode, atype, PyArray_BYTES(inArrValues), ArrayLength(inArrValues), strideValue, PyArray_ITEMSIZE(inArrValues), PyArray_BYTES(outArrValues), PyArray_ITEMSIZE(outArrValues) );
 

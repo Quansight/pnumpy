@@ -440,10 +440,14 @@ heapsort_(void* pVoidStart, int64_t n)
 // indirect heapsort
 template <typename T, typename UINDEX>
 static int
-aheapsort_(T* vv, UINDEX* tosort, UINDEX n)
+aheapsort_(void* vv1, void* tosort1, int64_t n)
 {
+    T* vv = (T*)vv1;
+    UINDEX* tosort = (UINDEX*)tosort1;
+
     T* v = vv;
-    UINDEX* a, i, j, l, tmp;
+    UINDEX* a, tmp;
+    int64_t i, j, l;
     /* The arrays need to be offset by one for heapsort indexing */
     a = tosort - 1;
 
@@ -581,8 +585,10 @@ quicksort_(void* pVoidStart, int64_t length)
 // argsort (indirect quicksort)
 template <typename T, typename UINDEX>
 static int
-aquicksort_(T* vv, UINDEX* tosort, int64_t num)
+aquicksort_(void* vv1, void* tosort1, int64_t num)
 {
+    T* vv = (T*)vv1;
+    UINDEX* tosort = (UINDEX *) tosort1;
     T* v = vv;
     T vp;
     UINDEX* pl = tosort;
@@ -933,21 +939,40 @@ amergesort0_(UINDEX* pl, UINDEX* pr, T* v, UINDEX* pw)
 // allocates workspace
 template <typename T, typename UINDEX>
 static int
-amergesort_(T* v, UINDEX* tosort, UINDEX num)
+amergesort_(void* v1, void* tosort1, int64_t length)
 {
+    T* v = (T*)v1;
+    UINDEX* tosort = (UINDEX*)tosort1;
+
     UINDEX* pl, * pr, * pworkspace;
 
     pl = tosort;
-    pr = pl + num;
+    pr = pl + length;
 
-    pworkspace = (UINDEX*)WORKSPACE_ALLOC((num / 2) * sizeof(UINDEX));
+    pworkspace = (UINDEX*)WORKSPACE_ALLOC((length / 2) * sizeof(UINDEX));
     if (pworkspace == NULL) {
         return -1;
     }
-    amergesort0_(pl, pr, v, pworkspace);
+    amergesort0_<T, UINDEX>(pl, pr, v, pworkspace);
     WORKSPACE_FREE(pworkspace);
 
     return 0;
+}
+
+//-----------------------------------------------------------------------------------------------
+// does not allocate workspace
+template <typename T, typename UINDEX>
+static void
+amergesortworkspace_(void* v1, void* tosort1, int64_t length, int64_t notused, void* pworkspace)
+{
+    T* v = (T*)v1;
+    UINDEX* tosort = (UINDEX*)tosort1;
+    UINDEX* pl, * pr;
+
+    pl = tosort;
+    pr = pl + length;
+
+    amergesort0_<T, UINDEX>(pl, pr, v, (UINDEX*)pworkspace);
 }
 
 
@@ -1150,10 +1175,126 @@ struct SORT_FUNCTION_ANY {
 typedef void(*SORT_STEP_TWO)(void* pValue1, int64_t totalLen, int64_t strlen, void* pWorkSpace1);
 typedef void(*MERGE_STEP_ONE)(void* pValue, void* pToSort, int64_t num, int64_t strlen, void* pWorkSpace);
 typedef void(*MERGE_STEP_TWO)(void* pValue1, void* pToSort1, int64_t totalLen, int64_t strlen, void* pWorkSpace1);
+
+typedef int(*ARGSORT_FUNCTION)(void* pValue, void* pToSort, int64_t length);
+typedef void(*ARGSORT_FUNCTION_STRING)(void* pValue, void* pToSort, int64_t length, int64_t strlen, void* pWorkSpace);
+
+// One of them will be NULL
+struct ARGSORT_FUNCTION_ANY {
+    ARGSORT_FUNCTION argsortfunc;
+    ARGSORT_FUNCTION_STRING argsortstringfunc;
+    void init() {
+        argsortfunc = NULL;
+        argsortstringfunc = NULL;
+    }
+};
+
+
+//========================================================================
+//
+enum PAR_SORT_TYPE {
+    Normal = 0,
+    Float = 1,
+    String = 2,
+    Unicode = 3,
+    Void = 4
+};
+
+struct MERGE_SPLITTER {
+    // used to synchronize parallel merges
+    int     NumLevels;
+    int     NumCores;
+    int64_t EndPositions[17];
+    int64_t Level[4];
+
+    // How many threads to use
+    // Caller can set numCores ==0 to auto pick
+    void SetLevels(int64_t arrayLength, int numCores) {
+
+        NumCores = numCores;
+        if (NumCores == 0) {
+            //NOTE set this value to 2,4 or 8 (or 16) ?
+            NumCores = THREADER->GetNumCores();
+            int maxCores = THREADER->GetFutexWakeup() + 1;
+            if (maxCores < NumCores) {
+                NumCores = maxCores;
+            }
+        }
+
+        if (NumCores <= 2) {
+            NumCores = 2;
+            NumLevels = 1;
+        }
+        else if (NumCores <= 4) {
+            NumCores = 4;
+            NumLevels = 2;
+        }
+        else if (NumCores <= 8) {
+            NumCores = 8;
+            NumLevels = 3;
+        }
+        else {
+            NumCores = 16;
+            NumLevels = 4;
+        }
+
+        //stParMergeCallback.MergeBlocks = 8;
+
+        for (int i = 0; i < 4; i++) {
+            Level[i] = 0;
+        }
+
+        EndPositions[0] = 0;
+        switch (NumLevels) {
+        case 1:
+            EndPositions[1] = arrayLength;
+            break;
+        case 2:
+            // We use an 8 way merge, we need the size breakdown
+            EndPositions[4] = arrayLength;
+            EndPositions[2] = arrayLength / 2;
+            EndPositions[3] = EndPositions[4] + (arrayLength - EndPositions[4]) / 2;
+            break;
+        case 3:
+            // We use an 8 way merge, we need the size breakdown
+            EndPositions[8] = arrayLength;
+            EndPositions[4] = arrayLength / 2;
+            EndPositions[6] = EndPositions[4] + (arrayLength - EndPositions[4]) / 2;
+            EndPositions[2] = 0 + (EndPositions[4] - 0) / 2;
+            EndPositions[7] = EndPositions[6] + (arrayLength - EndPositions[6]) / 2;
+            EndPositions[5] = EndPositions[4] + (EndPositions[6] - EndPositions[4]) / 2;
+            EndPositions[3] = EndPositions[2] + (EndPositions[4] - EndPositions[2]) / 2;
+            EndPositions[1] = 0 + (EndPositions[2] - 0) / 2;
+            break;
+        case 4:
+            // We use an 8 way merge, we need the size breakdown
+            EndPositions[16] = arrayLength;
+            EndPositions[8] = arrayLength / 2;
+            EndPositions[12] = EndPositions[8] + (arrayLength - EndPositions[8]) / 2;
+            EndPositions[4] = 0 + (EndPositions[8] - 0) / 2;
+            EndPositions[14] = EndPositions[12] + (arrayLength - EndPositions[12]) / 2;
+            EndPositions[10] = EndPositions[8] + (EndPositions[12] - EndPositions[8]) / 2;
+            EndPositions[6] = EndPositions[4] + (EndPositions[8] - EndPositions[4]) / 2;
+            EndPositions[2] = 0 + (EndPositions[4] - 0) / 2;
+
+            EndPositions[15] = EndPositions[14] + (EndPositions[16] - EndPositions[14]) / 2;
+            EndPositions[13] = EndPositions[12] + (EndPositions[14] - EndPositions[12]) / 2;
+            EndPositions[11] = EndPositions[10] + (EndPositions[12] - EndPositions[10]) / 2;
+            EndPositions[9] = EndPositions[0] + (EndPositions[10] - EndPositions[8]) / 2;
+            EndPositions[7] = EndPositions[6] + (EndPositions[8] - EndPositions[6]) / 2;
+            EndPositions[5] = EndPositions[4] + (EndPositions[6] - EndPositions[4]) / 2;
+            EndPositions[3] = EndPositions[2] + (EndPositions[4] - EndPositions[2]) / 2;
+            EndPositions[1] = EndPositions[0] + (EndPositions[2] - EndPositions[0]) / 2;
+
+            break;
+        }
+    }
+};
+
 //--------------------------------------------------------------------
 struct MERGE_STEP_ONE_CALLBACK {
     union {
-        MERGE_STEP_ONE MergeCallbackOne;
+        ARGSORT_FUNCTION_ANY ArgSortCallbackOne;
         SORT_FUNCTION_ANY  SortCallbackOne;
     };
     union {
@@ -1170,19 +1311,21 @@ struct MERGE_STEP_ONE_CALLBACK {
     // pointer to the merge workspace (usually half array length in size)
     char* pWorkSpace;
 
+    PAR_SORT_TYPE  SortType;
+
     // how much was used per 1/8 chunk when allocating the workspace
     int64_t AllocChunk;
-    int64_t MergeBlocks;
     int64_t TypeSizeInput;
 
     // not valid for inplace sorting, otherwise is sizeof(int32) or sizeof(int64) depending on index size
     int64_t TypeSizeOutput;
 
     // used to synchronize parallel merges
-    int64_t EndPositions[9];
-    int64_t Level[3];
+    MERGE_SPLITTER  MergeSplitter;
+    //int64_t EndPositions[9];
+    //int64_t Level[3];
 
-} stParMergeCallback;
+};
 
 
 //------------------------------------------------------------------------------
@@ -1289,7 +1432,7 @@ CopyData(
 //------------------------------------------------------------------------------
 // Concurrent callback from multiple threads
 // this routine is for indirect sorting
-static int64_t ParMergeThreadCallback(struct stMATH_WORKER_ITEM* pstWorkerItem, int core, int64_t workIndex) {
+static int64_t ParArgSortCallback(struct stMATH_WORKER_ITEM* pstWorkerItem, int core, int64_t workIndex) {
     MERGE_STEP_ONE_CALLBACK* Callback = (MERGE_STEP_ONE_CALLBACK*)pstWorkerItem->WorkCallbackArg;
     int64_t didSomeWork = FALSE;
 
@@ -1302,8 +1445,8 @@ static int64_t ParMergeThreadCallback(struct stMATH_WORKER_ITEM* pstWorkerItem, 
         index--;
 
         // the very first index starts at 0
-        int64_t pFirst =  Callback->EndPositions[index];
-        int64_t pSecond = Callback->EndPositions[index+1];
+        int64_t pFirst =  Callback->MergeSplitter.EndPositions[index];
+        int64_t pSecond = Callback->MergeSplitter.EndPositions[index+1];
 
         PLOGGING("[%d] DoWork start loop -- %lld  index: %lld   pFirst: %lld   pSecond: %lld\n", core, workIndex, index, pFirst, pSecond);
 
@@ -1315,30 +1458,35 @@ static int64_t ParMergeThreadCallback(struct stMATH_WORKER_ITEM* pstWorkerItem, 
         // Workspace uses half the size
         char* pWorkSpace1 = Callback->pWorkSpace + (index * Callback->AllocChunk * Callback->TypeSizeOutput);
 
-        Callback->MergeCallbackOne(Callback->pValues, pToSort1 + (pFirst * Callback->TypeSizeOutput), MergeSize, Callback->StrLen, pWorkSpace1);
+        if (Callback->ArgSortCallbackOne.argsortfunc) {
+            Callback->ArgSortCallbackOne.argsortfunc(Callback->pValues, pToSort1 + (pFirst * Callback->TypeSizeOutput), MergeSize);
+        }
+        else {
+            Callback->ArgSortCallbackOne.argsortstringfunc(Callback->pValues, pToSort1 + (pFirst * Callback->TypeSizeOutput), MergeSize, Callback->StrLen, pWorkSpace1);
+        }
 
-        if (IsBuddyBitSet(index, &Callback->Level[0])) {
+        if (IsBuddyBitSet(index, &Callback->MergeSplitter.Level[0])) {
 
             // Move to next level -- 4 things to sort
             index = index / 2;
             pWorkSpace1 = Callback->pWorkSpace + (index * 2 * Callback->AllocChunk * Callback->TypeSizeOutput);
 
-            pFirst = Callback->EndPositions[index*2];
-            pSecond = Callback->EndPositions[index*2 + 2];
+            pFirst = Callback->MergeSplitter.EndPositions[index*2];
+            pSecond = Callback->MergeSplitter.EndPositions[index*2 + 2];
             MergeSize = (pSecond - pFirst);
 
             PLOGGING("size:%lld  first: %lld  second: %lld   expected: %lld\n", MergeSize, pFirst, pSecond, pFirst + (MergeSize >> 1));
 
             Callback->MergeCallbackTwo(Callback->pValues, pToSort1 + (pFirst * Callback->TypeSizeOutput), MergeSize, Callback->StrLen, pWorkSpace1);
 
-            if (IsBuddyBitSet(index, &Callback->Level[1])) {
+            if (Callback->MergeSplitter.NumLevels > 1 && IsBuddyBitSet(index, &Callback->MergeSplitter.Level[1])) {
                 index /= 2;
 
                 // Move to next level -- 2 things to sort
                 pWorkSpace1 = Callback->pWorkSpace + (index * 4 * Callback->AllocChunk * Callback->TypeSizeOutput);
 
-                pFirst = Callback->EndPositions[index*4];
-                pSecond = Callback->EndPositions[index*4 + 4];
+                pFirst = Callback->MergeSplitter.EndPositions[index*4];
+                pSecond = Callback->MergeSplitter.EndPositions[index*4 + 4];
                 MergeSize = (pSecond - pFirst);
 
                 PLOGGING("%d : MergeThree index: %llu  %lld  %lld\n", core, index, pFirst, MergeSize);
@@ -1346,10 +1494,10 @@ static int64_t ParMergeThreadCallback(struct stMATH_WORKER_ITEM* pstWorkerItem, 
                 PLOGGING("Level 2 %p %p,  size: %lld,  pworkspace: %p\n", Callback->pValues, pToSort1 + (pFirst * Callback->TypeSizeOutput), MergeSize, pWorkSpace1);
                 Callback->MergeCallbackTwo(Callback->pValues, pToSort1 + (pFirst * Callback->TypeSizeOutput), MergeSize, Callback->StrLen, pWorkSpace1);
 
-                if (IsBuddyBitSet(index, &Callback->Level[2])) {
+                if (Callback->MergeSplitter.NumLevels > 2 && IsBuddyBitSet(index, &Callback->MergeSplitter.Level[2])) {
                     // Final merge
                     PLOGGING("%d : MergeFinal index: %llu  %lld  %lld  %lld\n", core, index, 0LL, Callback->ArrayLength, 0LL);
-                    stParMergeCallback.MergeCallbackTwo(Callback->pValues, Callback->pToSort, Callback->ArrayLength, Callback->StrLen, Callback->pWorkSpace);
+                    Callback->MergeCallbackTwo(Callback->pValues, Callback->pToSort, Callback->ArrayLength, Callback->StrLen, Callback->pWorkSpace);
                 }
             }
         }
@@ -1387,8 +1535,8 @@ static int64_t ParMergeInPlaceThreadCallback(struct stMATH_WORKER_ITEM* pstWorke
         char* pData = (char*)(Callback->pToSort);
 
         // the very first index starts at 0
-        int64_t pFirst = Callback->EndPositions[index];
-        int64_t pSecond = Callback->EndPositions[index + 1];
+        int64_t pFirst = Callback->MergeSplitter.EndPositions[index];
+        int64_t pSecond = Callback->MergeSplitter.EndPositions[index + 1];
 
         PLOGGING("[%d] DoWork start loop -- %lld  index: %lld   pFirst: %lld   pSecond: %lld\n", core, workIndex, index, pFirst, pSecond);
 
@@ -1411,36 +1559,36 @@ static int64_t ParMergeInPlaceThreadCallback(struct stMATH_WORKER_ITEM* pstWorke
             Callback->SortCallbackOne.sortstringfunc(pData + (pFirst * itemSizeInput), MergeSize, strLen);
         }
 
-        if (IsBuddyBitSet(index, &Callback->Level[0])) {
+        if (IsBuddyBitSet(index, &Callback->MergeSplitter.Level[0])) {
             // Move to next level -- 4 things to sort
             index = index / 2;
             pWorkSpace1 = Callback->pWorkSpace + (index * 2 * Callback->AllocChunk * itemSizeInput);
 
-            pFirst = Callback->EndPositions[index * 2];
-            pSecond = Callback->EndPositions[index * 2 + 2];
+            pFirst = Callback->MergeSplitter.EndPositions[index * 2];
+            pSecond = Callback->MergeSplitter.EndPositions[index * 2 + 2];
             MergeSize = (pSecond - pFirst);
 
             PLOGGING("size:%lld  first: %lld  second: %lld   expected: %lld\n", MergeSize, pFirst, pSecond, pFirst + (MergeSize >> 1));
 
             Callback->SortCallbackTwo(pData + (pFirst * itemSizeInput), MergeSize, strLen, pWorkSpace1);
 
-            if (IsBuddyBitSet(index, &Callback->Level[1])) {
+            if (Callback->MergeSplitter.NumLevels > 1 && IsBuddyBitSet(index, &Callback->MergeSplitter.Level[1])) {
                 index /= 2;
 
                 // Move to next level -- 2 things to sort
                 pWorkSpace1 = Callback->pWorkSpace + (index * 4 * Callback->AllocChunk * itemSizeInput);
 
-                pFirst = Callback->EndPositions[index * 4];
-                pSecond = Callback->EndPositions[index * 4 + 4];
+                pFirst = Callback->MergeSplitter.EndPositions[index * 4];
+                pSecond = Callback->MergeSplitter.EndPositions[index * 4 + 4];
                 MergeSize = (pSecond - pFirst);
 
                 PLOGGING("%d : MergeThree index: %llu  %lld  %lld\n", core, index, pFirst, MergeSize);
                 Callback->SortCallbackTwo(pData + (pFirst * itemSizeInput), MergeSize, strLen, pWorkSpace1);
 
-                if (IsBuddyBitSet(index, &Callback->Level[2])) {
+                if (Callback->MergeSplitter.NumLevels > 2 && IsBuddyBitSet(index, &Callback->MergeSplitter.Level[2])) {
                     // Final merge
                     PLOGGING("%d : MergeFinal index: %llu  %lld  %lld  %lld\n", core, index, 0LL, Callback->ArrayLength, 0LL);
-                    stParMergeCallback.SortCallbackTwo(pData, Callback->ArrayLength, strLen, Callback->pWorkSpace);
+                    Callback->SortCallbackTwo(pData, Callback->ArrayLength, strLen, Callback->pWorkSpace);
                 }
             }
         }
@@ -1455,15 +1603,6 @@ static int64_t ParMergeInPlaceThreadCallback(struct stMATH_WORKER_ITEM* pstWorke
     return didSomeWork;
 }
 
-//========================================================================
-//
-enum PAR_SORT_TYPE {
-    Normal = 0,
-    Float = 1,
-    String = 2,
-    Unicode = 3,
-    Void = 4
-};
 
 typedef int(*SINGLE_MERGESORT)(
     void* pValuesT,
@@ -1534,7 +1673,8 @@ par_amergesort(
 
     int64_t          arrayLength,
     int64_t          strlen,
-    PAR_SORT_TYPE  sortType)
+    PAR_SORT_TYPE  sortType,
+    ARGSORT_FUNCTION_ANY argSortStepOne)
 {
     if (pCutOffs) {
         PLOGGING("partition version col: %lld  %p  %p  %p\n", cutOffLength, pToSort, pToSort + arrayLength, pValues);
@@ -1603,124 +1743,111 @@ par_amergesort(
         THREADER->DoMultiThreadedWork((int)cutOffLength, lambdaPSCallback, &psort);
 
     }
-    else
+    else {
 
         // If size is large, go parallel
-        if (arrayLength >= CMathWorker::WORK_ITEM_BIG) {
+        stMATH_WORKER_ITEM* pWorkItem = THREADER->GetWorkItem(arrayLength);
+        if (pWorkItem != NULL) {
+            MERGE_STEP_ONE_CALLBACK stParMergeCallback;
+            stParMergeCallback.MergeSplitter.SetLevels(arrayLength, 8);
 
             PLOGGING("Parallel version  %p  %p  %p\n", pToSort, pToSort + arrayLength, pValues);
             // Divide into 8 jobs
             // Allocate all memory up front
             // Allocate enough for 8 
-            int64_t allocChunk = (arrayLength /16) + 1;
+            int64_t allocChunk = (arrayLength / (stParMergeCallback.MergeSplitter.NumCores * 2)) + 1;
             void* pWorkSpace = NULL;
 
             // Allocate half the size since the workspace is only needed for left
-            uint64_t allocSize = allocChunk * 8 * sizeof(UINDEX);
+            uint64_t allocSize = allocChunk * stParMergeCallback.MergeSplitter.NumCores * sizeof(UINDEX);
             pWorkSpace = WORKSPACE_ALLOC(allocSize);
 
             if (pWorkSpace == NULL) {
                 return -1;
             }
 
-            MERGE_STEP_ONE mergeStepOne = NULL;
+            pWorkItem->DoWorkCallback = ParArgSortCallback;
+            pWorkItem->WorkCallbackArg = &stParMergeCallback;
 
+            stParMergeCallback.SortType = sortType;
+            stParMergeCallback.ArgSortCallbackOne = argSortStepOne;
             switch (sortType) {
+
             case PAR_SORT_TYPE::String:
-                mergeStepOne = ParMergeString<const unsigned char*, UINDEX>;
+                stParMergeCallback.MergeCallbackTwo = ParMergeMergeString< const unsigned char*, UINDEX>;
                 break;
             case PAR_SORT_TYPE::Unicode:
-                mergeStepOne = ParMergeString<const uint32_t*, UINDEX>;
+                stParMergeCallback.MergeCallbackTwo = ParMergeMergeString< const uint32_t*, UINDEX>;
                 break;
             case PAR_SORT_TYPE::Void:
-                mergeStepOne = ParMergeString<const char *, UINDEX>;
+                stParMergeCallback.MergeCallbackTwo = ParMergeMergeString< const char*, UINDEX>;
                 break;
             default:
-                mergeStepOne = ParMergeNormal<T, UINDEX>;
+                // Last Merge
+                stParMergeCallback.MergeCallbackTwo = ParMergeMerge<T, UINDEX>;
+            };
+
+
+            stParMergeCallback.pValues = pValues;
+            stParMergeCallback.pToSort = pToSort;
+            stParMergeCallback.ArrayLength = arrayLength;
+            stParMergeCallback.StrLen = strlen;
+            stParMergeCallback.AllocChunk = allocChunk;
+            stParMergeCallback.pWorkSpace = (char*)pWorkSpace;
+            stParMergeCallback.TypeSizeInput = sizeof(T);
+            if (strlen) {
+                stParMergeCallback.TypeSizeInput = strlen;
             }
+            stParMergeCallback.TypeSizeOutput = sizeof(UINDEX);
 
-            stMATH_WORKER_ITEM* pWorkItem = THREADER->GetWorkItem(arrayLength);
-
-            if (pWorkItem == NULL) {
-
-                // Threading not allowed for this work item, call it directly from main thread
-                mergeStepOne(pValues, pToSort, arrayLength, strlen, pWorkSpace);
-            }
-            else {
-
-                pWorkItem->DoWorkCallback = ParMergeThreadCallback;
-                pWorkItem->WorkCallbackArg = &stParMergeCallback;
-
-                stParMergeCallback.MergeCallbackOne = mergeStepOne;
-                switch (sortType) {
-
-                case PAR_SORT_TYPE::String:
-                    stParMergeCallback.MergeCallbackTwo = ParMergeMergeString< const unsigned char*, UINDEX>;
-                    break;
-                case PAR_SORT_TYPE::Unicode:
-                    stParMergeCallback.MergeCallbackTwo = ParMergeMergeString< const uint32_t*, UINDEX>;
-                    break;
-                case PAR_SORT_TYPE::Void:
-                    stParMergeCallback.MergeCallbackTwo = ParMergeMergeString< const char*, UINDEX>;
-                    break;
-                default:
-                    // Last Merge
-                    stParMergeCallback.MergeCallbackTwo = ParMergeMerge<T, UINDEX>;
-                };
-
-
-                stParMergeCallback.pValues = pValues;
-                stParMergeCallback.pToSort = pToSort;
-                stParMergeCallback.ArrayLength = arrayLength;
-                stParMergeCallback.StrLen = strlen;
-                stParMergeCallback.AllocChunk = allocChunk;
-                stParMergeCallback.pWorkSpace = (char*)pWorkSpace;
-                stParMergeCallback.TypeSizeInput = sizeof(T);
-                if (strlen) {
-                    stParMergeCallback.TypeSizeInput = strlen;
-                }
-                stParMergeCallback.TypeSizeOutput = sizeof(UINDEX);
-
-                //NOTE set this value to 2,4 or 8
-                stParMergeCallback.MergeBlocks = 8;
-
-                for (int i = 0; i < 3; i++) {
-                    stParMergeCallback.Level[i] = 0;
-                }
-
-                // We use an 8 way merge, we need the size breakdown
-                stParMergeCallback.EndPositions[8] = arrayLength;
-                stParMergeCallback.EndPositions[4] = arrayLength / 2;
-                stParMergeCallback.EndPositions[6] = stParMergeCallback.EndPositions[4] + (arrayLength - stParMergeCallback.EndPositions[4]) / 2;
-                stParMergeCallback.EndPositions[2] = 0 + (stParMergeCallback.EndPositions[4] - 0) / 2;
-                stParMergeCallback.EndPositions[7] = stParMergeCallback.EndPositions[6] + (arrayLength - stParMergeCallback.EndPositions[6]) / 2;
-                stParMergeCallback.EndPositions[5] = stParMergeCallback.EndPositions[4] + (stParMergeCallback.EndPositions[6] - stParMergeCallback.EndPositions[4]) / 2;
-                stParMergeCallback.EndPositions[3] = stParMergeCallback.EndPositions[2] + (stParMergeCallback.EndPositions[4] - stParMergeCallback.EndPositions[2]) / 2;
-                stParMergeCallback.EndPositions[1] = 0 + (stParMergeCallback.EndPositions[2] - 0) / 2;
-                stParMergeCallback.EndPositions[0] = 0;
-
-                // This will notify the worker threads of a new work item
-                // Default thead wakeup to 7
-                THREADER->WorkMain(pWorkItem, stParMergeCallback.MergeBlocks, 7, 1, FALSE);
-
-            }
+            // This will notify the worker threads of a new work item
+            // Default thead wakeup to 7
+            THREADER->WorkMain(pWorkItem, stParMergeCallback.MergeSplitter.NumCores, (int32_t)(stParMergeCallback.MergeSplitter.NumCores - 1), 1, FALSE);
 
             // Free temp memory used
             WORKSPACE_FREE(pWorkSpace);
 
         }
         else {
-
+            // TODO
+            // Call merge step one
             // single threaded sort
-            return
-                single_amergesort<T, UINDEX>(
+
+            if (argSortStepOne.argsortfunc) {
+                argSortStepOne.argsortfunc(
+                    pValues,
+                    pToSort,
+                    arrayLength);
+            }
+            else {
+                // NOTE: currently all strings use a mergesort since the SWAP function for quicksort is so slow
+                // Allocate half the size since the workspace is only needed for left
+                uint64_t allocSize = (arrayLength / 2) * sizeof(UINDEX);
+                void* pWorkSpace = WORKSPACE_ALLOC(allocSize);
+
+                if (pWorkSpace == NULL) {
+                    return -1;
+                }
+
+                argSortStepOne.argsortstringfunc(
                     pValues,
                     pToSort,
                     arrayLength,
                     strlen,
-                    sortType);
-        }
+                    pWorkSpace);
 
+                WORKSPACE_FREE(pWorkSpace);
+
+            }
+            //return
+            //    single_amergesort<T, UINDEX>(
+            //        pValues,
+            //        pToSort,
+            //        arrayLength,
+            //        strlen,
+            //        sortType);
+        }
+    }
     return 0;
 }
 
@@ -1730,6 +1857,7 @@ par_amergesort(
 // parallel version
 // if strlen==0, then not string (int or float)
 // If the array is large enough, a parallel quick sort is invoked
+// if pValues == pOut, then no copy is performed
 // Returns -1 on failure
 template <typename DATATYPE>
 static int
@@ -1743,87 +1871,76 @@ par_sort(
     SORT_FUNCTION_ANY   pSortFunction)
 {
     // If size is large, go parallel
-    if (arrayLength >= CMathWorker::WORK_ITEM_BIG) {
+    LOGGING("Parallel version  %p  %p  %p\n", pSortFunction.sortfunc, pOut , pValues);
 
-        LOGGING("Parallel version  %p  %p  %p\n", pSortFunction, pOut , pValues);
+    stMATH_WORKER_ITEM* pWorkItem = THREADER->GetWorkItem(arrayLength);
 
-        stMATH_WORKER_ITEM* pWorkItem = THREADER->GetWorkItem(arrayLength);
+    if (pWorkItem) {
+        MERGE_STEP_ONE_CALLBACK stParMergeCallback;
+        //NOTE set this value to 2,4 or 8
+        stParMergeCallback.MergeSplitter.SetLevels(arrayLength, 8);
+        LOGGING("!! sort with %d cores\n", stParMergeCallback.MergeSplitter.NumCores);
 
-        if (pWorkItem) {
-            // Divide into 8 jobs
-            // Allocate all memory up front
-            // Allocate enough for 8 
-            int64_t allocChunk = (arrayLength / 16) + 1;
-            void* pWorkSpace = NULL;
+        // Divide into 8 jobs
+        // Allocate all memory up front
+        // Allocate enough for 8 
+        int64_t allocChunk = (arrayLength / (stParMergeCallback.MergeSplitter.NumCores * 2)) + 1;
+        void* pWorkSpace = NULL;
 
-            // Allocate half the size since the workspace is only needed for left
-            uint64_t allocSize = allocChunk * 8 * itemSize;
-            pWorkSpace = WORKSPACE_ALLOC(allocSize);
+        // Allocate half the size since the workspace is only needed for left
+        uint64_t allocSize = allocChunk * stParMergeCallback.MergeSplitter.NumCores * itemSize;
+        pWorkSpace = WORKSPACE_ALLOC(allocSize);
 
-            if (pWorkSpace == NULL) {
-                return -1;
-            }
-
-            pWorkItem->DoWorkCallback = ParMergeInPlaceThreadCallback;
-            pWorkItem->WorkCallbackArg = &stParMergeCallback;
-
-            // First pass is a quicksort in place
-            stParMergeCallback.SortCallbackOne = pSortFunction;
-
-            // second pass is a mergesort in place
-            stParMergeCallback.SortCallbackTwo = ParInPlaceMerge<DATATYPE>;
-
-            stParMergeCallback.pValues = pValues;
-            stParMergeCallback.pToSort = pOut;
-            stParMergeCallback.ArrayLength = arrayLength;
-            stParMergeCallback.StrLen = itemSize;
-            stParMergeCallback.AllocChunk = allocChunk;
-            stParMergeCallback.pWorkSpace = (char*)pWorkSpace;
-            stParMergeCallback.TypeSizeInput = itemSize;
-            stParMergeCallback.TypeSizeOutput = stridesOut;
-
-            //NOTE set this value to 2,4 or 8
-            stParMergeCallback.MergeBlocks = 8;
-
-            for (int i = 0; i < 3; i++) {
-                stParMergeCallback.Level[i] = 0;
-            }
-
-            // We use an 8 way merge, we need the size breakdown
-            // TODO: Call a function to do this
-            stParMergeCallback.EndPositions[8] = arrayLength;
-            stParMergeCallback.EndPositions[4] = arrayLength / 2;
-            stParMergeCallback.EndPositions[6] = stParMergeCallback.EndPositions[4] + (arrayLength - stParMergeCallback.EndPositions[4]) / 2;
-            stParMergeCallback.EndPositions[2] = 0 + (stParMergeCallback.EndPositions[4] - 0) / 2;
-            stParMergeCallback.EndPositions[7] = stParMergeCallback.EndPositions[6] + (arrayLength - stParMergeCallback.EndPositions[6]) / 2;
-            stParMergeCallback.EndPositions[5] = stParMergeCallback.EndPositions[4] + (stParMergeCallback.EndPositions[6] - stParMergeCallback.EndPositions[4]) / 2;
-            stParMergeCallback.EndPositions[3] = stParMergeCallback.EndPositions[2] + (stParMergeCallback.EndPositions[4] - stParMergeCallback.EndPositions[2]) / 2;
-            stParMergeCallback.EndPositions[1] = 0 + (stParMergeCallback.EndPositions[2] - 0) / 2;
-            stParMergeCallback.EndPositions[0] = 0;
-
-            // This will notify the worker threads of a new work item
-            // Default thead wakeup to 7
-            THREADER->WorkMain(pWorkItem, stParMergeCallback.MergeBlocks, (int32_t)(stParMergeCallback.MergeBlocks-1), 1, FALSE);
-
-            // Free temp memory used
-            WORKSPACE_FREE(pWorkSpace);
-            return 0;
+        if (pWorkSpace == NULL) {
+            return -1;
         }
+
+        pWorkItem->DoWorkCallback = ParMergeInPlaceThreadCallback;
+        pWorkItem->WorkCallbackArg = &stParMergeCallback;
+
+        // First pass is a quicksort in place
+        stParMergeCallback.SortCallbackOne = pSortFunction;
+
+        // second pass is a mergesort in place
+        stParMergeCallback.SortCallbackTwo = ParInPlaceMerge<DATATYPE>;
+
+        stParMergeCallback.pValues = pValues;
+        stParMergeCallback.pToSort = pOut;
+        stParMergeCallback.ArrayLength = arrayLength;
+        stParMergeCallback.StrLen = itemSize;
+        stParMergeCallback.AllocChunk = allocChunk;
+        stParMergeCallback.pWorkSpace = (char*)pWorkSpace;
+        stParMergeCallback.TypeSizeInput = itemSize;
+        stParMergeCallback.TypeSizeOutput = stridesOut;
+
+        // This will notify the worker threads of a new work item
+        // Default thead wakeup to 7
+        THREADER->WorkMain(pWorkItem, stParMergeCallback.MergeSplitter.NumCores, (int32_t)(stParMergeCallback.MergeSplitter.NumCores-1), 1, FALSE);
+
+        // Free temp memory used
+        WORKSPACE_FREE(pWorkSpace);
+        return 0;
     }
 
-    CopyData(
-        pValues,
-        arrayLength,
-        stridesIn,
-        itemSize,
-        pOut,
-        stridesOut);
+    // No threading path
+
+    // Check if in place or a copy needs to be done
+    if (pValues != pOut) {
+        CopyData(
+            pValues,
+            arrayLength,
+            stridesIn,
+            itemSize,
+            pOut,
+            stridesOut);
+    }
 
     // single threaded sort
     if (pSortFunction.sortfunc)
         return  pSortFunction.sortfunc(pOut, arrayLength);
     if (pSortFunction.sortstringfunc)
         return  pSortFunction.sortstringfunc(pOut, arrayLength, itemSize);
+    printf("!!sort failed %p\n", pSortFunction.sortfunc);
     return -1;
 }
 
@@ -1878,25 +1995,28 @@ static int
 SortIndex(
     int64_t* pCutOffs, int64_t cutOffLength, void* pDataIn1, UINDEX* toSort, int64_t arraySize1, SORT_MODE mode) {
 
-    int result = 0;
+    ARGSORT_FUNCTION_ANY    argsort ;
+    argsort.init();
+
 
     switch (mode) {
     case SORT_MODE::SORT_MODE_QSORT:
-        result = aquicksort_<DATATYPE, UINDEX>((DATATYPE*)pDataIn1, (UINDEX*)toSort, arraySize1);
-        break;
-
-        //case SORT_MODE::SORT_MODE_MERGE:
-        //   result = amergesort_<DATATYPE, UINDEX>((DATATYPE*)pDataIn1, (UINDEX*)toSort, arraySize1);
-        //   break;
-    case SORT_MODE::SORT_MODE_MERGE:
-        result = par_amergesort<DATATYPE, UINDEX>(pCutOffs, cutOffLength, (DATATYPE*)pDataIn1, (UINDEX*)toSort, arraySize1, 0, PAR_SORT_TYPE::Normal);
+        argsort.argsortfunc = aquicksort_<DATATYPE, UINDEX>;
         break;
 
     case SORT_MODE::SORT_MODE_HEAP:
-        result = aheapsort_<DATATYPE, UINDEX>((DATATYPE*)pDataIn1, (UINDEX*)toSort, (UINDEX)arraySize1);
+        argsort.argsortfunc = aheapsort_<DATATYPE, UINDEX>;
+        break;
+    
+    default:
+        //argsort.argsortfunc = amergesort_<DATATYPE, UINDEX>;
+        argsort.argsortstringfunc = amergesortworkspace_<DATATYPE, UINDEX>;
         break;
 
     }
+
+    int result = 0;
+    result = par_amergesort<DATATYPE, UINDEX>(pCutOffs, cutOffLength, (DATATYPE*)pDataIn1, (UINDEX*)toSort, arraySize1, 0, PAR_SORT_TYPE::Normal, argsort);
 
     if (result != 0) {
         LOGGING("**Error sorting.  size %llu   mode %d\n", (int64_t)arraySize1, mode);
@@ -1904,61 +2024,6 @@ SortIndex(
 
     return result;
 }
-
-
-
-
-//-----------------------------------------------------------------------------------------------
-template <typename UINDEX>
-static int
-SortIndexString(int64_t* pCutOffs, int64_t cutOffLength, const char* pDataIn1, UINDEX* toSort, int64_t arraySize1, SORT_MODE mode, int64_t strlen) {
-
-    int result = 0;
-    switch (mode) {
-    default:
-    case SORT_MODE::SORT_MODE_MERGE:
-        result = par_amergesort<char, UINDEX>(pCutOffs, cutOffLength, (char*)pDataIn1, (UINDEX*)toSort, (int32_t)arraySize1, strlen, PAR_SORT_TYPE::String);
-        break;
-
-    }
-
-    return result;
-}
-
-
-//-----------------------------------------------------------------------------------------------
-template <typename UINDEX>
-static int
-SortIndexUnicode(int64_t* pCutOffs, int64_t cutOffLength, const char* pDataIn1, UINDEX* toSort, int64_t arraySize1, SORT_MODE mode, int64_t strlen) {
-
-    int result = 0;
-    switch (mode) {
-    default:
-    case SORT_MODE::SORT_MODE_MERGE:
-        result = par_amergesort<char, UINDEX>(pCutOffs, cutOffLength, (char*)pDataIn1, (UINDEX*)toSort, arraySize1, strlen, PAR_SORT_TYPE::Unicode);
-        break;
-
-    }
-
-    return result;
-}
-
-//-----------------------------------------------------------------------------------------------
-template <typename UINDEX>
-static int
-SortIndexVoid(int64_t* pCutOffs, int64_t cutOffLength, const char* pDataIn1, UINDEX* toSort, int64_t arraySize1, SORT_MODE mode, int64_t strlen) {
-
-    int result = 0;
-    switch (mode) {
-    default:
-    case SORT_MODE::SORT_MODE_MERGE:
-        result = par_amergesort<char, UINDEX>(pCutOffs, cutOffLength, (char*)pDataIn1, (UINDEX*)toSort, arraySize1, strlen, PAR_SORT_TYPE::Void);
-        break;
-    }
-
-    return result;
-}
-
 
 //------------------------------------------------------------------------------------------
 // Internal and can be called from groupby
@@ -1975,13 +2040,21 @@ static int SortIndex(
     int        arrayType1,
     int64_t    strlen) {
 
+
+    ARGSORT_FUNCTION_ANY mergeStepOne;
+    mergeStepOne.init();
+
+
     switch (arrayType1) {
     case ATOP_UNICODE:
-        return SortIndexUnicode<UINDEX>(pCutOffs, cutOffLength, (const char*)pDataIn1, pDataOut1, arraySize1, mode, strlen);
-    case ATOP_VOID:
-        return SortIndexVoid<UINDEX>(pCutOffs, cutOffLength, (const char*)pDataIn1, pDataOut1, arraySize1, mode, strlen);
+        mergeStepOne.argsortstringfunc = ParMergeString<const uint32_t*, UINDEX>;
+        return par_amergesort<char, UINDEX>(pCutOffs, cutOffLength, (char*)pDataIn1, pDataOut1, arraySize1, strlen, PAR_SORT_TYPE::Unicode, mergeStepOne);
     case ATOP_STRING:
-        SortIndexString<UINDEX>(pCutOffs, cutOffLength, (const char*)pDataIn1, pDataOut1, arraySize1, mode, strlen);
+        mergeStepOne.argsortstringfunc = ParMergeString<const unsigned char*, UINDEX>;
+        return par_amergesort<char, UINDEX>(pCutOffs, cutOffLength, (char*)pDataIn1, pDataOut1, arraySize1, strlen, PAR_SORT_TYPE::String, mergeStepOne);
+    case ATOP_VOID:
+        mergeStepOne.argsortstringfunc = ParMergeString<const char*, UINDEX>;
+        return par_amergesort<char, UINDEX>(pCutOffs, cutOffLength, (char*)pDataIn1, pDataOut1, arraySize1, strlen, PAR_SORT_TYPE::Void, mergeStepOne);
     case ATOP_BOOL:
     case ATOP_INT8:
         return SortIndex<int8_t, UINDEX>(pCutOffs, cutOffLength, pDataIn1, pDataOut1, arraySize1, mode);
@@ -2108,6 +2181,7 @@ extern "C" int Sort(
     int64_t stridesOut) {
 
     SORT_FUNCTION_ANY pSortFunction = { NULL, NULL };
+    LOGGING("sort called for %d %d\n", atype, sortmode);
 
     pSortFunction.sortfunc= GetSortFunction(pDataIn1, arraySize1, atype, sortmode);
     if (!pSortFunction.sortfunc) {

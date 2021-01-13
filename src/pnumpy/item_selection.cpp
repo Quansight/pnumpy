@@ -719,7 +719,7 @@ PyObject* PyArray_PTakeFrom(PyArrayObject* self0, PyObject* indices0, int axis,
     }
 
     n = m = chunk = 1;
-    nd = PyArray_NDIM(self) + PyArray_NDIM(indices) - 1;
+    nd = (int64_t)PyArray_NDIM(self) + (int64_t)PyArray_NDIM(indices) - 1;
     for (i = 0; i < nd; i++) {
         if (i < axis) {
             shape[i] = PyArray_DIMS(self)[i];
