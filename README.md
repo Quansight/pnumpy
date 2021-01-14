@@ -1,6 +1,5 @@
 # PNumPy
-Parallel NumPy is a new multithreaded package which seamlessly speeds up NumPy for large arrays (> 64,000 elements).
-Most importantly, there is *no change required to your existing NumPy code*.
+Parallel NumPy seamlessly speeds up NumPy for large arrays (64K+ elements) with *no change required to your existing NumPy code*.
 
 This first release speeds up NumPy binary and unary ufuncs such **add, multiply, isnan, abs, sin, log, sum, min and many more**.
 Sped up functions also include: **sort, argsort, lexsort, boolean indexing, and fancy indexing**.
@@ -53,6 +52,11 @@ To cap the number of additional worker threads to 3 run
 ```
 pn.thread_setworkers(3)
 ```
+
+## Threading
+PNumPy uses a combination of threads and 256 bit vector intrinsics to speed up calculations.  By default most operations will only use 3 additional worker threads in combination with the main python thread for a total 4.  Large arrays are divided up into 16K chunks and threads are assigned to maintain cache coherency.  More threads are dynamically deployed for more intensive CPU problems like **np.sin**.  Users can customize threading.  The example below shows how 4 threads can work together to quadruple the effective L2 cache size.
+
+![plot](./doc_src/images/threading_npadd.PNG)
 
 ## FAQ
 **Q: If I type np.sort(a) where a is an array, will it be sped up?**
