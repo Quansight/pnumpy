@@ -675,7 +675,7 @@ ArgMinMaxFunc g_UFuncArgMinMaxLUT[2][ATOP_LAST] =
 
 //=============================================================================
 // Arange
-#define DEF_ARANGE_USTUB(_ATYPE_) int ARANGEF##_ATYPE_##(void* pDest, npy_intp length, void* unused) { \
+#define DEF_ARANGE_USTUB(_ATYPE_) int ARANGEF##_ATYPE_(void* pDest, npy_intp length, void* unused) { \
     return AtopArangeMathFunction(pDest, length, unused, _ATYPE_);}
 
 DEF_ARANGE_USTUB(ATOP_BOOL); 
