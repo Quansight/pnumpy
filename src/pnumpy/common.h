@@ -43,7 +43,9 @@ enum OP_CATEGORY:int32_t {
     OPCAT_CONVERT = 4,
     OPCAT_SORT = 5,
     OPCAT_ARGSORT = 6,
-    OPCAT_LAST = 7,
+    OPCAT_ARANGE = 7,
+    OPCAT_ARGMINMAX = 8,
+    OPCAT_LAST = 9,
 };
 
 struct stOpCategory {

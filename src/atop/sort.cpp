@@ -699,6 +699,8 @@ mergesort0_(T* pl, T* pr, T* pw)
         }
     }
     else {
+        // NOTE 50% of sort time is spent here
+        // Consider a vectorized bitonic sort
         /* insertion sort */
         for (pi = pl + 1; pi < pr; ++pi) {
             vp = *pi;
