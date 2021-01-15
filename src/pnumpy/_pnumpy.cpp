@@ -180,6 +180,15 @@ static stUFuncToAtop gArgSortMapping[] = {
     {"argsort",           TRIG_OPERATION::SIN},
 };
 
+static stUFuncToAtop gArangeMapping[] = {
+    {"arange",           0},
+};
+
+static stUFuncToAtop gArgMinMaxMapping[] = {
+    {"argmax",           0},
+    {"argmin",           1},
+};
+
 // Global table lookup to get to all loops, used by ledger
 stOpCategory gOpCategory[OP_CATEGORY::OPCAT_LAST] = {
     {"Binary", sizeof(gBinaryMapping) / sizeof(stUFuncToAtop), OP_CATEGORY::OPCAT_BINARY, gBinaryMapping},
@@ -189,6 +198,8 @@ stOpCategory gOpCategory[OP_CATEGORY::OPCAT_LAST] = {
     {"Convert", sizeof(gConvertMapping) / sizeof(stUFuncToAtop), OP_CATEGORY::OPCAT_CONVERT, gConvertMapping},
     {"Sort", sizeof(gSortMapping) / sizeof(stUFuncToAtop), OP_CATEGORY::OPCAT_SORT, gSortMapping},
     {"ArgSort", sizeof(gArgSortMapping) / sizeof(stUFuncToAtop), OP_CATEGORY::OPCAT_ARGSORT, gArgSortMapping},
+    {"Arange", sizeof(gArangeMapping) / sizeof(stUFuncToAtop), OP_CATEGORY::OPCAT_ARANGE, gArangeMapping},
+    {"ArgMinMax", sizeof(gArgMinMaxMapping) / sizeof(stUFuncToAtop), OP_CATEGORY::OPCAT_ARGMINMAX, gArgMinMaxMapping},
 };
 
 // Python dictionary keeping track of all functions we hook
@@ -280,7 +291,7 @@ struct stSortFunc {
 //SortFunc g_UFuncSortLUT[NPY_NSORTS][ATOP_LAST];
 stSortFunc g_SortFuncLUT[NPY_NSORTS][ATOP_LAST];
 
-
+//---------------------------------------------------------------------
 typedef int (*ArgSortFunc)(void*, npy_intp*, npy_intp, void*);
 typedef int (*ArgSortFuncStub)(void*, npy_intp*, npy_intp, void*, int sortkind, int atype);
 
@@ -295,8 +306,42 @@ struct stArgSortFunc {
 };
 
 // 3 sort functions
-//SortFunc g_UFuncSortLUT[NPY_NSORTS][ATOP_LAST];
 stArgSortFunc g_ArgSortFuncLUT[NPY_NSORTS][ATOP_LAST];
+
+//---------------------------------------------------------------------
+typedef int (*ArgMinMaxFunc)(void*, npy_intp, npy_intp*, void*);
+typedef int (*ArgMinMaxFuncStub)(void*, npy_intp, npy_intp*, void*, int kind, int atype);
+
+struct stArgMinMaxFunc {
+    ArgMinMaxFunc  pOldFunc;
+
+    // the maximum threads to deploy
+    int32_t                 MaxThreads;
+
+    // the minimum number of elements in the array before threading allowed
+    int32_t                 MinElementsToThread;
+};
+
+// 2 minmax functions
+stArgMinMaxFunc g_ArgMinMaxFuncLUT[2][ATOP_LAST];
+
+//---------------------------------------------------------------------
+typedef int (*ArangeFunc)(void*, npy_intp length, void* unused);
+typedef int (*ArangeFuncStub)(void*, npy_intp length, void* unused, int atype);
+
+struct stArangeFunc {
+    ArangeFunc  pOldFunc;
+
+    // the maximum threads to deploy
+    int32_t                 MaxThreads;
+
+    // the minimum number of elements in the array before threading allowed
+    int32_t                 MinElementsToThread;
+};
+
+// 1 arange function
+stArangeFunc g_ArangeFuncLUT[ATOP_LAST];
+
 
 
 // set to 0 to disable
@@ -1046,6 +1091,57 @@ static int AtopArgSortMathFunction(void* pValue, npy_intp* pInt64Buffer, npy_int
     return result;
 }
 
+
+//=============================================================
+// All argminmax like functions that we hook hit this routine
+static int AtopArgMinMaxMathFunction(void* pValue, npy_intp length, npy_intp* something, void* pArrayObject, int kind, int atype) {
+    LOGGING("argminmax called %d %d   src:%p\n", kind, atype, pValue);
+    if (!g_Settings.LedgerEnabled) {
+        stArgMinMaxFunc* pArgMinMaxFunc = &g_ArgMinMaxFuncLUT[kind][atype];
+        if (g_Settings.AtopEnabled) {
+        }
+        // punt to old routine
+        return pArgMinMaxFunc->pOldFunc(pValue, length, something, pArrayObject);
+    }
+    LEDGER_START();
+    int result = AtopArgMinMaxMathFunction(pValue, length, something, pArrayObject, kind, atype);
+    LEDGER_END2(OP_CATEGORY::OPCAT_ARGMINMAX);
+    return result;
+}
+
+//=============================================================
+// All arange like functions that we hook hit this routine
+static int AtopArangeMathFunction(void* pValue, npy_intp length, void* unused, int atype) {
+    LOGGING("Arange called %d   src:%p\n", atype, pValue);
+    if (!g_Settings.LedgerEnabled) {
+        stArangeFunc* pArangeFunc = &g_ArangeFuncLUT[atype];
+        if (g_Settings.AtopEnabled) {
+            int itemsize = convert_atop_to_itemsize[atype];
+
+            // For arange, numpy puts the start and next as the first two values
+            char* buffer = (char*)pValue;
+            char* pStartValue = buffer;
+            char* pNextValue = buffer + itemsize;
+
+            int result = ArangeFill(atype, buffer, pStartValue, pNextValue, length, pArangeFunc->MaxThreads);
+            if (result >= 0) return result;
+
+        }
+        // punt to old routine
+        if (pArangeFunc->pOldFunc) {
+            return pArangeFunc->pOldFunc(pValue, length, unused);
+        }
+        //PyErr_SetString(PyExc_ValueError, "no fill-function for data-type.");
+        return -1;
+    }
+    LEDGER_START();
+    int result = AtopArangeMathFunction(pValue, length, unused, atype);
+    LEDGER_END2(OP_CATEGORY::OPCAT_ARANGE);
+    return result;
+
+}
+
+
 // the inclusion of this file is because there is no callback argument
 #include "stubs.h"
 
@@ -1135,7 +1231,7 @@ PyObject* oldinit(PyObject *self, PyObject *args, PyObject *kwargs) {
     return result;
 }
 
-// Add to global dict
+// Add to global dict of functions we have hooked
 void AddToDict(const char* ufunc_name, int dtype, void* pstUFunc) {
     // Create a tuple pair of ufuncname/dtype
     PyObject* pTuple = PyTuple_New(2);
@@ -1178,16 +1274,6 @@ int MyMoveInto(PyArrayObject * dest, PyArrayObject * src) {
 
 // PyArray_GetCastFunc
 typedef PyArray_VectorUnaryFunc* (*GETCASTFUNC)(PyArray_Descr* from, int totype);
-GETCASTFUNC gOriginalCastFunc = NULL;
-extern "C"
-PyArray_VectorUnaryFunc* MyCastFunc(PyArray_Descr * from, int totype) {
-    printf("MyCastFunc %p \n", from);
-    return gOriginalCastFunc(from, totype);
-}
-
-//#define PyArray_CopyInto \
-//        (*(int (*)(PyArrayObject *, PyArrayObject *)) \
-//         PyArray_API[82])
 
 extern "C"
 PyObject* newinit(PyObject* self, PyObject* args, PyObject* kwargs) {
@@ -1458,6 +1544,8 @@ PyObject* newinit(PyObject* self, PyObject* args, PyObject* kwargs) {
             int atypeSrc = convert_dtype_to_atop[dtypes[j]];
             int srcdtype = dtypes[j];
             npy_intp  dims[1] = { 10 };
+
+            // Allocate an array of 10
             PyArrayObject* pTemp=  AllocateNumpyArray(1, dims, srcdtype);
             //PyArray_Descr* pSrcDtype = PyArray_DescrFromType(srcdtype);
             PyArray_Descr* pSrcDtype = PyArray_DESCR(pTemp);
@@ -1495,6 +1583,45 @@ PyObject* newinit(PyObject* self, PyObject* args, PyObject* kwargs) {
                     }
                 }
 
+                // other funcs
+                // nonzero; NOTE: only appears to be called with a.nonzero()
+                // fillwithscalar; NOTE: no longer called
+                //
+                // fill: used in arange
+                // argmin/argmax: still used
+
+                stArgMinMaxFunc* pArgMinMax = &g_ArgMinMaxFuncLUT[0][atypeSrc];
+                if (pSrcDtype->f->argmax && pSrcDtype->f->argmax != g_UFuncArgMinMaxLUT[0][atypeSrc]) {
+                    LOGGING("ArgMinMax func %d  kind: %d\n", srcdtype, 0);
+                    pArgMinMax->pOldFunc = pSrcDtype->f->argmax;
+                    pArgMinMax->MaxThreads = 3;
+                    pSrcDtype->f->argmax = g_UFuncArgMinMaxLUT[0][atypeSrc];
+                }
+
+                pArgMinMax = &g_ArgMinMaxFuncLUT[1][atypeSrc];
+                if (pSrcDtype->f->argmin && pSrcDtype->f->argmin != g_UFuncArgMinMaxLUT[1][atypeSrc]) {
+                    LOGGING("ArgMinMax func %d  kind: %d\n", srcdtype, 1);
+                    pArgMinMax->pOldFunc = pSrcDtype->f->argmin;
+                    pArgMinMax->MaxThreads = 3;
+                    pSrcDtype->f->argmin = g_UFuncArgMinMaxLUT[1][atypeSrc];
+                }
+
+                stArangeFunc* pArange = &g_ArangeFuncLUT[atypeSrc];
+                // If numpy has no fill, we have no fill
+                if (pSrcDtype->f->fill && pSrcDtype->f->fill != g_UFuncArangeLUT[atypeSrc]) {
+                    LOGGING("Arange func %d  kind: %d\n", srcdtype, k);
+                    pArange->pOldFunc = pSrcDtype->f->fill;
+                    pArange->MaxThreads = 3;
+                    pSrcDtype->f->fill = g_UFuncArangeLUT[atypeSrc];
+                }
+
+
+                // NOTES below on how to hook lower level copy functions in numpy
+                // ones, calls copyto, calls PyArray_AssignArray, calls PyArray_AssignRawScalar, raw_array_assign_scalar,
+                // calls PyArray_GetDTypeTransferFunction, PyArray_GetStridedCopyFn, return &_contig_to_contig,  memmove(dst, src, src_itemsize*N)
+                // NOTE: Tell numpy devs -> in lowlevel_strided_loops.c.src, replace memset/memcpy/memmove with
+                // Hook fill
+                // funcs->fill(PyArray_DATA(range), length, range);
 
                 // TODO: Future hook for conversions
                 //for (int k = 0; k < num_dtypes; k++) {

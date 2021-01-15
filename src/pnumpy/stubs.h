@@ -494,8 +494,6 @@ PyVFuncGenericFunction g_UFuncConvertLUT[ATOP_LAST][ATOP_LAST] =
 
 //=============================================================================
 // Sort
-//static void AtopSortFunction(char* pDest, char* pSrc, npy_intp length, PyArrayObject* fromarr, PyArrayObject* toarr, int fromtype, int totype) {
-// call the central convesion routine
 #define DEF_SORT_USTUB(_FUNC_, _ATYPE_) int SORTF##_ATYPE_##_FUNC_(void* pDest, npy_intp length, void* pSrc) { \
     return AtopSortMathFunction(pDest, length, pSrc, _FUNC_, _ATYPE_);}
 
@@ -557,8 +555,6 @@ SortFunc g_UFuncSortLUT[NPY_NSORTS][ATOP_LAST] =
 
 //=============================================================================
 // ArgSort
-//static void AtopArgSortFunction(char* pDest, npy_intp* something, char* pSrc, npy_intp length, PyArrayObject* fromarr, PyArrayObject* toarr, int fromtype, int totype) {
-// call the central convesion routine
 #define DEF_ARGSORT_USTUB(_FUNC_, _ATYPE_) int ARGSORTF##_ATYPE_##_FUNC_(void* pDest, npy_intp* something, npy_intp length, void* pSrc) { \
     return AtopArgSortMathFunction(pDest, something, length, pSrc, _FUNC_, _ATYPE_);}
 
@@ -615,5 +611,114 @@ ArgSortFunc g_UFuncArgSortLUT[NPY_NSORTS][ATOP_LAST] =
 {DEF_ARGSORT_USTUB_NAME(0)},
 {DEF_ARGSORT_USTUB_NAME(1)},
 {DEF_ARGSORT_USTUB_NAME(2)},
+};
+
+
+//=============================================================================
+// ArgMinMax
+#define DEF_ARGMINMAX_USTUB(_FUNC_, _ATYPE_) int ARGMINMAXF##_ATYPE_##_FUNC_(void* pDest, npy_intp length, npy_intp* something,  void* pSrc) { \
+    return AtopArgMinMaxMathFunction(pDest, length, something, pSrc, _FUNC_, _ATYPE_);}
+
+#define DEF_ARGMINMAX_USTUB_EXPAND(_FUNC_) \
+    DEF_ARGMINMAX_USTUB(_FUNC_, ATOP_BOOL); \
+    DEF_ARGMINMAX_USTUB(_FUNC_, ATOP_INT8); \
+    DEF_ARGMINMAX_USTUB(_FUNC_, ATOP_UINT8); \
+    DEF_ARGMINMAX_USTUB(_FUNC_, ATOP_INT16); \
+    DEF_ARGMINMAX_USTUB(_FUNC_, ATOP_UINT16); \
+    DEF_ARGMINMAX_USTUB(_FUNC_, ATOP_INT32); \
+    DEF_ARGMINMAX_USTUB(_FUNC_, ATOP_UINT32); \
+    DEF_ARGMINMAX_USTUB(_FUNC_, ATOP_INT64); \
+    DEF_ARGMINMAX_USTUB(_FUNC_, ATOP_UINT64); \
+    DEF_ARGMINMAX_USTUB(_FUNC_, ATOP_INT128); \
+    DEF_ARGMINMAX_USTUB(_FUNC_, ATOP_UINT128); \
+    DEF_ARGMINMAX_USTUB(_FUNC_, ATOP_HALF_FLOAT); \
+    DEF_ARGMINMAX_USTUB(_FUNC_, ATOP_FLOAT); \
+    DEF_ARGMINMAX_USTUB(_FUNC_, ATOP_DOUBLE); \
+    DEF_ARGMINMAX_USTUB(_FUNC_, ATOP_LONGDOUBLE); \
+    DEF_ARGMINMAX_USTUB(_FUNC_, ATOP_CHALF_FLOAT); \
+    DEF_ARGMINMAX_USTUB(_FUNC_, ATOP_CFLOAT); \
+    DEF_ARGMINMAX_USTUB(_FUNC_, ATOP_CDOUBLE); \
+    DEF_ARGMINMAX_USTUB(_FUNC_, ATOP_CLONGDOUBLE);
+
+// For however many functions there are
+DEF_ARGMINMAX_USTUB_EXPAND(0)
+DEF_ARGMINMAX_USTUB_EXPAND(1)
+
+#define DEF_ARGMINMAX_USTUB_NAME(_FUNC_) \
+    ARGMINMAXFATOP_BOOL##_FUNC_, \
+    ARGMINMAXFATOP_INT8##_FUNC_, \
+    ARGMINMAXFATOP_UINT8##_FUNC_, \
+    ARGMINMAXFATOP_INT16##_FUNC_, \
+    ARGMINMAXFATOP_UINT16##_FUNC_, \
+    ARGMINMAXFATOP_INT32##_FUNC_, \
+    ARGMINMAXFATOP_UINT32##_FUNC_, \
+    ARGMINMAXFATOP_INT64##_FUNC_, \
+    ARGMINMAXFATOP_UINT64##_FUNC_, \
+    ARGMINMAXFATOP_INT128##_FUNC_, \
+    ARGMINMAXFATOP_UINT128##_FUNC_, \
+    ARGMINMAXFATOP_HALF_FLOAT##_FUNC_, \
+    ARGMINMAXFATOP_FLOAT##_FUNC_, \
+    ARGMINMAXFATOP_DOUBLE##_FUNC_, \
+    ARGMINMAXFATOP_LONGDOUBLE##_FUNC_, \
+    ARGMINMAXFATOP_CHALF_FLOAT##_FUNC_, \
+    ARGMINMAXFATOP_CFLOAT##_FUNC_, \
+    ARGMINMAXFATOP_CDOUBLE##_FUNC_, \
+    ARGMINMAXFATOP_CLONGDOUBLE##_FUNC_ 
+
+
+ArgMinMaxFunc g_UFuncArgMinMaxLUT[2][ATOP_LAST] =
+{
+{DEF_ARGMINMAX_USTUB_NAME(0)},
+{DEF_ARGMINMAX_USTUB_NAME(1)},
+};
+
+
+//=============================================================================
+// Arange
+#define DEF_ARANGE_USTUB(_ATYPE_) int ARANGEF##_ATYPE_##(void* pDest, npy_intp length, void* unused) { \
+    return AtopArangeMathFunction(pDest, length, unused, _ATYPE_);}
+
+DEF_ARANGE_USTUB(ATOP_BOOL); 
+DEF_ARANGE_USTUB(ATOP_INT8); 
+DEF_ARANGE_USTUB(ATOP_UINT8); 
+DEF_ARANGE_USTUB(ATOP_INT16); 
+DEF_ARANGE_USTUB(ATOP_UINT16); 
+DEF_ARANGE_USTUB(ATOP_INT32); 
+DEF_ARANGE_USTUB(ATOP_UINT32); 
+DEF_ARANGE_USTUB(ATOP_INT64); 
+DEF_ARANGE_USTUB(ATOP_UINT64); 
+DEF_ARANGE_USTUB(ATOP_INT128); 
+DEF_ARANGE_USTUB(ATOP_UINT128); 
+DEF_ARANGE_USTUB(ATOP_HALF_FLOAT); 
+DEF_ARANGE_USTUB(ATOP_FLOAT); 
+DEF_ARANGE_USTUB(ATOP_DOUBLE); 
+DEF_ARANGE_USTUB(ATOP_LONGDOUBLE); 
+DEF_ARANGE_USTUB(ATOP_CHALF_FLOAT); 
+DEF_ARANGE_USTUB(ATOP_CFLOAT); 
+DEF_ARANGE_USTUB(ATOP_CDOUBLE); 
+DEF_ARANGE_USTUB(ATOP_CLONGDOUBLE);
+
+
+ArangeFunc g_UFuncArangeLUT[ATOP_LAST] =
+
+{   ARANGEFATOP_BOOL, 
+    ARANGEFATOP_INT8, 
+    ARANGEFATOP_UINT8, 
+    ARANGEFATOP_INT16, 
+    ARANGEFATOP_UINT16, 
+    ARANGEFATOP_INT32, 
+    ARANGEFATOP_UINT32, 
+    ARANGEFATOP_INT64, 
+    ARANGEFATOP_UINT64, 
+    ARANGEFATOP_INT128, 
+    ARANGEFATOP_UINT128, 
+    ARANGEFATOP_HALF_FLOAT, 
+    ARANGEFATOP_FLOAT, 
+    ARANGEFATOP_DOUBLE, 
+    ARANGEFATOP_LONGDOUBLE, 
+    ARANGEFATOP_CHALF_FLOAT, 
+    ARANGEFATOP_CFLOAT, 
+    ARANGEFATOP_CDOUBLE, 
+    ARANGEFATOP_CLONGDOUBLE 
 };
 

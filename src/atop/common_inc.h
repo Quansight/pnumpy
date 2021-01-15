@@ -511,4 +511,11 @@ extern "C" int Sort(
     void* pDataOut1,
     int64_t stridesOut);
 
+extern "C" int ArangeFill(
+    int   atype,
+    char* pBuffer,
+    void* pFirstValue,
+    void* pSecondValue,
+    int64_t length,
+    int32_t threadwakeup);
 

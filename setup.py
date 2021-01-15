@@ -115,6 +115,7 @@ setup(
                      'src/atop/threads.cpp',
                      'src/atop/recarray.cpp',
                      'src/atop/sort.cpp',
+                     'src/atop/fill.cpp',
                      'src/atop/ops_binary.cpp',
                      'src/atop/ops_compare.cpp',
                      'src/atop/ops_unary.cpp',
