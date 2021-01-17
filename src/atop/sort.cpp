@@ -128,6 +128,27 @@ FORCE_INLINE static bool COMPARE_LT(int16_t X, int16_t Y) { return (X < Y); }
 FORCE_INLINE static bool COMPARE_LT(uint8_t X, uint8_t Y) { return (X < Y); }
 FORCE_INLINE static bool COMPARE_LT(uint16_t X, uint16_t Y) { return (X < Y); }
 
+// Find nans at the sorted right side of two sided merge.  nans will be at end
+// For floats we move the pointer back to skip over nans, for ints we do nothing
+FORCE_INLINE static float* FIND_NANS(float* pr, float* pm)
+    { do { float cmp = *(pr - 1); if (cmp == cmp) return pr; --pr; } while (pm < pr); return pr; };
+FORCE_INLINE static double* FIND_NANS(double* pr, double* pm)
+    { do { double cmp = *(pr - 1); if (cmp == cmp) return pr; --pr; } while (pm < pr); return pr; };
+FORCE_INLINE static long double* FIND_NANS(long double* pr, long double* pm) 
+    { do { long double cmp = *(pr - 1); if (cmp == cmp) return pr; --pr; } while (pm < pr); return pr;  };
+FORCE_INLINE static int8_t* FIND_NANS(int8_t* pr, int8_t* pm) { return pr; }
+FORCE_INLINE static int16_t* FIND_NANS(int16_t* pr, int16_t* pm) { return pr; }
+FORCE_INLINE static int32_t* FIND_NANS(int32_t* pr, int32_t* pm) { return pr; }
+FORCE_INLINE static int64_t* FIND_NANS(int64_t* pr, int64_t* pm) { return pr; }
+FORCE_INLINE static uint8_t*  FIND_NANS(uint8_t* pr,  uint8_t* pm) { return pr; }
+FORCE_INLINE static uint16_t* FIND_NANS(uint16_t* pr, uint16_t* pm) { return pr; }
+FORCE_INLINE static uint32_t* FIND_NANS(uint32_t* pr, uint32_t* pm) { return pr; }
+FORCE_INLINE static uint64_t* FIND_NANS(uint64_t* pr, uint64_t* pm) { return pr; }
+FORCE_INLINE static bool* FIND_NANS(bool* pr, bool* pm) { return pr; }
+
+// not nan aware
+#define COMPARE_LT_UNSAFE(X,Y) ((X) < (Y))
+
 // Routines for HALF_FLOAT
 FORCE_INLINE static bool
 atop_half_isnan(atop_half h)
@@ -667,40 +688,185 @@ aquicksort_(void* vv1, void* tosort1, int64_t num)
 
 
 //--------------------------------------------------------------------------------------
+// Will return 1 if copied into workspace
+// Will return 0 if NOT copied data into workspace, thus avoiding MEMCPY
+template <typename T>
+static int
+mergesort0left_(T* pl, T* pr, T* pw)
+{
+    if (pr - pl > SMALL_MERGESORT) {
+        /* merge sort */
+        T* pm = pl + ((pr - pl) >> 1);
+
+        // Solve right first
+        mergesort0_(pm, pr, pw);
+
+        // Now left
+        mergesort0_(pl, pm, pw);
+
+        if (COMPARE_LT(*pm, *(pm - 1))) {
+            // For floats, we will work backwards from the right side
+            // of the merge to search for nans
+            // NOTE: integers do not need to find nans
+            T* origpr = pr;
+
+            // Merge into workspace...
+            pr = FIND_NANS(pr, pm);
+
+            T* pDest = pw;
+            pw = pl;
+            T* pwEnd = pm;
+
+            while (pw < pwEnd && pm < pr) {
+                T cmpR = *pm;
+                T cmpL = *pw;
+
+                // nans ok here because we moved pr pointer past all nans
+                // only cmpL can have nans now
+                if (cmpL <= cmpR) {
+                    *pDest++ = cmpL; pw++;
+                }
+                else {
+                    *pDest++ = cmpR; pm++;
+                }
+
+            }
+            while (pw < pwEnd) {
+                *pDest++ = *pw++;
+            }
+
+            // we are moving all of it into workspace
+            // for floats, this picks up any nans on the far right
+            while (pm < origpr) {
+                *pDest++ = *pm++;
+            }
+            // data in workspace
+            return 1;
+        }
+        return 0;
+    }
+    else {
+        T vp;
+        T* pj; T* pk; T* pi;
+        // NOTE 50% of sort time is spent here
+        // Consider a vectorized bitonic sort
+        // For floats, consider moving nans to the end as the first step
+        // to avoid the more complicated nan comparison
+        /* insertion sort */
+        for (pi = pl + 1; pi < pr; ++pi) {
+            vp = *pi;
+            pj = pi;
+            pk = pi - 1;
+            while (pj > pl&& COMPARE_LT(vp, *pk)) {
+                *pj-- = *pk--;
+            }
+            *pj = vp;
+        }
+    }
+    return 0;
+}
+
+
+
+//--------------------------------------------------------------------------------------
 template <typename T>
 static void
 mergesort0_(T* pl, T* pr, T* pw)
 {
-    T vp, * pi, * pj, * pk, * pm;
-
     if (pr - pl > SMALL_MERGESORT) {
         /* merge sort */
-        pm = pl + ((pr - pl) >> 1);
-        mergesort0_(pl, pm, pw);
+        T* pm =pl + ((pr - pl) >> 1);
+
+        // Solve right first
         mergesort0_(pm, pr, pw);
 
-        if (COMPARE_LT(*pm, *(pm - 1))) {
-            MEMCPYR(pw, pl, (pm - pl) * sizeof(T));
+        // Now the left hand side can use the full workspace
+        int copiedIntoWorkSpace = mergesort0left_(pl, pm, pw);
 
-                pi = pw + (pm - pl);
-                pj = pw;
-                pk = pl;
-                while (pj < pi && pm < pr) {
-                    if (COMPARE_LT(*pm, *pj)) {
-                        *pk++ = *pm++;
+        if (copiedIntoWorkSpace) {
+            // is this check ok?
+            // For floats, we will work backwards from the right side
+            // of the merge to search for nans
+            // NOTE: integers do not need to find nans
+
+            // the workspace holds the left now
+            T* pwEnd = pw + (pm - pl);
+
+            // compare first value on right side (pm)
+            // to last value on left (which is in ws now)
+            if (COMPARE_LT(*pm, *(pwEnd - 1))) {
+
+                // skip past nans at back of the workspace
+                pr = FIND_NANS(pr, pm);
+
+                // can skip copy because data in workspace
+                //MEMCPYR(pw, pl, (pm - pl) * sizeof(T));
+
+                // the destination changed, merge into left pointer
+                T* pDest = pl;
+
+                while (pw < pwEnd && pm < pr) {
+                    T cmpR = *pm;
+                    T cmpL = *pw;
+
+                    // nans ok here because we moved pr pointer past all nans
+                    // only cmpL can have nans now
+                    if (cmpL <= cmpR) {
+                        *pDest++ = cmpL; pw++;
                     }
                     else {
-                        *pk++ = *pj++;
+                        *pDest++ = cmpR; pm++;
                     }
+
                 }
-            while (pj < pi) {
-                *pk++ = *pj++;
+                while (pw < pwEnd) {
+                    *pDest++ = *pw++;
+                }
+                // data not in workspace anymore
+            }
+            else {
+                // Data is already sorted, but in wrong location
+                // Copy from workspace to left
+                MEMCPYR(pl, pw, (pm - pl) * sizeof(T));
             }
         }
+        else if (COMPARE_LT(*pm, *(pm - 1))) {
+            // For floats, we will work backwards from the right side
+            // of the merge to search for nans
+            // NOTE: integers do not need to find nans
+            pr = FIND_NANS(pr, pm);
+            MEMCPYR(pw, pl, (pm - pl) * sizeof(T));
+
+            T* pwEnd = pw + (pm - pl);
+            T* pDest = pl;
+
+            while (pw < pwEnd && pm < pr) {
+                T cmpR = *pm;
+                T cmpL = *pw;
+
+                // nans ok here because we moved pr pointer past all nans
+                // only cmpL can have nans now
+                if (cmpL <= cmpR) {
+                    *pDest++ = cmpL; pw++;
+                }
+                else {
+                    *pDest++ = cmpR; pm++;
+                }
+
+            }
+            while (pw < pwEnd) {
+                *pDest++ = *pw++;
+            }                
+        }
+
     }
     else {
+        T vp;
+        T* pj; T* pk; T* pi;
         // NOTE 50% of sort time is spent here
         // Consider a vectorized bitonic sort
+        // For floats, consider moving nans to the end as the first step
+        // to avoid the more complicated nan comparison
         /* insertion sort */
         for (pi = pl + 1; pi < pr; ++pi) {
             vp = *pi;
