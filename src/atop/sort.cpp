@@ -69,10 +69,13 @@ FORCE_INLINE static void MEMCPYR(void* pDestV, void *pSrcV, int64_t length) {
 
 #define SMALL_MERGESORT 16
 #define PYA_QS_STACK 128
-#define SMALL_QUICKSORT 15
+
+// A large value helps with floats, but not ints
+#define SMALL_QUICKSORT 30
+
 #define INTP_SWAP(_X_,_Y_) { auto temp=_X_; _X_=_Y_; _Y_=temp;}
-#define T_SWAP(_X_, _Y_) { auto temp= _X_; _X_ = _Y_; _Y_ = temp; }
-//#define T_SWAP(_X_, _Y_) std::swap(_X_,_Y_); 
+//#define T_SWAP(_X_, _Y_) { auto temp= _X_; _X_ = _Y_; _Y_ = temp; }
+#define T_SWAP(_X_, _Y_) std::swap(_X_,_Y_); 
 
 FORCE_INLINE static void STRING_SWAP(void* _X_, void* _Y_, int64_t len) {
     char* pSrc = (char*)_X_;
