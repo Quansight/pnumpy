@@ -1023,18 +1023,23 @@ static int AtopSortMathFunction(void* pDest, npy_intp length, void* pArrayObject
 
             if (dtype <= NPY_UNICODE && dtype != NPY_OBJECT && PyArray_NDIM(pSrcObject) == 1) {
                 if (sortkind < NPY_NSORTS) {
-                    int itemsize = convert_atop_to_itemsize[atype];
 
-                    // Make sure we can handle this
-                    if (PyArray_ITEMSIZE(pSrcObject) == itemsize && PyArray_STRIDE(pSrcObject, 0) ==itemsize) {
-                        SORT_MODE sortmode = (SORT_MODE)sortkind;
-                        int result =
-                            Sort(sortmode, atype, PyArray_BYTES(pSrcObject), ArrayLength(pSrcObject), PyArray_STRIDE(pSrcObject, 1), PyArray_ITEMSIZE(pSrcObject), pDest, PyArray_ITEMSIZE(pSrcObject));
+                    // For hasable sizes (2 bytes or less) with a stable sort, we defer back to numpy
+                    // because we have not written a stable hash sort yet
+                    if (atype > NPY_UINT16 || sortkind != NPY_STABLESORT) {
+                        int itemsize = convert_atop_to_itemsize[atype];
 
-                        LOGGING("result is %d  %d   len: %lld\n", result, atype, length);
-                        if (result >= 0)
-                            return result;
-                    } 
+                        // Make sure we can handle this
+                        if (PyArray_ITEMSIZE(pSrcObject) == itemsize && PyArray_STRIDE(pSrcObject, 0) == itemsize) {
+                            SORT_MODE sortmode = (SORT_MODE)sortkind;
+                            int result =
+                                Sort(sortmode, atype, PyArray_BYTES(pSrcObject), ArrayLength(pSrcObject), PyArray_STRIDE(pSrcObject, 1), PyArray_ITEMSIZE(pSrcObject), pDest, PyArray_ITEMSIZE(pSrcObject));
+
+                            LOGGING("result is %d  %d   len: %lld\n", result, atype, length);
+                            if (result >= 0)
+                                return result;
+                        }
+                    }
                 }
             }
         }
@@ -1061,24 +1066,27 @@ static int AtopArgSortMathFunction(void* pValue, npy_intp* pInt64Buffer, npy_int
             int dtype = PyArray_TYPE(pSrcObject);
 
             if (dtype <= NPY_UNICODE && dtype != NPY_OBJECT) {
+                // For hasable sizes (2 bytes or less) with a stable sort, we defer back to numpy
+                // because we have not written a stable hash sort yet
+                if (atype > NPY_UINT16 || sortkind != NPY_STABLESORT) {
+                    int itemsize = convert_atop_to_itemsize[atype];
+                    SORT_MODE sortmode = (SORT_MODE)sortkind;
 
-                int itemsize = convert_atop_to_itemsize[atype];
-                SORT_MODE sortmode = (SORT_MODE)sortkind;
+                    // todo check sizeof npy_intp
+                    int result =
+                        SortIndex64(
+                            NULL, // pCutOffs,
+                            0,    //cutOffLength,
+                            pValue,
+                            length,
+                            (int64_t*)pInt64Buffer,
+                            sortmode,
+                            atype,
+                            PyArray_ITEMSIZE(pSrcObject));
 
-                // todo check sizeof npy_intp
-                int result=
-                SortIndex64(
-                    NULL, // pCutOffs,
-                    0,    //cutOffLength,
-                    pValue,
-                    length,
-                    (int64_t*)pInt64Buffer,
-                    sortmode,
-                    atype,
-                    PyArray_ITEMSIZE(pSrcObject));
-
-                LOGGING("!!called argsort with result %d\n", result);
-                if (result >= 0) return result;
+                    LOGGING("!!called argsort with result %d\n", result);
+                    if (result >= 0) return result;
+                }
             }
         }
         // punt to old routine

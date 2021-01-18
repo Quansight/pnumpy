@@ -219,9 +219,10 @@ int64_t GetKind(PyObject* kwargs, SORT_MODE defval) {
     // Borrowed reference
     // Returns NULL if key not present
     pKind = GetKwarg( &PyUnicode_Type, kwargs, "kind");
+    SORT_MODE retval = defval;
+
     // Check for cutoffs kwarg to see if going into parallel mode
     if (pKind) {
-        SORT_MODE retval = defval;
 
         if (CheckFirstLetter(pKind, "q") >= 0) {
             retval = SORT_MODE::SORT_MODE_QSORT;
@@ -237,8 +238,8 @@ int64_t GetKind(PyObject* kwargs, SORT_MODE defval) {
         }
         return retval;
     }
-    // default to quicksort
-    return SORT_MODE::SORT_MODE_QSORT;
+    // default to what user wanted
+    return retval;
 }
 
 
@@ -286,7 +287,7 @@ static int64_t ARangeCallback(void* callbackArgT, int core, int64_t start, int64
         pDataOut[i] = i;
     }
 
-    return (iend-istart);
+    return (int64_t)(iend-istart);
 }
 
 

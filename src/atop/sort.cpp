@@ -31,6 +31,8 @@
 
 FORCE_INLINE static int npy_get_msb(uint64_t unum)
 {
+    // FUTURE OP: This is just leading zero count
+    // return 64 - _lzcnt_u64(unum);
     int depth_limit = 0;
     while (unum >>= 1) {
         depth_limit++;
@@ -67,15 +69,16 @@ FORCE_INLINE static void MEMCPYR(void* pDestV, void *pSrcV, int64_t length) {
     //}
 }
 
-#define SMALL_MERGESORT 16
+#define SMALL_MERGESORT 15
 #define PYA_QS_STACK 128
 
 // A large value helps with floats, but not ints
 #define SMALL_QUICKSORT 30
 
-#define INTP_SWAP(_X_,_Y_) { auto temp=_X_; _X_=_Y_; _Y_=temp;}
+//#define INTP_SWAP(_X_,_Y_) { auto temp=_X_; _X_=_Y_; _Y_=temp;}
+#define INTP_SWAP(_X_,_Y_) std::swap(_X_,_Y_)
 //#define T_SWAP(_X_, _Y_) { auto temp= _X_; _X_ = _Y_; _Y_ = temp; }
-#define T_SWAP(_X_, _Y_) std::swap(_X_,_Y_); 
+#define T_SWAP(_X_, _Y_) std::swap(_X_,_Y_) 
 
 FORCE_INLINE static void STRING_SWAP(void* _X_, void* _Y_, int64_t len) {
     char* pSrc = (char*)_X_;
@@ -721,13 +724,14 @@ mergesort0left_(T* pl, T* pr, T* pw)
             T* pwEnd = pm;
 
             while (pw < pwEnd && pm < pr) {
-                T cmpR = *pm;
-                T cmpL = *pw;
+                const T cmpR = *pm;
+                const T cmpL = *pw;
 
                 // nans ok here because we moved pr pointer past all nans
                 // only cmpL can have nans now
                 if (cmpL <= cmpR) {
                     *pDest++ = cmpL; pw++;
+                    continue;
                 }
                 else {
                     *pDest++ = cmpR; pm++;
@@ -749,17 +753,15 @@ mergesort0left_(T* pl, T* pr, T* pw)
         return 0;
     }
     else {
-        T vp;
-        T* pj; T* pk; T* pi;
         // NOTE 50% of sort time is spent here
         // Consider a vectorized bitonic sort
         // For floats, consider moving nans to the end as the first step
         // to avoid the more complicated nan comparison
         /* insertion sort */
-        for (pi = pl + 1; pi < pr; ++pi) {
-            vp = *pi;
-            pj = pi;
-            pk = pi - 1;
+        for (T* pi = pl + 1; pi < pr; ++pi) {
+            const T vp = *pi;
+            T* pj = pi;
+            T* pk = pi - 1;
             while (pj > pl&& COMPARE_LT(vp, *pk)) {
                 *pj-- = *pk--;
             }
@@ -809,13 +811,14 @@ mergesort0_(T* pl, T* pr, T* pw)
                 T* pDest = pl;
 
                 while (pw < pwEnd && pm < pr) {
-                    T cmpR = *pm;
-                    T cmpL = *pw;
+                    const T cmpR = *pm;
+                    const T cmpL = *pw;
 
                     // nans ok here because we moved pr pointer past all nans
                     // only cmpL can have nans now
                     if (cmpL <= cmpR) {
                         *pDest++ = cmpL; pw++;
+                        continue;
                     }
                     else {
                         *pDest++ = cmpR; pm++;
@@ -844,13 +847,14 @@ mergesort0_(T* pl, T* pr, T* pw)
             T* pDest = pl;
 
             while (pw < pwEnd && pm < pr) {
-                T cmpR = *pm;
-                T cmpL = *pw;
+                const T cmpR = *pm;
+                const T cmpL = *pw;
 
                 // nans ok here because we moved pr pointer past all nans
                 // only cmpL can have nans now
                 if (cmpL <= cmpR) {
                     *pDest++ = cmpL; pw++;
+                    continue;
                 }
                 else {
                     *pDest++ = cmpR; pm++;
@@ -864,17 +868,15 @@ mergesort0_(T* pl, T* pr, T* pw)
 
     }
     else {
-        T vp;
-        T* pj; T* pk; T* pi;
         // NOTE 50% of sort time is spent here
         // Consider a vectorized bitonic sort
         // For floats, consider moving nans to the end as the first step
         // to avoid the more complicated nan comparison
         /* insertion sort */
-        for (pi = pl + 1; pi < pr; ++pi) {
-            vp = *pi;
-            pj = pi;
-            pk = pi - 1;
+        for (T* pi = pl + 1; pi < pr; ++pi) {
+            const T vp = *pi;
+            T* pj = pi;
+            T* pk = pi - 1;
             while (pj > pl&& COMPARE_LT(vp, *pk)) {
                 *pj-- = *pk--;
             }
@@ -1041,64 +1043,135 @@ amergesort0_string(UINDEX* pl, UINDEX* pr, const char* strItem, UINDEX* pw, int6
 }
 
 
+//-----------------------------------------------------------------------------------------------
+// T= data type == int16,int32,uint32,int64.uint64
+// UINDEX = int32_t or int64_t
+// returns 1 if copied into workspace
+// returns 0 if not copied into workspace
+template <typename T, typename UINDEX>
+static int
+amergesort0left_(UINDEX* pl, UINDEX* pr, const T* v, UINDEX* pw)
+{
+    if (pr - pl > SMALL_MERGESORT) {
+        /* merge sort */
+        UINDEX* pm = pl + ((pr - pl) >> 1);
+
+        // merge right first since tail was merged last
+        amergesort0_(pm, pr, v, pw);
+
+        // merge left
+        amergesort0_(pl, pm, v, pw);
+
+        // check if already sorted
+        // if the first element on the right is less than the last element on the left
+        //printf("comparing %d to %d ", (int)pm[0], (int)pm[-1]);
+        if (COMPARE_LT(v[*pm], v[*(pm - 1)])) {
+            // Merge into workspace
+            UINDEX* plEnd = pm;
+
+            while (pl < plEnd && pm < pr) {
+
+                if (COMPARE_LT(v[*pm], v[*pl])) {
+                    *pw++ = *pm++;
+                }
+                else {
+                    *pw++ = *pl++;
+                }
+            }
+            while (pl < plEnd) {
+                *pw++ = *pl++;
+            }
+            // we are moving all of it into workspace
+            // for floats, this picks up any nans on the far right
+            while (pm < pr) {
+                 *pw++ = *pm++;
+            }
+            // data in workspace
+            return 1;
+        }
+        return 0;
+    }
+    else {
+        /* insertion sort */
+        for (UINDEX* pi = pl + 1; pi < pr; ++pi) {
+            UINDEX vi = *pi;
+            const T vp = v[vi];
+            UINDEX* pj = pi;
+            UINDEX* pk = pi - 1;
+            while (pj > pl && COMPARE_LT(vp, v[*pk])) {
+                *pj-- = *pk--;
+            }
+            *pj = vi;
+        }
+    }
+    return 0;
+}
+
 
 //-----------------------------------------------------------------------------------------------
 // T= data type == int16,int32,uint32,int64.uint64
 // UINDEX = int32_t or int64_t
 template <typename T, typename UINDEX>
 static void
-amergesort0_(UINDEX* pl, UINDEX* pr, T* v, UINDEX* pw)
+amergesort0_(UINDEX* pl, UINDEX* pr, const T* v, UINDEX* pw)
 {
-    T vp;
-    UINDEX vi, * pi, * pj, * pk, * pm;
-
     if (pr - pl > SMALL_MERGESORT) {
         /* merge sort */
-        pm = pl + ((pr - pl) >> 1);
-        amergesort0_(pl, pm, v, pw);
-        amergesort0_(pm, pr, v, pw);
+        UINDEX* pm = pl + ((pr - pl) >> 1);
 
-        // check if already sorted
-        // if the first element on the right is less than the last element on the left
-        //printf("comparing %d to %d ", (int)pm[0], (int)pm[-1]);
-        if (COMPARE_LT(v[*pm], v[*(pm - 1)])) {
-            if ((pm - pl) >= 32) {
-                MEMCPYR(pw, pl, (pm - pl) * sizeof(UINDEX));
+        // sort right first
+        amergesort0_(pm, pr, v, pw);
+        //amergesort0_(pl, pm, v, pw);
+
+        // sort left next and check copied into workspace
+        if (!amergesort0left_(pl, pm, v, pw)) {
+
+            // was not copied into workspace
+            if (!COMPARE_LT(v[*pm], v[*(pm - 1)])) {
+                // nothing to do
+                return;
+            }
+            // copy into workspace
+            MEMCPYR(pw, pl, (pm - pl) * sizeof(UINDEX));
+        }
+        else {
+            // NOTE: could have extra check here to see if workspace is already sorted
+            // if so, just do a mempcpy from workspace to pl
+        }
+
+        //printf("merging %lld\n", pr - pl);
+        // For floats, we will work backwards from the right side
+        // of the merge to search for nans
+        // NOTE: integers do not need to find nans
+
+        // the workspace holds the left now
+        UINDEX* pwEnd = pw + (pm - pl);
+
+        // destination is left
+        // moving from workspace into left
+
+        while (pw < pwEnd && pm < pr) {
+            if (v[*pm] < v[*pw]) {
+                *pl++ = *pm++;
             }
             else {
-                // Copy left side into workspace
-                pi = pw;
-                pj = pl;
-                while (pj < pm) {
-                    *pi++ = *pj++;
-                }
+                *pl++ = *pw++;
             }
 
-            pi = pw + (pm - pl);
-            pj = pw;
-            pk = pl;
-            while (pj < pi && pm < pr) {
-                if (COMPARE_LT(v[*pm], v[*pj])) {
-                    *pk++ = *pm++;
-                }
-                else {
-                    *pk++ = *pj++;
-                }
-            }
-            while (pj < pi) {
-                *pk++ = *pj++;
-            }
+        }
+        while (pw < pwEnd) {
+            *pl++ = *pw++;
         }
 
     }
     else {
         /* insertion sort */
-        for (pi = pl + 1; pi < pr; ++pi) {
-            vi = *pi;
-            vp = v[vi];
-            pj = pi;
-            pk = pi - 1;
-            while (pj > pl&& COMPARE_LT(vp, v[*pk])) {
+        for (UINDEX* pi = pl + 1; pi < pr; ++pi) {
+            UINDEX vi = *pi;
+            const T vp = v[vi];
+            UINDEX* pj = pi;
+            UINDEX* pk = pi - 1;
+            while (pj > pl && COMPARE_LT(vp, v[*pk])) {
                 *pj-- = *pk--;
             }
             *pj = vi;
@@ -1120,6 +1193,7 @@ amergesort_(void* v1, void* tosort1, int64_t length)
     pl = tosort;
     pr = pl + length;
 
+    // ideally look for memory in the cache
     pworkspace = (UINDEX*)WORKSPACE_ALLOC((length / 2) * sizeof(UINDEX));
     if (pworkspace == NULL) {
         return -1;
@@ -1624,15 +1698,17 @@ static int64_t ParArgSortCallback(struct stMATH_WORKER_ITEM* pstWorkerItem, int 
         char* pToSort1 = (char*)(Callback->pToSort);
 
         int64_t MergeSize = (pSecond - pFirst);
-        PLOGGING("%d : MergeOne index: %llu  %lld  %lld  %lld\n", core, index, pFirst, MergeSize, OffsetSize);
+        PLOGGING("%d : ArgMergeOne index: %llu  %lld  size:%lld  outputsize:%lld\n", core, index, pFirst, MergeSize, Callback->TypeSizeOutput);
 
         // Workspace uses half the size
         char* pWorkSpace1 = Callback->pWorkSpace + (index * Callback->AllocChunk * Callback->TypeSizeOutput);
 
         if (Callback->ArgSortCallbackOne.argsortfunc) {
+            printf("int!\n");
             Callback->ArgSortCallbackOne.argsortfunc(Callback->pValues, pToSort1 + (pFirst * Callback->TypeSizeOutput), MergeSize);
         }
         else {
+            // used for merge sort also (not just string)
             Callback->ArgSortCallbackOne.argsortstringfunc(Callback->pValues, pToSort1 + (pFirst * Callback->TypeSizeOutput), MergeSize, Callback->StrLen, pWorkSpace1);
         }
 
@@ -2144,6 +2220,7 @@ SortInPlace( SORT_MODE mode) {
 template <typename DATATYPE>
 static SORT_FUNCTION_STRING
 SortInPlaceString(SORT_MODE mode) {
+    // merge string is always faster
     return mergesortstring_<DATATYPE>;
     //switch (mode) {
     //case SORT_MODE::SORT_MODE_QSORT:
@@ -2215,18 +2292,9 @@ static int SortIndex(
     ARGSORT_FUNCTION_ANY mergeStepOne;
     mergeStepOne.init();
 
-
     switch (arrayType1) {
-    case ATOP_UNICODE:
-        mergeStepOne.argsortstringfunc = ParMergeString<const uint32_t*, UINDEX>;
-        return par_amergesort<char, UINDEX>(pCutOffs, cutOffLength, (char*)pDataIn1, pDataOut1, arraySize1, strlen, PAR_SORT_TYPE::Unicode, mergeStepOne);
-    case ATOP_STRING:
-        mergeStepOne.argsortstringfunc = ParMergeString<const unsigned char*, UINDEX>;
-        return par_amergesort<char, UINDEX>(pCutOffs, cutOffLength, (char*)pDataIn1, pDataOut1, arraySize1, strlen, PAR_SORT_TYPE::String, mergeStepOne);
-    case ATOP_VOID:
-        mergeStepOne.argsortstringfunc = ParMergeString<const char*, UINDEX>;
-        return par_amergesort<char, UINDEX>(pCutOffs, cutOffLength, (char*)pDataIn1, pDataOut1, arraySize1, strlen, PAR_SORT_TYPE::Void, mergeStepOne);
     case ATOP_BOOL:
+        return SortIndex<uint8_t, UINDEX>(pCutOffs, cutOffLength, pDataIn1, pDataOut1, arraySize1, mode);
     case ATOP_INT8:
         return SortIndex<int8_t, UINDEX>(pCutOffs, cutOffLength, pDataIn1, pDataOut1, arraySize1, mode);
     case ATOP_INT16:
@@ -2249,6 +2317,15 @@ static int SortIndex(
         return SortIndex<double, UINDEX>(pCutOffs, cutOffLength, pDataIn1, pDataOut1, arraySize1, mode);
     case ATOP_LONGDOUBLE:
         return SortIndex<long double, UINDEX>(pCutOffs, cutOffLength, pDataIn1, pDataOut1, arraySize1, mode);
+    case ATOP_UNICODE:
+        mergeStepOne.argsortstringfunc = ParMergeString<const uint32_t*, UINDEX>;
+        return par_amergesort<char, UINDEX>(pCutOffs, cutOffLength, (char*)pDataIn1, pDataOut1, arraySize1, strlen, PAR_SORT_TYPE::Unicode, mergeStepOne);
+    case ATOP_STRING:
+        mergeStepOne.argsortstringfunc = ParMergeString<const unsigned char*, UINDEX>;
+        return par_amergesort<char, UINDEX>(pCutOffs, cutOffLength, (char*)pDataIn1, pDataOut1, arraySize1, strlen, PAR_SORT_TYPE::String, mergeStepOne);
+    case ATOP_VOID:
+        mergeStepOne.argsortstringfunc = ParMergeString<const char*, UINDEX>;
+        return par_amergesort<char, UINDEX>(pCutOffs, cutOffLength, (char*)pDataIn1, pDataOut1, arraySize1, strlen, PAR_SORT_TYPE::Void, mergeStepOne);
     default:
         LOGGING("SortIndex does not understand type %d\n", arrayType1);
     }
