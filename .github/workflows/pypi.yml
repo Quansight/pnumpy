@@ -90,4 +90,5 @@ jobs:
       - uses: pypa/gh-action-pypi-publish@master
         with:
           user: __token__
-          password: ${{ secrets.pypi }}
+          password: ${{ secrets.test_pypi }}  # switch to non-test pwd after testing
+          repository_url: https://test.pypi.org/legacy/  # remove line after testing
