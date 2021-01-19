@@ -21,7 +21,7 @@ enable/disable any of the subsystems:
 
     Provide faster implementations of NumPy inner loops.
 """
-__version__ = '2.0.0'
+from ._version import __version__
 __all__ = [
     'initialize', 'atop_enable', 'atop_disable', 'atop_isenabled', 'atop_info', 'atop_setworkers','cpustring',
     'thread_enable', 'thread_disable', 'thread_isenabled', 'thread_getworkers', 'thread_setworkers', 'thread_zigzag',
