@@ -88,8 +88,6 @@ def get_git_version(abbrev=7):
     # First try to get the current version using “git describe”.
 
     version = call_git_describe(abbrev)
-    if is_dirty():
-        version += "-dirty"
 
     # If that doesn't work, fall back on the value that's in
     # RELEASE-VERSION.
@@ -102,6 +100,9 @@ def get_git_version(abbrev=7):
     if version is None:
         raise ValueError("Cannot find the version number!")
 
+    if is_dirty():
+        version += "-dirty"
+ 
     # If the current version is different from what's in the
     # RELEASE-VERSION file, update the file to be current.
 
