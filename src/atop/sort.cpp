@@ -692,6 +692,11 @@ aquicksort_(void* vv1, void* tosort1, int64_t num)
 }
 
 
+//--------------------------------------------------------------------------------------
+// Forward declaration
+template <typename T>
+static void
+mergesort0_(T* pl, T* pr, T* pw);
 
 //--------------------------------------------------------------------------------------
 // Will return 1 if copied into workspace
@@ -1042,6 +1047,12 @@ amergesort0_string(UINDEX* pl, UINDEX* pr, const char* strItem, UINDEX* pw, int6
     }
 }
 
+
+//-----------------------------------------------------------------------------------------------
+// Forward declaration
+template <typename T, typename UINDEX>
+static void
+amergesort0_(UINDEX* pl, UINDEX* pr, const T* v, UINDEX* pw);
 
 //-----------------------------------------------------------------------------------------------
 // T= data type == int16,int32,uint32,int64.uint64
