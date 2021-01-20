@@ -51,7 +51,7 @@ _add_newdocs.main()
 
 setup(
     name='pnumpy',
-    version='0.0.0',
+    #version=get_git_version(), #'0.0.0',
     license='MIT',
     description='Faster loops for NumPy using multithreading and other tricks',
     long_description=long_description,
@@ -87,7 +87,13 @@ setup(
     },
     keywords=[
         # eg: 'keyword1', 'keyword2', 'keyword3',
-    ],
+    ],   
+    setup_requires=['setuptools_scm'],
+    use_scm_version = {
+        'version_scheme': 'post-release',
+        'write_to': 'src/pnumpy/_version.py',
+        'write_to_template': '__version__ = "{version}"',
+    },
     python_requires='>=3.6',
     install_requires=[
         # eg: 'aspectlib==1.1.1', 'six>=1.7',
