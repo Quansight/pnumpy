@@ -1,5 +1,10 @@
 import numpy as np
-import pnumpy
+HAVE_PNUMPY = True
+try:
+    import pnumpy
+except Exception:
+    HAVE_PNUMPY = False
+
 import pytest
 
 # pnumpy.initialize() is called from conftest.py
@@ -58,25 +63,26 @@ def data(in_dtypes, out_dtypes, shape, rng):
 def test_threads(name, types, initialize_pnumpy, rng):
     """ Test that enabling the threading does not change the results
     """
-    ufunc = getattr(np, name)
-    for in_dtypes, out_dtypes in types:
-        # Skip object dtypes
-        if any([o == 'object' for o in out_dtypes]):
-            continue
-        if any([o == 'object' for o in in_dtypes]):
-            continue
-        in_data, out_data = data(in_dtypes, out_dtypes, [1024, 1024], rng)
-        if (name in ('power',) and 
-                issubclass(in_data[1].dtype.type, np.integer)):
-            in_data[1] = np.abs(in_data[1])
-            in_data[1][in_data[1] < 0] = 0
-        if len(out_data) == 1:
-            out_data = out_data[0]
-        out1 = ufunc(*in_data, out=out_data)
-        pnumpy.thread_enable()
-        assert pnumpy.thread_isenabled()
-        out2 = ufunc(*in_data, out=out_data)
-        pnumpy.thread_disable()
-        # may not work on datetime
-        if not any([o == 'datetime64' for o in out_dtypes]):
-            np.testing.assert_allclose(out1, out2, equal_nan=True)
+    if HAVE_PNUMPY:
+        ufunc = getattr(np, name)
+        for in_dtypes, out_dtypes in types:
+            # Skip object dtypes
+            if any([o == 'object' for o in out_dtypes]):
+                continue
+            if any([o == 'object' for o in in_dtypes]):
+                continue
+            in_data, out_data = data(in_dtypes, out_dtypes, [1024, 1024], rng)
+            if (name in ('power',) and 
+                    issubclass(in_data[1].dtype.type, np.integer)):
+                in_data[1] = np.abs(in_data[1])
+                in_data[1][in_data[1] < 0] = 0
+            if len(out_data) == 1:
+                out_data = out_data[0]
+            out1 = ufunc(*in_data, out=out_data)
+            pnumpy.thread_enable()
+            assert pnumpy.thread_isenabled()
+            out2 = ufunc(*in_data, out=out_data)
+            pnumpy.thread_disable()
+            # may not work on datetime
+            if not any([o == 'datetime64' for o in out_dtypes]):
+                np.testing.assert_allclose(out1, out2, equal_nan=True)
