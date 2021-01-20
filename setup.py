@@ -91,8 +91,9 @@ setup(
     setup_requires=['setuptools_scm'],
     use_scm_version = {
         'version_scheme': 'post-release',
+        'local_scheme': 'no-local-version',
         'write_to': 'src/pnumpy/_version.py',
-        'write_to_template': '__version__ = "{version.split('.post')[0]}"',
+        'write_to_template': '__version__ = "{version}"',
     },
     python_requires='>=3.6',
     install_requires=[
