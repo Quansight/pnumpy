@@ -92,7 +92,7 @@ setup(
     use_scm_version = {
         'version_scheme': 'post-release',
         'write_to': 'src/pnumpy/_version.py',
-        'write_to_template': '__version__ = "{version}"',
+        'write_to_template': '__version__ = "{version.split('.post')[0]}"',
     },
     python_requires='>=3.6',
     install_requires=[
