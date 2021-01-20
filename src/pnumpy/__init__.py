@@ -2,32 +2,37 @@
 Call ``initialize`` to setup the package. This imports and scans NumPy,
 replacing all the inner loops of UFuncs with wrapped versions. Then you can
 enable/disable any of the subsystems:
-
   - threading
-
     Threading will kick in when the number of elements to be processed is more
     than 50,000. It will break the operation into chunks. Each chunk will be
     executed in its own thread.
   - ledger
-
     The ledger records data on each loop execution to
     enable more accurate heuristics on memory allocation, threading behavior
     and reporting for logging and benchmarking.
   - recycler
-
     Once we can change the NumPy memory allocation strategy, we can use the
     data from the ledger to create more performant memory caches.
   - atop
-
     Provide faster implementations of NumPy inner loops.
 """
-__version__ = '2.0.0'
+from ._version import __version__
 __all__ = [
     'initialize', 'atop_enable', 'atop_disable', 'atop_isenabled', 'atop_info', 'atop_setworkers','cpustring',
     'thread_enable', 'thread_disable', 'thread_isenabled', 'thread_getworkers', 'thread_setworkers', 'thread_zigzag',
     'ledger_enable', 'ledger_disable', 'ledger_isenabled', 'ledger_info',
     'recycler_enable', 'recycler_disable', 'recycler_isenabled', 'recycler_info',
     'timer_gettsc','timer_getutc']
+
+import numpy as np
+import numpy.core._multiarray_umath as umath
+
+# TODO check for Apple M1 chip (where AVX2 makes no sense)
+# TODO check for numpy version
+
+if not umath.__cpu_features__['AVX2']:
+    raise ValueError(f"pnumpy requires a CPU with AVX2 capability to work")
+
 import pnumpy._pnumpy as _pnumpy
 from pnumpy._pnumpy import atop_enable, atop_disable, atop_isenabled, atop_info, atop_setworkers, cpustring 
 from pnumpy._pnumpy import thread_enable, thread_disable, thread_isenabled, thread_getworkers, thread_setworkers, thread_zigzag
@@ -40,7 +45,6 @@ from .cpu import cpu_count_linux, init, enable, disable
 from .sort import sort, lexsort, argsort, argmin, argmax, searchsorted
 from .benchmark import benchmark, benchmark_func
 from .recarray import recarray_to_colmajor
-import numpy as np
 
 # to be removed
 def initialize():
@@ -49,4 +53,3 @@ def initialize():
 # start the engine by default
 # TODO: check environment variable
 init()
-
