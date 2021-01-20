@@ -38,6 +38,12 @@ jobs:
           PLATFORM="${{ matrix.platform }}"
           echo $RUNNER_OS
           echo $PLATFORM
+          if [ "$PLATFORM" == "x64" ]; then
+            export CIBW_SKIP = "cp27-* cp35-* *-win32 *-manylinux_i686 *manylinux_aarch64 *manylinux_ppc64le *manylinux_s390x"
+          elif [ "$PLATFORM" == "x32" ]; then
+            export CIBW_SKIP = "cp27-* cp35-*"
+          fi
+          # others to excluse  manylinux_aarch64 manylinux_ppc64le manylinux_s390x
           if [ "$RUNNER_OS" == "Windows" ]; then
             if [ "$PLATFORM" == "x64" ]; then
               export CIBW_BUILD="cp36-win_amd64 cp37-win_amd64 cp38-win_amd64"
@@ -46,7 +52,7 @@ jobs:
             fi
           elif [ "$RUNNER_OS" == "Linux" ]; then
             if [ "$PLATFORM" == "x64" ]; then
-              export CIBW_BUILD="cp36-manylinux_x86_64 cp36-manylinux_aarch64 cp36-manylinux_ppc64le cp36-manylinux_s390x cp37-manylinux_x86_64 cp37-manylinux_aarch64 cp37-manylinux_ppc64le cp37-manylinux_s390x cp38-manylinux_x86_64 cp38-manylinux_aarch64 cp38-manylinux_ppc64le cp38-manylinux_s390x"
+              export CIBW_BUILD="cp36-manylinux_x86_64 cp37-manylinux_x86_64 cp38-manylinux_x86_64"
             elif [ "$PLATFORM" == "x32" ]; then
               export CIBW_BUILD="cp36-manylinux_i686 cp37-manylinux_i686 cp38-manylinux_i686"
             fi
