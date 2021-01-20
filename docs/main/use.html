@@ -34,7 +34,7 @@
             
   <div class="section" id="how-to-use-it">
 <h1>How to use it?<a class="headerlink" href="#how-to-use-it" title="Permalink to this headline">¶</a></h1>
-<span class="target" id="module-pnumpy"></span><p>Call <code class="docutils literal notranslate"><span class="pre">initialize</span></code> to setup the package. This imports and scans NumPy,
+<span class="target" id="module-pnumpy"></span><p>Pnumpy now calls <code class="docutils literal notranslate"><span class="pre">init</span></code> at startup to setup the package. This imports NumPy,
 replacing all the inner loops of UFuncs with wrapped versions. Then you can
 enable/disable any of the subsystems:</p>
 <blockquote>
