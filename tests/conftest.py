@@ -1,17 +1,22 @@
 import numpy as np
 import pytest
 from packaging.utils import Version
-import pnumpy
+HAVE_PNUMPY = True
+try:
+    import pnumpy
+except Exception:
+    HAVE_PNUMPY = False
 
 old_numpy = Version(np.__version__) < Version('1.18')
 
 
 @pytest.fixture(scope='session')
 def initialize_pnumpy():
-    from numpy.core._multiarray_umath import __cpu_features__ as cpu
-    if not cpu['AVX2']:
-        pytest.skip('pnumpy.initialize requires AVX2')
-    pnumpy.initialize()
+    if HAVE_PNUMPY:
+        from numpy.core._multiarray_umath import __cpu_features__ as cpu
+        if not cpu['AVX2']:
+            pytest.skip('pnumpy.initialize requires AVX2')
+        pnumpy.initialize()
 
 @pytest.fixture(scope='function')
 def rng():
