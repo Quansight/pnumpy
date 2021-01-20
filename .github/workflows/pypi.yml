@@ -67,7 +67,7 @@ jobs:
       - uses: actions/setup-python@v2
         name: Install Python
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: '3.7'
 
       - name: Build sdist
         run: |
