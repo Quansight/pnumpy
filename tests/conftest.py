@@ -9,7 +9,6 @@ except Exception:
 
 old_numpy = Version(np.__version__) < Version('1.18')
 
-
 @pytest.fixture(scope='session')
 def initialize_pnumpy():
     if HAVE_PNUMPY:
