@@ -1,18 +1,21 @@
 """
-Call ``initialize`` to setup the package. This imports and scans NumPy,
+Pnumpy now calls ``init`` at startup to setup the package. This imports NumPy,
 replacing all the inner loops of UFuncs with wrapped versions. Then you can
 enable/disable any of the subsystems:
   - threading
     Threading will kick in when the number of elements to be processed is more
     than 50,000. It will break the operation into chunks. Each chunk will be
     executed in its own thread.
+
   - ledger
     The ledger records data on each loop execution to
     enable more accurate heuristics on memory allocation, threading behavior
     and reporting for logging and benchmarking.
+
   - recycler
     Once we can change the NumPy memory allocation strategy, we can use the
     data from the ledger to create more performant memory caches.
+
   - atop
     Provide faster implementations of NumPy inner loops.
 """
