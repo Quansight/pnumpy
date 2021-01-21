@@ -57,7 +57,7 @@ jobs:
       run: |
         pip install cibuildwheel pip setuptools_scm twine --upgrade;
         python -m cibuildwheel --output-dir dist;
-        python -m twine upload dist/* -u "tdimitri" -p "pypi99!" --skip-existing --verbose;
+        #python -m twine upload dist/* -u "tdimitri" -p "!" --skip-existing --verbose;
         # python -m twine upload dist/* -u "$PYPI_USERNAME" -p "$PYPI_PASSWORD" --skip-existing --verbose;
           
     - name: Build wheels (windows) ${{ matrix.python-version }} on ${{ matrix.os }}
@@ -133,7 +133,7 @@ jobs:
           python setup.py build --force
           python setup.py install
           python setup.py sdist
-          python -m twine upload dist/* -u "tdimitri" -p "pypi99!" --skip-existing --verbose;
+          #python -m twine upload dist/* -u "tdimitri" -p "!" --skip-existing --verbose;
           # twine upload dist/* --verbose
       - uses: actions/upload-artifact@v2
         with:
