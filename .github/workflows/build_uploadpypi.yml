@@ -60,7 +60,8 @@ jobs:
     - name: Build wheels (windows) ${{ matrix.python-version }} on ${{ matrix.os }}
       if: matrix.python-version == '3.8' && matrix.os == 'windows-latest'
       env:
-        CIBW_BUILD: 'cp36-* cp37-* cp38-*'
+        #CIBW_BUILD: 'cp36-* cp37-* cp38-*'
+        CIBW_BUILD: 'cp36-*'
         CIBW_SKIP: 'cp27-* cp35-* *-win32'
         PYPI_PASSWORD: ${{ secrets.pypi_password }}
         PYPI_USERNAME: ${{ secrets.pypi_username }}
