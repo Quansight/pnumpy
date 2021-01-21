@@ -21,13 +21,16 @@ import numpy as np
 try:
     from setuptools_scm import get_version
 except Exception:
-    import pip
-    package='setuptools_scm'
-    if hasattr(pip, 'main'):
-        pip.main(['install', package])
-    else:
-        pip._internal.main(['install', package])
-    from setuptools_scm import get_version    
+    try:
+        import pip
+        package='setuptools_scm'
+        if hasattr(pip, 'main'):
+            pip.main(['install', package])
+        else:
+            pip._internal.main(['install', package])
+        from setuptools_scm import get_version
+    except Exception:
+        print("**could not install pip or setuptools_scm, version is defaulted"
 
 def myversion():
     try:
