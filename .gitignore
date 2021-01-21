@@ -28,6 +28,9 @@ __pycache__
 # C extensions
 *.so
 
+# version
+src/pnumpy/_version.py
+
 # Packages
 *.egg
 *.egg-info
