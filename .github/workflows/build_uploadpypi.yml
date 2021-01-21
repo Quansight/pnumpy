@@ -49,11 +49,6 @@ jobs:
         PLATFORM="${{ matrix.platform }}"
         echo $RUNNER_OS
         echo $PLATFORM
-        if [ "$PLATFORM" == "x64" ]; then
-          export CIBW_SKIP="cp27-* cp35-* *-win32 *-manylinux_i686 *manylinux_aarch64 *manylinux_ppc64le *manylinux_s390x"
-        elif [ "$PLATFORM" == "x32" ]; then
-          export CIBW_SKIP="cp27-* cp35-*"
-        fi
         python -m cibuildwheel --output-dir wheelhouse
     - uses: actions/upload-artifact@v2
       with:
