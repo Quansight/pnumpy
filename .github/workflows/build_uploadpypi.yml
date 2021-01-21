@@ -53,6 +53,21 @@ jobs:
         echo $RUNNER_OS
         echo $PLATFORM
         export CIBW_BUILD="cp36-manylinux_x86_64 cp37-manylinux_x86_64 cp38-manylinux_x86_64"
+        if [ "$RUNNER_OS" == "Windows" ]; then
+          if [ "$PLATFORM" == "x64" ]; then
+            export CIBW_BUILD="cp36-win_amd64 cp37-win_amd64 cp38-win_amd64"
+          elif [ "$PLATFORM" == "x32" ]; then
+            export CIBW_BUILD="cp37-win32"
+          fi
+        elif [ "$RUNNER_OS" == "Linux" ]; then
+          if [ "$PLATFORM" == "x64" ]; then
+            export CIBW_BUILD="cp36-manylinux_x86_64 cp37-manylinux_x86_64 cp38-manylinux_x86_64"
+          elif [ "$PLATFORM" == "x32" ]; then
+            export CIBW_BUILD="cp36-manylinux_i686 cp37-manylinux_i686 cp38-manylinux_i686"
+          fi
+        elif [ "$RUNNER_OS" == "macOS" ]; then
+          export CIBW_BUILD="cp36-macosx_x86_64 cp37-macosx_x86_64 cp38-macosx_x86_64"
+        fi        
         python -m cibuildwheel --output-dir wheelhouse
     - uses: actions/upload-artifact@v2
       with:
