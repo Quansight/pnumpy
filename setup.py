@@ -18,16 +18,19 @@ from setuptools import find_packages
 from setuptools import setup
 import numpy as np
 
-from setuptools_scm import get_version
-def myversion():
-    version = get_version()
-    return version
-
 try:
-    thisversion=myversion()
-    thisversion = '.'.join(thisversion.split('.')[:3])
+    from setuptools_scm import get_version
 except Exception:
-    thisversion='DEV'
+    pass
+
+def myversion():
+    try:
+        version = get_version()
+    except Exception:
+        version = '2.0.11'
+
+thisversion=myversion()
+thisversion = '.'.join(thisversion.split('.')[:3])
 
 def writeversion():
     text_file = open("src/pnumpy/_version.py", "w")
