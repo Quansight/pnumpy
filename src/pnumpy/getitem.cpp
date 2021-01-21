@@ -687,6 +687,7 @@ static void GetItemUInt(void* aValues, void* aIndex, void* aDataOut, int64_t val
     if (sizeof(VALUE) == strideValue && sizeof(INDEX) == strideIndex) {
         while (pDataOut != pDataOutEnd) {
             const INDEX index = *pIndex;
+
             *pDataOut =
                 // Make sure the item is in range
                 index < valLength
