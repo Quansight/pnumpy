@@ -53,9 +53,9 @@ jobs:
         CIBW_SKIP: 'cp27-* cp35-* *-manylinux_i686 *manylinux_aarch64 *manylinux_ppc64le *manylinux_s390x'
         PYPI_PASSWORD: ${{ secrets.pypi_password }}
       run: |
-        pip install cibuildwheel twine --upgrade;
+        pip install cibuildwheel pip twine --upgrade;
         python -m cibuildwheel --output-dir dist;
-        # python -m twine upload dist/* -u tdimitri -p "$PYPI_PASSWORD" --skip-existing;
+        # python -m twine upload dist/* -u "$PYPI_USERNAME" -p "$PYPI_PASSWORD" --skip-existing;
           
     - name: Build wheels (windows) ${{ matrix.python-version }} on ${{ matrix.os }}
       if: matrix.python-version == '3.8' && matrix.os == 'windows-latest'
@@ -63,6 +63,7 @@ jobs:
         CIBW_BUILD: 'cp36-* cp37-* cp38-*'
         CIBW_SKIP: 'cp27-* cp35-*'
         PYPI_PASSWORD: ${{ secrets.pypi_password }}
+        PYPI_USERNAME: ${{ secrets.pypi_username }}
       run: |
         pip install cibuildwheel twine --upgrade;
         python -m cibuildwheel --output-dir dist;
