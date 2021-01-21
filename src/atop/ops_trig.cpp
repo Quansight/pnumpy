@@ -200,11 +200,11 @@ template<typename T> static const inline __m256d CBRT_OP_256(__m256d x) { return
 //template<typename T> static const inline __m256d COS_OP_256(__m256d x) { return _ZGVdN4v_cos(x); }
 //
 
-template<typename T> static const inline __m256  SIN_OP_256(__m256 x) { return sinf(x); }
-template<typename T> static const inline __m256d SIN_OP_256(__m256d x) { return sin(x); }
+//template<typename T> static const inline __m256  SIN_OP_256(__m256 x) { return sinf(x); }
+//template<typename T> static const inline __m256d SIN_OP_256(__m256d x) { return sin(x); }
 
-template<typename T> static const inline __m256  COS_OP_256(__m256 x) { return cosf(x); }
-template<typename T> static const inline __m256d COS_OP_256(__m256d x) { return cos(x); }
+//template<typename T> static const inline __m256  COS_OP_256(__m256 x) { return cosf(x); }
+//template<typename T> static const inline __m256d COS_OP_256(__m256d x) { return cos(x); }
 
 #endif
 
@@ -568,7 +568,7 @@ UNARY_FUNC GetTrigOpFast(int func, int atopInType1, int* wantedOutType) {
     switch (func) {
     case TRIG_OPERATION::SIN:
         *wantedOutType = atopInType1;
-#if !defined(__clang__)
+#if defined(RT_COMPILER_MSVC)
         switch (atopInType1) {
         case ATOP_FLOAT:  return UnaryOpFast<float, __m256, SIN_OP<float>, SIN_OP_256<__m256>>;
         case ATOP_DOUBLE: return UnaryOpFast<double, __m256d, SIN_OP<double>, SIN_OP_256<__m256d>>;
@@ -578,7 +578,7 @@ UNARY_FUNC GetTrigOpFast(int func, int atopInType1, int* wantedOutType) {
 
     case TRIG_OPERATION::COS:
         *wantedOutType = atopInType1;
-#if !defined(__clang__)
+#if defined(RT_COMPILER_MSVC)
         switch (atopInType1) {
         case ATOP_FLOAT:  return UnaryOpFast<float, __m256, COS_OP<float>, COS_OP_256<__m256>>;
         case ATOP_DOUBLE: return UnaryOpFast<double, __m256d, COS_OP<double>, COS_OP_256<__m256d>>;
