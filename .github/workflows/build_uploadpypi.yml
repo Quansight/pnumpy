@@ -50,6 +50,7 @@ jobs:
       if: matrix.python-version == '3.8' && matrix.os != 'windows-latest'
       env:
         CIBW_BUILD: 'cp36-* cp37-* cp38-*'
+        CIBW_SKIP: 'cp27-* cp35-* *-manylinux_i686 *manylinux_aarch64 *manylinux_ppc64le *manylinux_s390x'
         PYPI_PASSWORD: ${{ secrets.pypi_password }}
       run: |
         pip install cibuildwheel twine --upgrade;
@@ -60,6 +61,7 @@ jobs:
       if: matrix.python-version == '3.8' && matrix.os == 'windows-latest'
       env:
         CIBW_BUILD: 'cp36-* cp37-* cp38-*'
+        CIBW_SKIP: 'cp27-* cp35-*'
         PYPI_PASSWORD: ${{ secrets.pypi_password }}
       run: |
         pip install cibuildwheel twine --upgrade;
