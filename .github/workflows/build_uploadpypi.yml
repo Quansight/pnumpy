@@ -26,7 +26,7 @@ jobs:
         # when fixed, add back macos-latest.  notee: mac user can still download and use riptable
         os: [ubuntu-latest, windows-latest, macos-latest]
         # 3.9 does not work because of llvmlite, 3.6 fails for another reason
-        python-version: [3.6, 3.7, 3.8]
+        python-version: [3.7]
         platform: [x64]
         exclude:
           - os: macos-latest
@@ -49,6 +49,7 @@ jobs:
         PLATFORM="${{ matrix.platform }}"
         echo $RUNNER_OS
         echo $PLATFORM
+        export CIBW_BUILD="cp36-manylinux_x86_64 cp37-manylinux_x86_64 cp38-manylinux_x86_64"
         python -m cibuildwheel --output-dir wheelhouse
     - uses: actions/upload-artifact@v2
       with:
