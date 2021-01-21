@@ -89,13 +89,13 @@ setup(
     keywords=[
         # eg: 'keyword1', 'keyword2', 'keyword3',
     ],   
-    setup_requires=['setuptools_scm'],
-    use_scm_version = {
-        'version_scheme': 'post-release',
-        'local_scheme': 'no-local-version',
-        'write_to': 'src/pnumpy/_version.py',
-        'write_to_template': '__version__ = "{version}"',
-    },
+    #setup_requires=['setuptools_scm'],
+    #use_scm_version = {
+    #    'version_scheme': 'post-release',
+    #    'local_scheme': 'no-local-version',
+    #    'write_to': 'src/pnumpy/_version.py',
+    #    'write_to_template': '__version__ = "{version}"',
+    #},
     python_requires='>=3.6',
     install_requires=[
         # eg: 'aspectlib==1.1.1', 'six>=1.7',
