@@ -52,7 +52,7 @@ _add_newdocs.main()
 setup(
     name='pnumpy',
     #version=get_git_version(), #'0.0.0',
-    version=2.0.11,
+    version='2.0.11',
     license='MIT',
     description='Faster loops for NumPy using multithreading and other tricks',
     long_description=long_description,
