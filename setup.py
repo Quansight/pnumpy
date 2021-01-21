@@ -28,6 +28,7 @@ def myversion():
         version = get_version()
     except Exception:
         version = '2.0.11'
+    return version
 
 thisversion=myversion()
 thisversion = '.'.join(thisversion.split('.')[:3])
