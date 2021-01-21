@@ -688,7 +688,6 @@ static void GetItemUInt(void* aValues, void* aIndex, void* aDataOut, int64_t val
         while (pDataOut != pDataOutEnd) {
             const INDEX index = *pIndex;
             *pDataOut =
-                *pDataOut =
                 // Make sure the item is in range
                 index < valLength
                 ? pValues[index]
