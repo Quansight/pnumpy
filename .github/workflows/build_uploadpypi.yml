@@ -18,8 +18,11 @@ on:
 
 jobs:
   build:
-
+    name: Build wheels ${{ matrix.os }}, ${{ matrix.platform }}
     runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
     strategy:
       matrix:
         # the mac computer used by github actions is too old to run the tests
