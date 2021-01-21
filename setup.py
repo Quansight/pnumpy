@@ -18,6 +18,24 @@ from setuptools import find_packages
 from setuptools import setup
 import numpy as np
 
+from setuptools_scm import get_version
+def myversion():
+    version = get_version()
+    return version
+
+try:
+    thisversion=myversion()
+    thisversion = '.'.join(thisversion.split('.')[:3])
+except Exception:
+    thisversion='DEV'
+
+def writeversion():
+    text_file = open("src/pnumpy/_version.py", "w")
+    strver = f"__version__='{thisversion}'"
+    n = text_file.write(strver)
+    text_file.close()
+    return thisversion
+
 # Enable code coverage for C code: we can't use CFLAGS=-coverage in tox.ini, since that may mess with compiling
 # dependencies (e.g. numpy). Therefore we set SETUP_PY_EXT_COVERAGE after deps have been safely installed).
 if os.environ.get('SETUP_PY_EXT_COVERAGE') == 'yes' and platform.system() == 'Linux':
@@ -52,7 +70,7 @@ _add_newdocs.main()
 setup(
     name='pnumpy',
     #version=get_git_version(), #'0.0.0',
-    version='2.0.11',
+    version=writeversion(),
     license='MIT',
     description='Faster loops for NumPy using multithreading and other tricks',
     long_description=long_description,
