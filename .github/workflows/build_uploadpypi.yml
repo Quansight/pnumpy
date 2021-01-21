@@ -105,7 +105,7 @@ jobs:
           python setup.py build --force
           python setup.py install
           python setup.py sdist
-          twine upload dist/* --verbose
+          # twine upload dist/* --verbose
       - uses: actions/upload-artifact@v2
         with:
           path: dist/*.tar.gz        
