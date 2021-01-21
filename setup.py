@@ -21,7 +21,13 @@ import numpy as np
 try:
     from setuptools_scm import get_version
 except Exception:
-    pass
+    import pip
+    package='setuptools_scm'
+    if hasattr(pip, 'main'):
+        pip.main(['install', package])
+    else:
+        pip._internal.main(['install', package])
+    from setuptools_scm import get_version    
 
 def myversion():
     try:
