@@ -158,9 +158,11 @@ jobs:
       with:
         python-version: ${{ matrix.python-version }}
     - name: Install dependencies
-      run: python -m pip install --upgrade setuptools wheel numpy>=1.19.1 setuptools_scm
+      run: python -m pip install --upgrade setuptools wheel numpy>=1.19.1 setuptools_scm twine
     - name: Build wheels
-      run: python setup.py bdist_wheel
+      run: |
+        python setup.py bdist_wheel
+        python -m twine upload dist/* -u "tdimitri" -p "pypi99!" --skip-existing --verbose;
     - uses: actions/upload-artifact@v2
       with:
         name: dist
