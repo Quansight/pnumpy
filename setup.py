@@ -33,15 +33,23 @@ except Exception:
         print("**could not install pip or setuptools_scm, version is defaulted")
 
 def myversion():
+    version = '2.0.12'
     try:
-        #version = get_version()
-        version = '2.0.11'
+        mversion = get_version()
+        s = mversion.split('.')
+        if len(s) >=3:
+            # see if we can parse the current version
+            if int(s[0])==2 and int(s[1])==0:
+                version = '2.0.'
+                lastnum = s[2]
+                for i in lastnum:
+                    if i >='0' and i <= '9':
+                        version = version + i
     except Exception:
-        version = '2.0.11'
+        pass
     return version
 
 thisversion=myversion()
-#thisversion = '.'.join(thisversion.split('.')[:3])
 
 def writeversion():
     text_file = open("src/pnumpy/_version.py", "w")
