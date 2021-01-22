@@ -33,7 +33,7 @@ except Exception:
         print("**could not install pip or setuptools_scm, version is defaulted")
 
 def myversion():
-    version = '2.0.13'
+    version = '2.0.14'
     try:
         mversion = get_version()
         s = mversion.split('.')
@@ -157,8 +157,8 @@ setup(
                      'src/pnumpy/conversions.cpp',
                      'src/pnumpy/recycler.cpp',
                      'src/pnumpy/sorting.cpp',
-                     'src/pnumpy/arange.cpp',
-                     'src/pnumpy/item_selection.cpp',
+                      #'src/pnumpy/arange.cpp',
+                      #'src/pnumpy/item_selection.cpp',
                      'src/atop/atop.cpp',
                      'src/atop/threads.cpp',
                      'src/atop/recarray.cpp',
