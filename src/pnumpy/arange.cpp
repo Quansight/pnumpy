@@ -20,7 +20,7 @@ _arange_safe_ceil_to_intp(double value)
 
     ivalue = ceil(value);
     /* condition inverted to handle NaN */
-    if (npy_isnan(ivalue)) {
+    if (isnan(ivalue)) {
         PyErr_SetString(PyExc_ValueError,
             "arange: cannot compute length");
         return -1;
@@ -53,7 +53,7 @@ PArange(double start, double stop, double step, int type_num)
 
     /* Underflow and divide-by-inf check */
     if (tmp_len == 0.0 && delta != 0.0) {
-        if (npy_signbit(tmp_len)) {
+        if (signbit(tmp_len)) {
             length = 0;
         }
         else {
