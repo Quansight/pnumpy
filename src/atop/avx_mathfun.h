@@ -46,12 +46,12 @@ typedef __m256i v4di; // vector of 4 int64   (avx)
 
 // Two ways to define the constants, as variables, or inline with mm256_set1_xxx
 #define _PS256_CONST(Name, Val) static const ALIGN32_BEG float _ps256_##Name[8] ALIGN32_END = { (float)Val, (float)Val, (float)Val, (float)Val, (float)Val, (float)Val, (float)Val, (float)Val }
-#define _PI32_CONST256(Name, Val) static const ALIGN32_BEG int _pi32_256_##Name[8] ALIGN32_END = { Val, Val, Val, Val, Val, Val, Val, Val }
-#define _PS256_CONST_TYPE(Name, Val) static const ALIGN32_BEG int32_t _ps256_##Name[8] ALIGN32_END = { Val, Val, Val, Val, Val, Val, Val, Val }
+#define _PI32_CONST256(Name, Val) static const ALIGN32_BEG int32_t _pi32_256_##Name[8] ALIGN32_END = { (int32_t)Val, (int32_t)Val, (int32_t)Val, (int32_t)Val, (int32_t)Val, (int32_t)Val, (int32_t)Val, (int32_t)Val }
+#define _PS256_CONST_TYPE(Name, Val) static const ALIGN32_BEG uint32_t _ps256_##Name[8] ALIGN32_END = { (uint32_t)Val, (uint32_t)Val, (uint32_t)Val, (uint32_t)Val, (uint32_t)Val, (uint32_t)Val, (uint32_t)Val, (uint32_t)Val }
 
 #define _PS256d_CONST(Name, Val) static const ALIGN32_BEG double _pd256d_##Name[4] ALIGN32_END = { (double)Val, (double)Val, (double)Val, (double)Val }
 #define _PI32_CONST256d(Name, Val) static const ALIGN32_BEG int64_t _pi32_256d_##Name[4] ALIGN32_END = { (int64_t)Val, (int64_t)Val, (int64_t)Val, (int64_t)Val }
-#define _PS256d_CONST_TYPE(Name, Val) static const ALIGN32_BEG int64_t _pd256d_##Name[4] ALIGN32_END = { (int64_t)Val, (int64_t)Val, (int64_t)Val, (int64_t)Val }
+#define _PS256d_CONST_TYPE(Name, Val) static const ALIGN32_BEG uint64_t _pd256d_##Name[4] ALIGN32_END = { (uint64_t)Val, (uint64_t)Val, (uint64_t)Val, (uint64_t)Val }
 
 //#define _PS256_CONST(Name, Val) static const inline __m256 _ps256_##Name() { return _mm256_set1_ps((float)Val);}
 //#define _PI32_CONST256(Name, Val) static const inline  __m256i _pi32_256_##Name() { return _mm256_set1_epi32((int32_t)Val); }
@@ -71,16 +71,16 @@ _PS256d_CONST(0p5, 0.5f);
 // First 8 bits all zero
 _PS256_CONST_TYPE(min_norm_pos,  0x00800000);
 _PS256_CONST_TYPE(mant_mask,  0x7f800000);
-_PS256_CONST_TYPE(inv_mant_mask,  ~0x7f800000);
+_PS256_CONST_TYPE(inv_mant_mask,  0x807fffff);
 _PS256_CONST_TYPE(sign_mask,  0x80000000);
-_PS256_CONST_TYPE(inv_sign_mask, ~0x80000000);
+_PS256_CONST_TYPE(inv_sign_mask, 0x7fffffff);
 
 // First 11 bits all zero
-_PS256d_CONST_TYPE(min_norm_pos, 0x0010000000000000LL);
-_PS256d_CONST_TYPE(mant_mask,  0x7ff0000000000000LL); 
-_PS256d_CONST_TYPE(inv_mant_mask,  ~0x7ff0000000000000LL);
+_PS256d_CONST_TYPE(min_norm_pos, 0x0010000000000000ULL);
+_PS256d_CONST_TYPE(mant_mask,  0x7ff0000000000000ULL); 
+_PS256d_CONST_TYPE(inv_mant_mask,  0x800fffffffffffffULL);
 _PS256d_CONST_TYPE(sign_mask,  0x8000000000000000LL);
-_PS256d_CONST_TYPE(inv_sign_mask,  ~0x8000000000000000LL);
+_PS256d_CONST_TYPE(inv_sign_mask,  0x7fffffffffffffffULL);
 
 _PI32_CONST256(0, 0);
 _PI32_CONST256(1, 1);
