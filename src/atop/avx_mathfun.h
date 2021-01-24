@@ -50,8 +50,8 @@ typedef __m256i v4di; // vector of 4 int64   (avx)
 #define _PS256_CONST_TYPE(Name, Val) static const ALIGN32_BEG int32_t _ps256_##Name[8] ALIGN32_END = { Val, Val, Val, Val, Val, Val, Val, Val }
 
 #define _PS256d_CONST(Name, Val) static const ALIGN32_BEG double _pd256d_##Name[4] ALIGN32_END = { (double)Val, (double)Val, (double)Val, (double)Val }
-#define _PI32_CONST256d(Name, Val) static const ALIGN32_BEG int64_t _pi32_256d_##Name[4] ALIGN32_END = { Val, Val, Val, Val }
-#define _PS256d_CONST_TYPE(Name, Val) static const ALIGN32_BEG int64_t _pd256d_##Name[4] ALIGN32_END = { Val, Val, Val, Val }
+#define _PI32_CONST256d(Name, Val) static const ALIGN32_BEG int64_t _pi32_256d_##Name[4] ALIGN32_END = { (int64_t)Val, (int64_t)Val, (int64_t)Val, (int64_t)Val }
+#define _PS256d_CONST_TYPE(Name, Val) static const ALIGN32_BEG int64_t _pd256d_##Name[4] ALIGN32_END = { (int64_t)Val, (int64_t)Val, (int64_t)Val, (int64_t)Val }
 
 //#define _PS256_CONST(Name, Val) static const inline __m256 _ps256_##Name() { return _mm256_set1_ps((float)Val);}
 //#define _PI32_CONST256(Name, Val) static const inline  __m256i _pi32_256_##Name() { return _mm256_set1_epi32((int32_t)Val); }
