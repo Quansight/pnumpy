@@ -2,6 +2,8 @@
 #include <cmath>
 #include "invalids.h"
 #include "thread"
+
+
 #if defined(__clang__)
 #pragma clang diagnostic ignored "-Wmissing-braces"
 #pragma clang diagnostic ignored "-Wunused-function"
@@ -19,6 +21,8 @@
 #endif
 #endif
 
+
+#include "avx_mathfun.h"
 
 //#define LOGGING printf
 #define LOGGING(...)
@@ -122,12 +126,28 @@ template<typename T> static const inline double ATANH_OP(double x) { return atan
 template<typename T> static const inline float ATANH_OP(float x) { return atanhf(x); }
 
 
+
+//template<typename T> static const inline __m256  SIN_OP_256(__m256 x) { return _mm256_sin_ps(x); }
+//template<typename T> static const inline __m256d SIN_OP_256(__m256d x) { return _mm256_sin_pd(x); }
+//template<typename T> static const inline __m256  COS_OP_256(__m256 x) { return _mm256_cos_ps(x); }
+//template<typename T> static const inline __m256d COS_OP_256(__m256d x) { return _mm256_cos_pd(x); }
+//template<typename T> static const inline __m256  LOG_OP_256(__m256 x) { return _mm256_log_ps(x); }
+//template<typename T> static const inline __m256d LOG_OP_256(__m256d x) { return _mm256_log_pd(x); }
+//template<typename T> static const inline __m256  EXP_OP_256(__m256 x) { return _mm256_exp_ps(x); }
+//template<typename T> static const inline __m256d EXP_OP_256(__m256d x) { return _mm256_exp_pd(x); }
+
+// Our custom sped up routines
+template<typename T> static const inline __m256  SIN_OP_256(__m256 x) { return sin256_ps(x); }
+template<typename T> static const inline __m256d SIN_OP_256(__m256d x) { return sin256_pd(x); }
+template<typename T> static const inline __m256  COS_OP_256(__m256 x) { return cos256_ps(x); }
+template<typename T> static const inline __m256d COS_OP_256(__m256d x) { return cos256_pd(x); }
+template<typename T> static const inline __m256  LOG_OP_256(__m256 x) { return log256_ps(x); }
+template<typename T> static const inline __m256d LOG_OP_256(__m256d x) { return log256_pd(x); }
+template<typename T> static const inline __m256  EXP_OP_256(__m256 x) { return exp256_ps(x); }
+template<typename T> static const inline __m256d EXP_OP_256(__m256d x) { return exp256_pd(x); }
+
 #if defined(RT_COMPILER_MSVC)
 
-template<typename T> static const inline __m256  SIN_OP_256(__m256 x) { return _mm256_sin_ps(x); }
-template<typename T> static const inline __m256d SIN_OP_256(__m256d x) { return _mm256_sin_pd(x); }
-template<typename T> static const inline __m256  COS_OP_256(__m256 x) { return _mm256_cos_ps(x); }
-template<typename T> static const inline __m256d COS_OP_256(__m256d x) { return _mm256_cos_pd(x); }
 template<typename T> static const inline __m256  TAN_OP_256(__m256 x) { return _mm256_tan_ps(x); }
 template<typename T> static const inline __m256d TAN_OP_256(__m256d x) { return _mm256_tan_pd(x); }
 
@@ -152,8 +172,7 @@ template<typename T> static const inline __m256d ACOSH_OP_256(__m256d x) { retur
 template<typename T> static const inline __m256  ATANH_OP_256(__m256 x) { return _mm256_atanh_ps(x); }
 template<typename T> static const inline __m256d ATANH_OP_256(__m256d x) { return _mm256_atanh_pd(x); }
 
-template<typename T> static const inline __m256  LOG_OP_256(__m256 x) { return _mm256_log_ps(x); }
-template<typename T> static const inline __m256d LOG_OP_256(__m256d x) { return _mm256_log_pd(x); }
+
 template<typename T> static const inline __m256  LOG1P_OP_256(__m256 x) { return _mm256_log1p_ps(x); }
 template<typename T> static const inline __m256d LOG1P_OP_256(__m256d x) { return _mm256_log1p_pd(x); }
 template<typename T> static const inline __m256  LOG10_OP_256(__m256 x) { return _mm256_log10_ps(x); }
@@ -161,8 +180,6 @@ template<typename T> static const inline __m256d LOG10_OP_256(__m256d x) { retur
 template<typename T> static const inline __m256  LOG2_OP_256(__m256 x) { return _mm256_log2_ps(x); }
 template<typename T> static const inline __m256d LOG2_OP_256(__m256d x) { return _mm256_log2_pd(x); }
 
-template<typename T> static const inline __m256  EXP_OP_256(__m256 x) { return _mm256_exp_ps(x); }
-template<typename T> static const inline __m256d EXP_OP_256(__m256d x) { return _mm256_exp_pd(x); }
 template<typename T> static const inline __m256  EXP2_OP_256(__m256 x) { return _mm256_exp2_ps(x); }
 template<typename T> static const inline __m256d EXP2_OP_256(__m256d x) { return _mm256_exp2_pd(x); }
 template<typename T> static const inline __m256  EXPM1_OP_256(__m256 x) { return _mm256_expm1_ps(x); }
@@ -369,55 +386,55 @@ template<typename T>
 static void UnaryOpSlowDouble_EXP2(void* pDataIn1, void* pDataOut, int64_t len, int64_t strideIn, int64_t strideOut) {
     return UnaryOpSlowDouble<T, const double(*)(double)>(EXP2_OP<double>, pDataIn1, pDataOut, len, strideIn, strideOut);
 }
-
-/*
- * Constants used in vector implementation of exp(x)
- */
-#define NPY_RINT_CVT_MAGICf 0x1.800000p+23f
-#define NPY_CODY_WAITE_LOGE_2_HIGHf -6.93145752e-1f
-#define NPY_CODY_WAITE_LOGE_2_LOWf -1.42860677e-6f
-#define NPY_COEFF_P0_EXPf 9.999999999980870924916e-01f
-#define NPY_COEFF_P1_EXPf 7.257664613233124478488e-01f
-#define NPY_COEFF_P2_EXPf 2.473615434895520810817e-01f
-#define NPY_COEFF_P3_EXPf 5.114512081637298353406e-02f
-#define NPY_COEFF_P4_EXPf 6.757896990527504603057e-03f
-#define NPY_COEFF_P5_EXPf 5.082762527590693718096e-04f
-#define NPY_COEFF_Q0_EXPf 1.000000000000000000000e+00f
-#define NPY_COEFF_Q1_EXPf -2.742335390411667452936e-01f
-#define NPY_COEFF_Q2_EXPf 2.159509375685829852307e-02f
-
- /*
-  * Constants used in vector implementation of log(x)
-  */
-#define NPY_COEFF_P0_LOGf 0.000000000000000000000e+00f
-#define NPY_COEFF_P1_LOGf 9.999999999999998702752e-01f
-#define NPY_COEFF_P2_LOGf 2.112677543073053063722e+00f
-#define NPY_COEFF_P3_LOGf 1.480000633576506585156e+00f
-#define NPY_COEFF_P4_LOGf 3.808837741388407920751e-01f
-#define NPY_COEFF_P5_LOGf 2.589979117907922693523e-02f
-#define NPY_COEFF_Q0_LOGf 1.000000000000000000000e+00f
-#define NPY_COEFF_Q1_LOGf 2.612677543073109236779e+00f
-#define NPY_COEFF_Q2_LOGf 2.453006071784736363091e+00f
-#define NPY_COEFF_Q3_LOGf 9.864942958519418960339e-01f
-#define NPY_COEFF_Q4_LOGf 1.546476374983906719538e-01f
-#define NPY_COEFF_Q5_LOGf 5.875095403124574342950e-03f
-  /*
-   * Constants used in vector implementation of sinf/cosf(x)
-   */
-#define NPY_TWO_O_PIf 0x1.45f306p-1f
-#define NPY_CODY_WAITE_PI_O_2_HIGHf -0x1.921fb0p+00f
-#define NPY_CODY_WAITE_PI_O_2_MEDf -0x1.5110b4p-22f
-#define NPY_CODY_WAITE_PI_O_2_LOWf -0x1.846988p-48f
-#define NPY_COEFF_INVF0_COSINEf 0x1.000000p+00f
-#define NPY_COEFF_INVF2_COSINEf -0x1.000000p-01f
-#define NPY_COEFF_INVF4_COSINEf 0x1.55553cp-05f
-#define NPY_COEFF_INVF6_COSINEf -0x1.6c06dcp-10f
-#define NPY_COEFF_INVF8_COSINEf 0x1.98e616p-16f
-#define NPY_COEFF_INVF3_SINEf -0x1.555556p-03f
-#define NPY_COEFF_INVF5_SINEf 0x1.11119ap-07f
-#define NPY_COEFF_INVF7_SINEf -0x1.a06bbap-13f
-#define NPY_COEFF_INVF9_SINEf 0x1.7d3bbcp-19f
-
+//
+///*
+// * Constants used in vector implementation of exp(x)
+// */
+//#define NPY_RINT_CVT_MAGICf 0x1.800000p+23f
+//#define NPY_CODY_WAITE_LOGE_2_HIGHf -6.93145752e-1f
+//#define NPY_CODY_WAITE_LOGE_2_LOWf -1.42860677e-6f
+//#define NPY_COEFF_P0_EXPf 9.999999999980870924916e-01f
+//#define NPY_COEFF_P1_EXPf 7.257664613233124478488e-01f
+//#define NPY_COEFF_P2_EXPf 2.473615434895520810817e-01f
+//#define NPY_COEFF_P3_EXPf 5.114512081637298353406e-02f
+//#define NPY_COEFF_P4_EXPf 6.757896990527504603057e-03f
+//#define NPY_COEFF_P5_EXPf 5.082762527590693718096e-04f
+//#define NPY_COEFF_Q0_EXPf 1.000000000000000000000e+00f
+//#define NPY_COEFF_Q1_EXPf -2.742335390411667452936e-01f
+//#define NPY_COEFF_Q2_EXPf 2.159509375685829852307e-02f
+//
+// /*
+//  * Constants used in vector implementation of log(x)
+//  */
+//#define NPY_COEFF_P0_LOGf 0.000000000000000000000e+00f
+//#define NPY_COEFF_P1_LOGf 9.999999999999998702752e-01f
+//#define NPY_COEFF_P2_LOGf 2.112677543073053063722e+00f
+//#define NPY_COEFF_P3_LOGf 1.480000633576506585156e+00f
+//#define NPY_COEFF_P4_LOGf 3.808837741388407920751e-01f
+//#define NPY_COEFF_P5_LOGf 2.589979117907922693523e-02f
+//#define NPY_COEFF_Q0_LOGf 1.000000000000000000000e+00f
+//#define NPY_COEFF_Q1_LOGf 2.612677543073109236779e+00f
+//#define NPY_COEFF_Q2_LOGf 2.453006071784736363091e+00f
+//#define NPY_COEFF_Q3_LOGf 9.864942958519418960339e-01f
+//#define NPY_COEFF_Q4_LOGf 1.546476374983906719538e-01f
+//#define NPY_COEFF_Q5_LOGf 5.875095403124574342950e-03f
+//  /*
+//   * Constants used in vector implementation of sinf/cosf(x)
+//   */
+//#define NPY_TWO_O_PIf 0x1.45f306p-1f
+//#define NPY_CODY_WAITE_PI_O_2_HIGHf -0x1.921fb0p+00f
+//#define NPY_CODY_WAITE_PI_O_2_MEDf -0x1.5110b4p-22f
+//#define NPY_CODY_WAITE_PI_O_2_LOWf -0x1.846988p-48f
+//#define NPY_COEFF_INVF0_COSINEf 0x1.000000p+00f
+//#define NPY_COEFF_INVF2_COSINEf -0x1.000000p-01f
+//#define NPY_COEFF_INVF4_COSINEf 0x1.55553cp-05f
+//#define NPY_COEFF_INVF6_COSINEf -0x1.6c06dcp-10f
+//#define NPY_COEFF_INVF8_COSINEf 0x1.98e616p-16f
+//#define NPY_COEFF_INVF3_SINEf -0x1.555556p-03f
+//#define NPY_COEFF_INVF5_SINEf 0x1.11119ap-07f
+//#define NPY_COEFF_INVF7_SINEf -0x1.a06bbap-13f
+//#define NPY_COEFF_INVF9_SINEf 0x1.7d3bbcp-19f
+//
 
 
 /*
@@ -568,22 +585,18 @@ UNARY_FUNC GetTrigOpFast(int func, int atopInType1, int* wantedOutType) {
     switch (func) {
     case TRIG_OPERATION::SIN:
         *wantedOutType = atopInType1;
-#if defined(RT_COMPILER_MSVC)
         switch (atopInType1) {
         case ATOP_FLOAT:  return UnaryOpFast<float, __m256, SIN_OP<float>, SIN_OP_256<__m256>>;
         case ATOP_DOUBLE: return UnaryOpFast<double, __m256d, SIN_OP<double>, SIN_OP_256<__m256d>>;
         }
-#endif
         break;
 
     case TRIG_OPERATION::COS:
         *wantedOutType = atopInType1;
-#if defined(RT_COMPILER_MSVC)
         switch (atopInType1) {
         case ATOP_FLOAT:  return UnaryOpFast<float, __m256, COS_OP<float>, COS_OP_256<__m256>>;
         case ATOP_DOUBLE: return UnaryOpFast<double, __m256d, COS_OP<double>, COS_OP_256<__m256d>>;
         }
-#endif
         break;
     case TRIG_OPERATION::TAN:
         *wantedOutType = atopInType1;
@@ -691,12 +704,10 @@ UNARY_FUNC GetTrigOpFast(int func, int atopInType1, int* wantedOutType) {
 
     case TRIG_OPERATION::EXP:
         *wantedOutType = atopInType1;
-#if defined(RT_COMPILER_MSVC)
         switch (atopInType1) {
         case ATOP_FLOAT:  return UnaryOpFast<float, __m256, EXP_OP<float>, EXP_OP_256<__m256>>;
         case ATOP_DOUBLE: return UnaryOpFast<double, __m256d, EXP_OP<double>, EXP_OP_256<__m256d>>;
         }
-#endif
         break;
 
     case TRIG_OPERATION::EXP2:
@@ -721,12 +732,10 @@ UNARY_FUNC GetTrigOpFast(int func, int atopInType1, int* wantedOutType) {
 
     case TRIG_OPERATION::LOG:
         *wantedOutType = atopInType1;
-#if defined(RT_COMPILER_MSVC)
         switch (atopInType1) {
         case ATOP_FLOAT:  return UnaryOpFast<float, __m256, LOG_OP<float>, LOG_OP_256<__m256>>;
         case ATOP_DOUBLE: return UnaryOpFast<double, __m256d, LOG_OP<double>, LOG_OP_256<__m256d>>;
         }
-#endif
         break;
 
     case TRIG_OPERATION::LOG2:
