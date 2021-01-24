@@ -70,17 +70,17 @@ _PS256d_CONST(0p5, 0.5f);
 /* the smallest non denormalized float number */
 // First 8 bits all zero
 _PS256_CONST_TYPE(min_norm_pos,  0x00800000);
-_PS256_CONST_TYPE(mant_mask,  0x7f800000);
-_PS256_CONST_TYPE(inv_mant_mask,  0x807fffff);
-_PS256_CONST_TYPE(sign_mask,  0x80000000);
+_PS256_CONST_TYPE(mant_mask,     0x7f800000);
+_PS256_CONST_TYPE(inv_mant_mask, 0x807fffff);
+_PS256_CONST_TYPE(sign_mask,     0x80000000);
 _PS256_CONST_TYPE(inv_sign_mask, 0x7fffffff);
 
 // First 11 bits all zero
-_PS256d_CONST_TYPE(min_norm_pos, 0x0010000000000000ULL);
-_PS256d_CONST_TYPE(mant_mask,  0x7ff0000000000000ULL); 
-_PS256d_CONST_TYPE(inv_mant_mask,  0x800fffffffffffffULL);
-_PS256d_CONST_TYPE(sign_mask,  0x8000000000000000LL);
-_PS256d_CONST_TYPE(inv_sign_mask,  0x7fffffffffffffffULL);
+_PS256d_CONST_TYPE(min_norm_pos,  0x0010000000000000ULL);
+_PS256d_CONST_TYPE(mant_mask,     0x7ff0000000000000ULL); 
+_PS256d_CONST_TYPE(inv_mant_mask, 0x800fffffffffffffULL);
+_PS256d_CONST_TYPE(sign_mask,     0x8000000000000000LL);
+_PS256d_CONST_TYPE(inv_sign_mask, 0x7fffffffffffffffULL);
 
 _PI32_CONST256(0, 0);
 _PI32_CONST256(1, 1);
@@ -257,7 +257,7 @@ FORCE_INLINE static v4df log256_pd(v4df x) {
 
     // this is again another AVX2 instruction
     imm0 = _mm256_sub_epi64(imm0, *(v4di*)_pi32_256d_0x7f);
-    v4df e = _mm256_cvtepi64_pd(imm0);
+    v4df e =int64_to_double(imm0);
 
     e = _mm256_add_pd(e, one);
 
