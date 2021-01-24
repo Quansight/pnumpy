@@ -31,10 +31,13 @@
 
 #include <immintrin.h>
 
+#if defined(RT_COMPILER_MSVC)
 # define ALIGN32_BEG __declspec(align(32))
 # define ALIGN32_END
-//# define ALIGN32_BEG
-//# define ALIGN32_END __attribute__((aligned(32)))
+#else
+# define ALIGN32_BEG
+# define ALIGN32_END __attribute__((aligned(32)))
+#endif
 
 typedef __m256  v8sf; // vector of 8 float (avx)
 typedef __m256i v8si; // vector of 8 int   (avx)
