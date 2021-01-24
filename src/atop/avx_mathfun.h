@@ -44,15 +44,6 @@ typedef __m256i v8si; // vector of 8 int   (avx)
 typedef __m256d v4df; // vector of 4 double (avx)
 typedef __m256i v4di; // vector of 4 int64   (avx)
 
-//#define _PI32AVX_CONST(Name, Val) static const ALIGN32_BEG int _pi32avx_##Name[4] ALIGN32_END = { Val, Val, Val, Val }
-//
-//_PI32AVX_CONST(1, 1);
-//_PI32AVX_CONST(inv1, ~1);
-//_PI32AVX_CONST(2, 2);
-//_PI32AVX_CONST(4, 4);
-
-
-/* declare some AVX constants -- why can't I figure a better way to do that? */
 // Two ways to define the constants, as variables, or inline with mm256_set1_xxx
 #define _PS256_CONST(Name, Val) static const ALIGN32_BEG float _ps256_##Name[8] ALIGN32_END = { (float)Val, (float)Val, (float)Val, (float)Val, (float)Val, (float)Val, (float)Val, (float)Val }
 #define _PI32_CONST256(Name, Val) static const ALIGN32_BEG int _pi32_256_##Name[8] ALIGN32_END = { Val, Val, Val, Val, Val, Val, Val, Val }
@@ -85,11 +76,11 @@ _PS256_CONST_TYPE(sign_mask,  0x80000000);
 _PS256_CONST_TYPE(inv_sign_mask, ~0x80000000);
 
 // First 11 bits all zero
-_PS256d_CONST_TYPE(min_norm_pos, 0x0010000000000000);
-_PS256d_CONST_TYPE(mant_mask,  0x7ff0000000000000); 
-_PS256d_CONST_TYPE(inv_mant_mask,  ~0x7ff0000000000000);
-_PS256d_CONST_TYPE(sign_mask,  0x8000000000000000);
-_PS256d_CONST_TYPE(inv_sign_mask,  ~0x8000000000000000);
+_PS256d_CONST_TYPE(min_norm_pos, 0x0010000000000000LL);
+_PS256d_CONST_TYPE(mant_mask,  0x7ff0000000000000LL); 
+_PS256d_CONST_TYPE(inv_mant_mask,  ~0x7ff0000000000000LL);
+_PS256d_CONST_TYPE(sign_mask,  0x8000000000000000LL);
+_PS256d_CONST_TYPE(inv_sign_mask,  ~0x8000000000000000LL);
 
 _PI32_CONST256(0, 0);
 _PI32_CONST256(1, 1);
