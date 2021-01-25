@@ -52,7 +52,7 @@ jobs:
       run: |
         pip install cibuildwheel pip setuptools_scm twine --upgrade;
         python -m cibuildwheel --output-dir dist;
-        python -m twine upload dist/* -u $TWINE_USERNAME -p $TWINE_PASSWORD --skip-existing --verbose;
+        python -m twine upload dist/* --skip-existing --verbose;
         # python -m twine upload dist/* -u "$PYPI_USERNAME" -p "$PYPI_PASSWORD" --skip-existing --verbose;
           
     - name: Build wheels (windows) ${{ matrix.python-version }} on ${{ matrix.os }}
@@ -68,7 +68,7 @@ jobs:
       run: |
         pip install cibuildwheel twine --upgrade;
         python -m cibuildwheel --output-dir dist;
-        python -m twine upload dist/* -u $TWINE_USERNAME -p $TWINE_PASSWORD --skip-existing --verbose;
+        python -m twine upload dist/* --skip-existing --verbose;
         # python -m twine upload dist/* --skip-existing --verbose;
               
 #    - name: Build wheels on ${{ matrix.os}}
@@ -162,7 +162,7 @@ jobs:
         TWINE_PASSWORD: ${{ secrets.pypi }}
       run: |
         python setup.py bdist_wheel
-        python -m twine upload dist/* -u $TWINE_USERNAME -p $TWINE_PASSWORD --skip-existing --verbose;
+        python -m twine upload dist/* --skip-existing --verbose;
     - uses: actions/upload-artifact@v2
       with:
         name: dist
