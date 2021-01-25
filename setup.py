@@ -33,7 +33,7 @@ except Exception:
         print("**could not install pip or setuptools_scm, version is defaulted")
 
 def myversion():
-    version = '2.0.15'
+    version = '2.0.16'
     try:
         mversion = get_version()
         s = mversion.split('.')
@@ -139,7 +139,7 @@ setup(
     python_requires='>=3.6',
     install_requires=[
         # eg: 'aspectlib==1.1.1', 'six>=1.7',
-        'numpy>=1.19.0',
+        'numpy>=1.18.0',   # has ufunc hooks
     ],
     extras_require={
         # eg:
