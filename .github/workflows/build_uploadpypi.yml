@@ -47,8 +47,8 @@ jobs:
         CIBW_SKIP: 'cp27-* cp35-* *-manylinux_i686 *manylinux_aarch64 *manylinux_ppc64le *manylinux_s390x'
         PYPI_PASSWORD: ${{ secrets.pypi_password }}
         PYPI_USERNAME: ${{ secrets.pypi_username }}
-        TWINE_USERNAME: __token__
-        TWINE_PASSWORD: ${{ secrets.pypi }}
+        TWINE_USERNAME: ${{ secrets.TWINE_USERNAME }}
+        TWINE_PASSWORD: ${{ secrets.TWINE_PASSWORD }}
       run: |
         pip install cibuildwheel pip setuptools_scm twine --upgrade;
         python -m cibuildwheel --output-dir dist;
@@ -63,8 +63,8 @@ jobs:
         CIBW_SKIP: 'cp27-* cp35-* *-win32'
         PYPI_PASSWORD: ${{ secrets.pypi_password }}
         PYPI_USERNAME: ${{ secrets.pypi_username }}
-        TWINE_USERNAME: __token__
-        TWINE_PASSWORD: ${{ secrets.pypi }}
+        TWINE_USERNAME: ${{ secrets.TWINE_USERNAME }}
+        TWINE_PASSWORD: ${{ secrets.TWINE_PASSWORD }}
       run: |
         pip install cibuildwheel twine --upgrade;
         python -m cibuildwheel --output-dir dist;
@@ -158,8 +158,8 @@ jobs:
       env:
         PYPI_PASSWORD: ${{ secrets.pypi_password }}
         PYPI_USERNAME: ${{ secrets.pypi_username }}
-        TWINE_USERNAME: __token__
-        TWINE_PASSWORD: ${{ secrets.pypi }}
+        TWINE_USERNAME: ${{ secrets.TWINE_USERNAME }}
+        TWINE_PASSWORD: ${{ secrets.TWINE_PASSWORD }}
       run: |
         python setup.py bdist_wheel
         python -m twine upload dist/* --skip-existing --verbose;
