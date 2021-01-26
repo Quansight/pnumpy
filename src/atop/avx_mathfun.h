@@ -53,13 +53,18 @@
 //#define _PI32_CONST256d(Name, Val) static const ALIGN32_BEG int64_t _pi32_256d_##Name[4] ALIGN32_END = { (int64_t)Val, (int64_t)Val, (int64_t)Val, (int64_t)Val }
 //#define _PS256d_CONST_TYPE(Name, Val) static const ALIGN32_BEG uint64_t _pd256d_##Name[4] ALIGN32_END = { (uint64_t)Val, (uint64_t)Val, (uint64_t)Val, (uint64_t)Val }
 
-#define _PS256_CONST(Name, Val) const __m256 _ps256_##Name = _mm256_set1_ps((float)Val);
-#define _PI32_CONST256(Name, Val) const  __m256i _pi32_256_##Name = _mm256_set1_epi32((int32_t)Val);
-#define _PS256_CONST_TYPE(Name, Val) const  __m256 _ps256_##Name = _mm256_castsi256_ps( _mm256_set1_epi32((int32_t)Val)); 
+//#define _PS256_CONST(Name, Val) static const __m256 _ps256_##Name = _mm256_set1_ps(Val);
+//#define _PI32_CONST256(Name, Val) static const  __m256i _pi32_256_##Name = _mm256_set1_epi32(Val);
+//#define _PS256_CONST_TYPE(Name, Val) static const  __m256 _ps256_##Name = _mm256_castsi256_ps( _mm256_set1_epi32(Val)); 
 
-#define _PS256d_CONST(Name, Val) const __m256d _pd256d_##Name = _mm256_set1_pd(Val); 
-#define _PI32_CONST256d(Name, Val) const __m256i _pi32_256d_##Name = _mm256_set1_epi64x((int64_t)Val); 
-#define _PS256d_CONST_TYPE(Name, Val) const __m256d _pd256d_##Name = _mm256_castsi256_pd(_mm256_set1_epi64x((int64_t)Val));
+#define _PS256d_CONST(Name, Val) static const __m256d _pd256d_##Name = _mm256_set1_pd(Val); 
+#define _PI32_CONST256d(Name, Val) static const __m256i _pi32_256d_##Name = _mm256_set1_epi64x((int64_t)Val); 
+#define _PS256d_CONST_TYPE(Name, Val) static const __m256d _pd256d_##Name = _mm256_castsi256_pd(_mm256_set1_epi64x((int64_t)Val));
+
+#define _PS256_CONST(Name, Val) static const float _ps256t_##Name = Val; static const __m256 _ps256_##Name = _mm256_broadcast_ss(&_ps256t_##Name);
+#define _PI32_CONST256(Name, Val) static const  __m256i _pi32_256_##Name = _mm256_set1_epi32(Val);
+#define _PS256_CONST_TYPE(Name, Val) static const uint32_t _ps256t_##Name = Val; static const  __m256 _ps256_##Name = _mm256_broadcast_ss((const float*)&_ps256t_##Name); 
+
 
 _PS256_CONST(1  , 1.0f);
 _PS256d_CONST(1, 1.0f);
@@ -92,7 +97,7 @@ _PI32_CONST256(0x7f, 0x7f);
 
 _PI32_CONST256d(0, 0);
 _PI32_CONST256d(1, 1);
-_PI32_CONST256d(inv1, ~(int64_t)1);   // or ~1LL  ?
+_PI32_CONST256d(inv1, ~(int64_t)1);   // or ~1LL  or -2?
 _PI32_CONST256d(2, 2);
 _PI32_CONST256d(4, 4);
 // srli 52 then mask off exponent (11 bits), note 0xffe = infinity
@@ -149,23 +154,24 @@ _PS256d_CONST(cephes_log_p8, +3.3333331174E-1);
 _PS256d_CONST(cephes_log_q1, -2.12194440e-4);
 _PS256d_CONST(cephes_log_q2, 0.693359375);
 
+_PS256_CONST(cephes_SQRTHF, 0.707106781186547524f);
+_PS256_CONST(cephes_log_p0, 7.0376836292E-2f);
+_PS256_CONST(cephes_log_p1, -1.1514610310E-1f);
+_PS256_CONST(cephes_log_p2, 1.1676998740E-1f);
+_PS256_CONST(cephes_log_p3, -1.2420140846E-1f);
+_PS256_CONST(cephes_log_p4, +1.4249322787E-1f);
+_PS256_CONST(cephes_log_p5, -1.6668057665E-1f);
+_PS256_CONST(cephes_log_p6, +2.0000714765E-1f);
+_PS256_CONST(cephes_log_p7, -2.4999993993E-1f);
+_PS256_CONST(cephes_log_p8, +3.3333331174E-1f);
+_PS256_CONST(cephes_log_q1, -2.12194440e-4f);
+_PS256_CONST(cephes_log_q2, 0.693359375f);
+
 
 /* natural logarithm computed for 8 simultaneous float 
    return NaN for x <= 0
 */
 FORCE_INLINE static v8sf log256_ps(v8sf x) {
-    _PS256_CONST(cephes_SQRTHF, 0.707106781186547524);
-    _PS256_CONST(cephes_log_p0, 7.0376836292E-2);
-    _PS256_CONST(cephes_log_p1, -1.1514610310E-1);
-    _PS256_CONST(cephes_log_p2, 1.1676998740E-1);
-    _PS256_CONST(cephes_log_p3, -1.2420140846E-1);
-    _PS256_CONST(cephes_log_p4, +1.4249322787E-1);
-    _PS256_CONST(cephes_log_p5, -1.6668057665E-1);
-    _PS256_CONST(cephes_log_p6, +2.0000714765E-1);
-    _PS256_CONST(cephes_log_p7, -2.4999993993E-1);
-    _PS256_CONST(cephes_log_p8, +3.3333331174E-1);
-    _PS256_CONST(cephes_log_q1, -2.12194440e-4);
-    _PS256_CONST(cephes_log_q2, 0.693359375);
 
     v8si imm0;
     v8sf one = _ps256_1;
@@ -328,21 +334,21 @@ _PS256d_CONST(cephes_exp_p3, 4.1665795894E-2);
 _PS256d_CONST(cephes_exp_p4, 1.6666665459E-1);
 _PS256d_CONST(cephes_exp_p5, 5.0000001201E-1);
 
+_PS256_CONST(exp_hi, 88.3762626647949f);
+_PS256_CONST(exp_lo, -88.3762626647949f);
+
+_PS256_CONST(cephes_LOG2EF, 1.44269504088896341f);
+_PS256_CONST(cephes_exp_C1, 0.693359375f);
+_PS256_CONST(cephes_exp_C2, -2.12194440e-4f);
+
+_PS256_CONST(cephes_exp_p0, 1.9875691500E-4f);
+_PS256_CONST(cephes_exp_p1, 1.3981999507E-3f);
+_PS256_CONST(cephes_exp_p2, 8.3334519073E-3f);
+_PS256_CONST(cephes_exp_p3, 4.1665795894E-2f);
+_PS256_CONST(cephes_exp_p4, 1.6666665459E-1f);
+_PS256_CONST(cephes_exp_p5, 5.0000001201E-1f);
 
 FORCE_INLINE static v8sf exp256_ps(v8sf x) {
-    _PS256_CONST(exp_hi, 88.3762626647949f);
-    _PS256_CONST(exp_lo, -88.3762626647949f);
-
-    _PS256_CONST(cephes_LOG2EF, 1.44269504088896341);
-    _PS256_CONST(cephes_exp_C1, 0.693359375);
-    _PS256_CONST(cephes_exp_C2, -2.12194440e-4);
-
-    _PS256_CONST(cephes_exp_p0, 1.9875691500E-4);
-    _PS256_CONST(cephes_exp_p1, 1.3981999507E-3);
-    _PS256_CONST(cephes_exp_p2, 8.3334519073E-3);
-    _PS256_CONST(cephes_exp_p3, 4.1665795894E-2);
-    _PS256_CONST(cephes_exp_p4, 1.6666665459E-1);
-    _PS256_CONST(cephes_exp_p5, 5.0000001201E-1);
 
     v8sf tmp = _mm256_setzero_ps(), fx;
     v8si imm0;
@@ -471,6 +477,17 @@ _PS256d_CONST(coscof_p1, -1.388731625493765E-003);
 _PS256d_CONST(coscof_p2, 4.166664568298827E-002);
 _PS256d_CONST(cephes_FOPI, 1.27323954473516); // 4 / M_PI
 
+_PS256_CONST(minus_cephes_DP1, -0.78515625f);
+_PS256_CONST(minus_cephes_DP2, -2.4187564849853515625e-4f);
+_PS256_CONST(minus_cephes_DP3, -3.77489497744594108e-8f);
+_PS256_CONST(sincof_p0, -1.9515295891E-4f);
+_PS256_CONST(sincof_p1, 8.3321608736E-3f);
+_PS256_CONST(sincof_p2, -1.6666654611E-1f);
+_PS256_CONST(coscof_p0, 2.443315711809948E-005f);
+_PS256_CONST(coscof_p1, -1.388731625493765E-003f);
+_PS256_CONST(coscof_p2, 4.166664568298827E-002f);
+_PS256_CONST(cephes_FOPI, 1.27323954473516f); // 4 / M_PI
+
 /* evaluation of 8 sines at onces using AVX intrisics
 
    The code is the exact rewriting of the cephes sinf function.
@@ -484,16 +501,6 @@ _PS256d_CONST(cephes_FOPI, 1.27323954473516); // 4 / M_PI
 
 */
 FORCE_INLINE static v8sf sin256_ps(v8sf x) {
-    _PS256_CONST(minus_cephes_DP1, -0.78515625);
-    _PS256_CONST(minus_cephes_DP2, -2.4187564849853515625e-4);
-    _PS256_CONST(minus_cephes_DP3, -3.77489497744594108e-8);
-    _PS256_CONST(sincof_p0, -1.9515295891E-4);
-    _PS256_CONST(sincof_p1, 8.3321608736E-3);
-    _PS256_CONST(sincof_p2, -1.6666654611E-1);
-    _PS256_CONST(coscof_p0, 2.443315711809948E-005);
-    _PS256_CONST(coscof_p1, -1.388731625493765E-003);
-    _PS256_CONST(coscof_p2, 4.166664568298827E-002);
-    _PS256_CONST(cephes_FOPI, 1.27323954473516); // 4 / M_PI
 
     v8sf xmm1, xmm2 = _mm256_setzero_ps(), xmm3, sign_bit, y;
     v8si imm0, imm2;
@@ -592,17 +599,6 @@ FORCE_INLINE static v8sf sin256_ps(v8sf x) {
 
 /* almost the same as sin_ps */
 FORCE_INLINE static v8sf cos256_ps(v8sf x) { // any x
-    _PS256_CONST(minus_cephes_DP1, -0.78515625);
-    _PS256_CONST(minus_cephes_DP2, -2.4187564849853515625e-4);
-    _PS256_CONST(minus_cephes_DP3, -3.77489497744594108e-8);
-    _PS256_CONST(sincof_p0, -1.9515295891E-4);
-    _PS256_CONST(sincof_p1, 8.3321608736E-3);
-    _PS256_CONST(sincof_p2, -1.6666654611E-1);
-    _PS256_CONST(coscof_p0, 2.443315711809948E-005);
-    _PS256_CONST(coscof_p1, -1.388731625493765E-003);
-    _PS256_CONST(coscof_p2, 4.166664568298827E-002);
-    _PS256_CONST(cephes_FOPI, 1.27323954473516); // 4 / M_PI
-
     v8sf xmm1, xmm2 = _mm256_setzero_ps(), xmm3, y;
     v8si imm0, imm2;
 
@@ -681,17 +677,6 @@ FORCE_INLINE static v8sf cos256_ps(v8sf x) { // any x
 /* since sin256_ps and cos256_ps are almost identical, sincos256_ps could replace both of them..
    it is almost as fast, and gives you a free cosine with your sine */
 FORCE_INLINE static void sincos256_ps(v8sf x, v8sf *s, v8sf *c) {
-
-    _PS256_CONST(minus_cephes_DP1, -0.78515625);
-    _PS256_CONST(minus_cephes_DP2, -2.4187564849853515625e-4);
-    _PS256_CONST(minus_cephes_DP3, -3.77489497744594108e-8);
-    _PS256_CONST(sincof_p0, -1.9515295891E-4);
-    _PS256_CONST(sincof_p1, 8.3321608736E-3);
-    _PS256_CONST(sincof_p2, -1.6666654611E-1);
-    _PS256_CONST(coscof_p0, 2.443315711809948E-005);
-    _PS256_CONST(coscof_p1, -1.388731625493765E-003);
-    _PS256_CONST(coscof_p2, 4.166664568298827E-002);
-    _PS256_CONST(cephes_FOPI, 1.27323954473516); // 4 / M_PI
 
     v8sf xmm1, xmm2, xmm3 = _mm256_setzero_ps(), sign_bit_sin, y;
     v8si imm0, imm2, imm4;
