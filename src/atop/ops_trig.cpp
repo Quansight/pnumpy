@@ -125,8 +125,6 @@ template<typename T> static const inline long double ATANH_OP(long double x) { r
 template<typename T> static const inline double ATANH_OP(double x) { return atanh(x); }
 template<typename T> static const inline float ATANH_OP(float x) { return atanhf(x); }
 
-
-
 //template<typename T> static const inline __m256  SIN_OP_256(__m256 x) { return _mm256_sin_ps(x); }
 //template<typename T> static const inline __m256d SIN_OP_256(__m256d x) { return _mm256_sin_pd(x); }
 //template<typename T> static const inline __m256  COS_OP_256(__m256 x) { return _mm256_cos_ps(x); }
@@ -137,7 +135,7 @@ template<typename T> static const inline float ATANH_OP(float x) { return atanhf
 //template<typename T> static const inline __m256d EXP_OP_256(__m256d x) { return _mm256_exp_pd(x); }
 
 // Our custom sped up routines
-template<typename T> static const inline __m256  SIN_OP_256(__m256 x) { return sin256_ps(x); }
+template<typename T> static const inline __m256  SIN_OP_256(__m256 x) { return sin256_ps(x);}
 template<typename T> static const inline __m256d SIN_OP_256(__m256d x) { return sin256_pd(x); }
 template<typename T> static const inline __m256  COS_OP_256(__m256 x) { return cos256_ps(x); }
 template<typename T> static const inline __m256d COS_OP_256(__m256d x) { return cos256_pd(x); }
