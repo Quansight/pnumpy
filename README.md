@@ -5,7 +5,7 @@ This first release speeds up NumPy binary and unary ufuncs such as **add, multip
 Sped up functions also include: **sort, argsort, lexsort, boolean indexing, and fancy indexing**.
 In the near future we will speed up: **astype, where, putmask, arange, searchsorted**.
 
-[![CI Status](https://github.com/Quansight/numpy-threading-extensions/workflows/tox/badge.svg)](https://github.com/Quansight/numpy-threading-extensions/actions)
+[![CI Status](https://github.com/Quansight/pnumpy/workflows/tox/badge.svg)](https://github.com/Quansight/pnumpy/actions)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
@@ -16,12 +16,12 @@ pip install pnumpy
 
 You can also install the latest development versions with
 ```
-pip install https://github.com/Quansight/numpy-threading-extensions/archive/main.zip
+pip install https://github.com/Quansight/pnumpy/archive/main.zip
 ```
 
 ## Documentation
 
-See the [full documentation](https://quansight.github.io/numpy-threading-extensions/stable/index.html)
+See the [full documentation](https://quansight.github.io/pnumpy/stable/index.html)
 
 To use the project:
 
