@@ -54,34 +54,40 @@ Sped up functions also include: <strong>sort, argsort, lexsort, boolean indexing
 In the near future we will speed up: <strong>astype, where, putmask, arange, searchsorted</strong>.</p>
 <div class="section" id="installation">
 <h2>Installation<a class="headerlink" href="#installation" title="Permalink to this headline">¶</a></h2>
-<p><code class="docutils literal notranslate"><span class="pre">`</span>
-<span class="pre">pip</span> <span class="pre">install</span> <span class="pre">pnumpy</span>
-<span class="pre">`</span></code></p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span>
+</pre></div>
+</div>
+<p>pip install pnumpy</p>
 <p>To use the project:</p>
-<p><code class="docutils literal notranslate"><span class="pre">`python</span>
-<span class="pre">import</span> <span class="pre">pnumpy</span> <span class="pre">as</span> <span class="pre">pn</span>
-<span class="pre">`</span></code></p>
-<p>Parallel NumPy speeds up NumPy silently under the hood.  To see some benchmarks yourself run
-<code class="docutils literal notranslate"><span class="pre">`</span>
-<span class="pre">pn.benchmark()</span>
-<span class="pre">`</span></code></p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span>
+</pre></div>
+</div>
+<p>import pnumpy as pn</p>
+<p>Parallel NumPy speeds up NumPy silently under the hood.  To see some benchmarks yourself run</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span>
+</pre></div>
+</div>
+<p>pn.benchmark()</p>
 <img alt="_images/bench4graph2.PNG" src="_images/bench4graph2.PNG" />
 <img alt="_images/bench4graph3.PNG" src="_images/bench4graph3.PNG" />
 <p>To get a partial list of functions sped up run
 <code class="docutils literal notranslate"><span class="pre">`</span>
 <span class="pre">pn.atop_info()</span>
 <span class="pre">`</span></code></p>
-<p>To disable or enable pnumpy run
-<code class="docutils literal notranslate"><span class="pre">`</span>
-<span class="pre">pn.disable()</span>
-<span class="pre">pn.enable()</span>
-<span class="pre">`</span></code></p>
-<p>To cap the number of additional worker threads to 3 run
-<code class="docutils literal notranslate"><span class="pre">`</span>
-<span class="pre">pn.thread_setworkers(3)</span>
-<span class="pre">`</span></code>
-Additional Functionality
-————————</p>
+<p>To disable or enable pnumpy run</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span>
+</pre></div>
+</div>
+<p>pn.disable()
+pn.enable()</p>
+<p>To cap the number of additional worker threads to 3 run</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span>
+</pre></div>
+</div>
+<p>pn.thread_setworkers(3)</p>
+</div>
+<div class="section" id="additional-functionality">
+<h2>Additional Functionality<a class="headerlink" href="#additional-functionality" title="Permalink to this headline">¶</a></h2>
 <p>PNumPy provides additional routines such as converting a NumPy record array to a column major array in parallel (<strong>pn.recarray_to_colmajor</strong>) which is useful for DataFrames.  Other routines include <strong>pn.lexsort32</strong>, which performs an indirect sort using <strong>np.int32</strong> instead of <strong>np.int64</strong> consuming half the memory and running faster.</p>
 </div>
 <div class="section" id="threading">
@@ -99,10 +105,11 @@ Additional Functionality
 <div class="section" id="development">
 <h2>Development<a class="headerlink" href="#development" title="Permalink to this headline">¶</a></h2>
 <p>To run all the tests run:</p>
-<p><code class="docutils literal notranslate"><span class="pre">`</span>
-<span class="pre">python</span> <span class="pre">-m</span> <span class="pre">pip</span> <span class="pre">install</span> <span class="pre">pytest</span>
-<span class="pre">python</span> <span class="pre">-m</span> <span class="pre">pytest</span> <span class="pre">tests</span>
-<span class="pre">`</span></code></p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span>
+</pre></div>
+</div>
+<p>python -m pip install pytest
+python -m pytest tests</p>
 </div>
 </div>
 <div class="section" id="indices-and-tables">
