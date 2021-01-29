@@ -1715,7 +1715,6 @@ static int64_t ParArgSortCallback(struct stMATH_WORKER_ITEM* pstWorkerItem, int 
         char* pWorkSpace1 = Callback->pWorkSpace + (index * Callback->AllocChunk * Callback->TypeSizeOutput);
 
         if (Callback->ArgSortCallbackOne.argsortfunc) {
-            printf("int!\n");
             Callback->ArgSortCallbackOne.argsortfunc(Callback->pValues, pToSort1 + (pFirst * Callback->TypeSizeOutput), MergeSize);
         }
         else {

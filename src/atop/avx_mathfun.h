@@ -45,6 +45,9 @@
 #define v4di __m256i
 
 // Two ways to define the constants, as variables, or inline with mm256_set1_xxx
+// If in aligned memory (32 bytes of AVX2 register)- Intel seems to run faster, probably in L1 cache
+// AMD appears to run faster the other way, load the registers ahead of time with broadcast.  Perhaps due to cache ownership per thread.
+//
 //#define _PS256_CONST(Name, Val) static const ALIGN32_BEG float _ps256_##Name[8] ALIGN32_END = { (float)Val, (float)Val, (float)Val, (float)Val, (float)Val, (float)Val, (float)Val, (float)Val }
 //#define _PI32_CONST256(Name, Val) static const ALIGN32_BEG int32_t _pi32_256_##Name[8] ALIGN32_END = { (int32_t)Val, (int32_t)Val, (int32_t)Val, (int32_t)Val, (int32_t)Val, (int32_t)Val, (int32_t)Val, (int32_t)Val }
 //#define _PS256_CONST_TYPE(Name, Val) static const ALIGN32_BEG uint32_t _ps256_##Name[8] ALIGN32_END = { (uint32_t)Val, (uint32_t)Val, (uint32_t)Val, (uint32_t)Val, (uint32_t)Val, (uint32_t)Val, (uint32_t)Val, (uint32_t)Val }
