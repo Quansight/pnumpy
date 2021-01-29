@@ -47,7 +47,7 @@ try:
 except Exception:
     __hasavx2 = True
 
-if not __hasvx2:
+if not __hasavx2:
     raise ValueError(f"PNumPy requires a CPU with AVX2 capability to work")
 
 del __hasavx2
