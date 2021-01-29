@@ -5,7 +5,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Welcome to Accelerated Numpy’s documentation! &#8212; accelerated_numpy v0.0.1 documentation</title>
+    <title>Welcome to PNumPy’s documentation! &#8212; accelerated_numpy v0.0.1 documentation</title>
     <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
     <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
     <script id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
@@ -32,8 +32,8 @@
 
           <div class="body" role="main">
             
-  <div class="section" id="welcome-to-accelerated-numpy-s-documentation">
-<h1>Welcome to Accelerated Numpy’s documentation!<a class="headerlink" href="#welcome-to-accelerated-numpy-s-documentation" title="Permalink to this headline">¶</a></h1>
+  <div class="section" id="welcome-to-pnumpy-s-documentation">
+<h1>Welcome to PNumPy’s documentation!<a class="headerlink" href="#welcome-to-pnumpy-s-documentation" title="Permalink to this headline">¶</a></h1>
 <div class="toctree-wrapper compound">
 <p class="caption"><span class="caption-text">Contents:</span></p>
 <ul>
@@ -47,10 +47,51 @@
 <li class="toctree-l1"><a class="reference internal" href="use.html">How to use it?</a></li>
 </ul>
 </div>
-<p>Faster loops for NumPy using multithreading and other tricks. The first release
-will target NumPy binary and unary ufuncs. Eventually we will enable overriding
-other NumPy functions, and provide an C-based (non-Python) API for extending
-via third-party functions.</p>
+<p>Parallel NumPy seamlessly speeds up NumPy for large arrays (64K+ elements) with <em>no change required to your existing NumPy code</em>.</p>
+<p>This first release speeds up NumPy binary and unary ufuncs such as <strong>add, multiply, isnan, abs, sin, log, sum, min and many more</strong>.
+Sped up functions also include: <strong>sort, argsort, lexsort, boolean indexing, and fancy indexing</strong>.
+In the near future we will speed up: <strong>astype, where, putmask, arange, searchsorted</strong>.</p>
+<p>## Installation
+<code class="docutils literal notranslate"><span class="pre">`</span>
+<span class="pre">pip</span> <span class="pre">install</span> <span class="pre">pnumpy</span>
+<span class="pre">`</span></code></p>
+<p>To use the project:</p>
+<p><code class="docutils literal notranslate"><span class="pre">`python</span>
+<span class="pre">import</span> <span class="pre">pnumpy</span> <span class="pre">as</span> <span class="pre">pn</span>
+<span class="pre">`</span></code></p>
+<p>Parallel NumPy speeds up NumPy silently under the hood.  To see some benchmarks yourself run
+<code class="docutils literal notranslate"><span class="pre">`</span>
+<span class="pre">pn.benchmark()</span>
+<span class="pre">`</span></code></p>
+<p>To get a partial list of functions sped up run
+<code class="docutils literal notranslate"><span class="pre">`</span>
+<span class="pre">pn.atop_info()</span>
+<span class="pre">`</span></code></p>
+<p>To disable or enable pnumpy run
+<code class="docutils literal notranslate"><span class="pre">`</span>
+<span class="pre">pn.disable()</span>
+<span class="pre">pn.enable()</span>
+<span class="pre">`</span></code></p>
+<p>To cap the number of additional worker threads to 3 run
+<code class="docutils literal notranslate"><span class="pre">`</span>
+<span class="pre">pn.thread_setworkers(3)</span>
+<span class="pre">`</span></code>
+## Additional Functionality
+PNumPy provides additional routines such as converting a NumPy record array to a column major array in parallel (<strong>pn.recarray_to_colmajor</strong>) which is useful for DataFrames.  Other routines include <strong>pn.lexsort32</strong>, which performs an indirect sort using <strong>np.int32</strong> instead of <strong>np.int64</strong> consuming half the memory and running faster.</p>
+<p>## Threading
+PNumPy uses a combination of threads and 256 bit vector intrinsics to speed up calculations.  By default most operations will only use 3 additional worker threads in combination with the main python thread for a total 4.  Large arrays are divided up into 16K chunks and threads are assigned to maintain cache coherency.  More threads are dynamically deployed for more intensive CPU problems like <strong>np.sin</strong>.  Users can customize threading.  The example below shows how 4 threads can work together to quadruple the effective L2 cache size.</p>
+<p>![plot](./doc_src/images/threading_npadd.PNG)</p>
+<p>## FAQ
+<strong>Q: If I type np.sort(a) where a is an array, will it be sped up?</strong></p>
+<p><em>A: If len(a) &gt; 65536 and pnumpy has been imported, it will automatically be sped up</em></p>
+<p><strong>Q: How is sort sped up?</strong></p>
+<p><em>A: PNumPy uses additional threads to divide up the sorting job.  For example it might perform an 8 way quicksort followed by a 4 way mergesort</em></p>
+<p>## Development</p>
+<p>To run all the tests run:</p>
+<p><code class="docutils literal notranslate"><span class="pre">`</span>
+<span class="pre">python</span> <span class="pre">-m</span> <span class="pre">pip</span> <span class="pre">install</span> <span class="pre">pytest</span>
+<span class="pre">python</span> <span class="pre">-m</span> <span class="pre">pytest</span> <span class="pre">tests</span>
+<span class="pre">`</span></code></p>
 </div>
 <div class="section" id="indices-and-tables">
 <h1>Indices and tables<a class="headerlink" href="#indices-and-tables" title="Permalink to this headline">¶</a></h1>
