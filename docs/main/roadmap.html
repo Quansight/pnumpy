@@ -35,34 +35,30 @@
             
   <div class="section" id="roadmap">
 <h1>Roadmap<a class="headerlink" href="#roadmap" title="Permalink to this headline">¶</a></h1>
-<p>Version 2.0 of the package exposes the first optimization: multithreaded ufunc
-loops.</p>
+<p>Version 2.0 of the package uses multithreaded ufunc loops and parallel sorts.</p>
 <p>Future versions of the package will extend these capabilites to cover more of
 the NumPy functionality. Some of these proposed enhancements will require new
-API from NumPy.</p>
-<div class="section" id="the-ledger">
-<h2>The ledger<a class="headerlink" href="#the-ledger" title="Permalink to this headline">¶</a></h2>
-<p>At the core of the next generation of enhancements lies the ledger, which will
-record various data about the use of UFuncs in the process. This will allow
-us to learn your use case:</p>
-<ul class="simple">
-<li><p>Do you call UFuncs with small arrays?</p></li>
-<li><p>Do you use strides or only contiguous memory?</p></li>
-</ul>
-<p>After we have profiled your use, we can
-tweak the different enhancements below to better speed up your code.</p>
+APIs from NumPy.</p>
+<div class="section" id="conversions">
+<h2>Conversions<a class="headerlink" href="#conversions" title="Permalink to this headline">¶</a></h2>
+<p>Currently NumPy does not expose a hook for dtype conversions.  When available,
+PNumPy will parallelize those conversions.</p>
 </div>
-<div class="section" id="replacing-loops-with-faster-code">
-<h2>Replacing loops with faster code<a class="headerlink" href="#replacing-loops-with-faster-code" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="vectorized-loops">
+<h2>Vectorized loops<a class="headerlink" href="#vectorized-loops" title="Permalink to this headline">¶</a></h2>
 <p>NumPy is only now beginning to use <a class="reference external" href="https://en.wikipedia.org/wiki/SIMD">SIMD</a>
 instructions to speed up loops. We have a few further enhancements to the
 current NumPy implementations. Check out the code in the <cite>atop</cite> directory.</p>
 </div>
 <div class="section" id="using-a-better-memory-allocator">
 <h2>Using a better memory allocator<a class="headerlink" href="#using-a-better-memory-allocator" title="Permalink to this headline">¶</a></h2>
-<p>NumPy uses a small cache for data memory. We will provide a better cache and
-will use the ledger to predict when it is worthwhile to compact the fragmented
-cached memory.</p>
+<p>NumPy uses a small cache for data memory but does not have one for larger
+arrays.  When the new API is available, we will provide a better cache.</p>
+</div>
+<div class="section" id="ledger">
+<h2>Ledger<a class="headerlink" href="#ledger" title="Permalink to this headline">¶</a></h2>
+<p>What PNumPy hooks can be recorded and timed.  This built in profiler will help
+you to tweak and speed up your code.</p>
 </div>
 </div>
 
@@ -86,9 +82,10 @@ cached memory.</p>
 <p class="caption"><span class="caption-text">Contents:</span></p>
 <ul class="current">
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Roadmap</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="#the-ledger">The ledger</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#replacing-loops-with-faster-code">Replacing loops with faster code</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#conversions">Conversions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#vectorized-loops">Vectorized loops</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#using-a-better-memory-allocator">Using a better memory allocator</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#ledger">Ledger</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
