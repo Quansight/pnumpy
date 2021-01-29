@@ -38,8 +38,14 @@ import numpy.core._multiarray_umath as umath
 # TODO check for Apple M1 chip (where AVX2 makes no sense)
 # TODO check for numpy version
 
-if not umath.__cpu_features__['AVX2']:
-    raise ValueError(f"pnumpy requires a CPU with AVX2 capability to work")
+try:
+    # Numpy 1.18 does not have __cpu_features
+    # If we cannot find it, we load anyway
+    # TODO: check for Apple M1 chip
+    if not umath.__cpu_features__['AVX2']:
+        raise ValueError(f"pnumpy requires a CPU with AVX2 capability to work")
+except Exception:
+    pass
 
 import pnumpy._pnumpy as _pnumpy
 from pnumpy._pnumpy import atop_enable, atop_disable, atop_isenabled, atop_info, atop_setworkers, cpustring 
