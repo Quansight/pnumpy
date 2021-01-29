@@ -24,20 +24,17 @@ Installation
 ------------
 
 .. code-block:: python
-
 pip install pnumpy
 
 To use the project:
 
 .. code-block:: python
-
 import pnumpy as pn
 
 
 Parallel NumPy speeds up NumPy silently under the hood.  To see some benchmarks yourself run
 
 .. code-block:: python
-
 pn.benchmark()
 
 .. image:: ../images/bench4graph2.PNG
@@ -51,14 +48,12 @@ pn.atop_info()
 To disable or enable pnumpy run
 
 .. code-block:: python
-
 pn.disable()
 pn.enable()
 
 To cap the number of additional worker threads to 3 run
 
 .. code-block:: python
-
 pn.thread_setworkers(3)
 
 Additional Functionality
@@ -90,7 +85,6 @@ Development
 To run all the tests run:
 
 .. code-block:: python
-
 python -m pip install pytest
 python -m pytest tests
 
