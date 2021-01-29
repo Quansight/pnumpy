@@ -42,10 +42,14 @@ try:
     # Numpy 1.18 does not have __cpu_features
     # If we cannot find it, we load anyway
     # TODO: check for Apple M1 chip
-    if not umath.__cpu_features__['AVX2']:
-        raise ValueError(f"pnumpy requires a CPU with AVX2 capability to work")
+    __hasavx2 = umath.__cpu_features__['AVX2']:
 except Exception:
-    pass
+    __hasavx2 = True
+
+if not __hasvx2:
+    raise ValueError(f"PNumPy requires a CPU with AVX2 capability to work")
+
+del __hasavx2
 
 import pnumpy._pnumpy as _pnumpy
 from pnumpy._pnumpy import atop_enable, atop_disable, atop_isenabled, atop_info, atop_setworkers, cpustring 
