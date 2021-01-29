@@ -40,9 +40,10 @@ import numpy.core._multiarray_umath as umath
 
 try:
     # Numpy 1.18 does not have __cpu_features
-    # If we cannot find it, we load anyway
+    # If we cannot find it, we load anyway because 95% have AVX2
+    # and we can hook numpy 1.18 ufuncs
     # TODO: check for Apple M1 chip
-    __hasavx2 = umath.__cpu_features__['AVX2']:
+    __hasavx2 = umath.__cpu_features__['AVX2']
 except Exception:
     __hasavx2 = True
 
