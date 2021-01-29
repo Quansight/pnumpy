@@ -17,7 +17,7 @@
 
 # -- Project information -----------------------------------------------------
 
-project = 'accelerated_numpy'
+project = 'PNumPy'
 copyright = '2020, tdimitri, mattip'
 author = 'Quansight'
 
