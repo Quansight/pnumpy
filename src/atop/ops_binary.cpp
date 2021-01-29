@@ -33,8 +33,8 @@ static FORCE_INLINE const __m256i MM_SET(int32_t* pData) { return _mm256_set1_ep
 static FORCE_INLINE const __m256i MM_SET(uint32_t* pData) { return _mm256_set1_epi32(*(int32_t*)pData); }
 static FORCE_INLINE const __m256i MM_SET(int64_t* pData) { return _mm256_set1_epi64x(*(int64_t*)pData); }
 static FORCE_INLINE const __m256i MM_SET(uint64_t* pData) { return _mm256_set1_epi64x(*(int64_t*)pData); }
-static FORCE_INLINE const __m256  MM_SET(float* pData) { return _mm256_set1_ps(*(float*)pData); }
-static FORCE_INLINE const __m256d MM_SET(double* pData) { return _mm256_set1_pd(*(double*)pData); }
+static FORCE_INLINE const __m256  MM_SET(float* pData) { return _mm256_broadcast_ss((const float*)pData); }
+static FORCE_INLINE const __m256d MM_SET(double* pData) { return _mm256_broadcast_sd((const double*)pData); }
 
 
 static const inline __m256d LOADU(__m256d* x) { return _mm256_loadu_pd((double const*)x); };
@@ -599,6 +599,12 @@ inline void SimpleMathOpFastSymmetric(void* pDataIn1X, void* pDataIn2X, void* pD
 
                     do {
                         // clang requires LOADU on last operand
+                        // NOTE: VEX.256 encoded version: The first source operand is a YMM register.
+                        // The second source operand can be a YMM register or a 256-bit memory location.
+                        // The destination operand is a YMM register
+                        // THUS for symmetric operations we can always put the memory operand as the SECOND operand
+                        // if it is 256 bit aligned
+
 #ifdef RT_COMPILER_MSVC
                         STOREU(pOut_256, MATH_OP256(LOADU(pIn1_256), *pIn2_256));
 #else
@@ -722,6 +728,11 @@ inline void SimpleMathOpFastSymmetric(void* pDataIn1X, void* pDataIn2X, void* pD
                         // apply 256bit aligned operations
                         while (pIn1_256 < pEnd_256) {
                             //pin1_256 is aligned
+                            // NOTE: VEX.256 encoded version: The first source operand is a YMM register.
+                            // The second source operand can be a YMM register or a 256-bit memory location.
+                            // The destination operand is a YMM register
+                            // THUS for symmetric operations we can always put the memory operand as the SECOND operand
+                            // if it is 256 bit aligned
                             STOREA(pIn1_256, MATH_OP256(m1, *pIn1_256));
                             pIn1_256++;
                         }
