@@ -98,6 +98,7 @@ def benchmark_func(
 
     Examples
     --------
+
     benchmark_func(np.add)
     benchmark_func(np.add, sizes=[2**16])
     benchmark_func(np.sqrt, unary=True)
@@ -127,8 +128,8 @@ def benchmark(
     The output is formatted to be copied and pasted in a csv file.
     A result above 1.0 indicates an improvement, below 1.0 indicates worse peformance.
 
-    Inputs
-    ------
+    Parameters
+    ----------
 
     Returns
     -------

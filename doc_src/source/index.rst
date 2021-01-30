@@ -4,7 +4,7 @@
    contain the root `toctree` directive.
 
 Welcome to PNumPy's documentation!
-=============================================
+==================================
 
 .. toctree::
     :maxdepth: 2
@@ -14,11 +14,14 @@ Welcome to PNumPy's documentation!
     installation
     use
 
-Parallel NumPy seamlessly speeds up NumPy for large arrays (64K+ elements) with *no change required to your existing NumPy code*.
+PNumPy seamlessly speeds up NumPy for large arrays (64K+ elements) with *no
+change required to your existing NumPy code*.
 
-This first release speeds up NumPy binary and unary ufuncs such as **add, multiply, isnan, abs, sin, log, sum, min and many more**.
-Sped up functions also include: **sort, argsort, lexsort, boolean indexing, and fancy indexing**.
-In the near future we will speed up: **astype, where, putmask, arange, searchsorted**.
+This first release speeds up NumPy binary and unary ufuncs such as ``add``,
+``multiply``, ``isnan``, ``abs``, ``sin``, ``log``, ``sum``, ``min`` and many more.
+Sped up functions also include: ``sort``, ``argsort``, ``lexsort``, boolean indexing, and
+fancy indexing.  In the near future we will speed up: ``astype``, ``where``, ``putmask``,
+``arange``, ``searchsorted``.
 
 Installation
 ------------
@@ -34,8 +37,10 @@ To use the project:
    import pnumpy as pn
 
 
-Parallel NumPy speeds up NumPy silently under the hood.  To see some benchmarks yourself run
-
+PNumPy speeds up NumPy silently under the hood.  To see some benchmarks
+yourself :ref:`run ASV <benchmarking_asv>` or use the built-in :ref:`benchmark
+<benchmarking>` function:
+ 
 .. code-block:: python
 
    pn.benchmark()
@@ -62,6 +67,9 @@ To cap the number of additional worker threads to 3 run
 
    pn.thread_setworkers(3)
 
+.. _ASV: https://asv.readthedocs.io/en/stable/using.html
+
+
 Additional Functionality
 ------------------------
 
@@ -73,6 +81,7 @@ Threading
 PNumPy uses a combination of threads and 256 bit vector intrinsics to speed up calculations.  By default most operations will only use 3 additional worker threads in combination with the main python thread for a total 4.  Large arrays are divided up into 16K chunks and threads are assigned to maintain cache coherency.  More threads are dynamically deployed for more intensive CPU problems like **np.sin**.  Users can customize threading.  The example below shows how 4 threads can work together to quadruple the effective L2 cache size.
 
 .. image:: ../images/threading_npadd.PNG
+
 
 FAQ
 ---
