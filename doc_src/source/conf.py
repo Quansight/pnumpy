@@ -18,11 +18,11 @@
 # -- Project information -----------------------------------------------------
 
 project = 'PNumPy'
-copyright = '2020, tdimitri, mattip'
+copyright = '2020-2021, tdimitri, mattip'
 author = 'Quansight'
 
 # The full version, including alpha/beta/rc tags
-release = 'v0.0.1'
+release = 'v2.0.20'
 
 
 # -- General configuration ---------------------------------------------------
