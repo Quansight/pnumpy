@@ -121,7 +121,7 @@ add_newdoc('pnumpy', 'recarray_to_colmajor',
     "            dtype=[('x', '<f4'), ('y', '<i2'), ('z', 'i8'),('zz','i8'),('yy','i4'),('str','<S20')])\n"
     ">>> item=np.tile(x,100_000)\n"
     ">>> mydict = recarray_to_colmajor(item)"
-   )
+   ))
            
 add_newdoc('pnumpy', "recycler_enable",
 "Enable recycler to compact memory usage")
