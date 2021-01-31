@@ -105,24 +105,23 @@ add_newdoc('pnumpy', "ledger_info",
 "Return ledger information")
 
 add_newdoc('recarray_to_colmajor', 
-    """
-    Converts a numpy record array (void type) to a dictionary of numpy arrays, col major\n
-    Inputs\n
-    ------\n
-    item: A numpy recorarray to return as column major\n
-    parallel: Default to True\n
-    \n
-    Returns\n
-    -------\n
-    A dictionary of numpy arrays corresponding to the original numpy record array.\n
-    \n
-    Examples\n
-    --------\n
-    >>> x=np.array([(1.0, 2, 3, 4, 5, 'this is a long test'), (3.0, 4, 5, 6, 7, 'short'), (30.0, 40, 50, 60, 70, '')],\n
-                dtype=[('x', '<f4'), ('y', '<i2'), ('z', 'i8'),('zz','i8'),('yy','i4'),('str','<S20')])\n
-    >>> item=np.tile(x,100_000)\n
-    >>> mydict = recarray_to_colmajor(item)\n
-    """)
+   ("Converts a numpy record array (void type) to a dictionary of numpy arrays, col major\n"
+    "Inputs\n"
+    "------\n"
+    "item: A numpy recorarray to return as column major\n"
+    "parallel: Default to True\n"
+    "\n"
+    "Returns\n"
+    "-------\n"
+    "A dictionary of numpy arrays corresponding to the original numpy record array.\n"
+    "\n"
+    "Examples\n"
+    "--------\n"
+    ">>> x=np.array([(1.0, 2, 3, 4, 5, 'this is a long test'), (3.0, 4, 5, 6, 7, 'short'), (30.0, 40, 50, 60, 70, '')],\n"
+    "            dtype=[('x', '<f4'), ('y', '<i2'), ('z', 'i8'),('zz','i8'),('yy','i4'),('str','<S20')])\n"
+    ">>> item=np.tile(x,100_000)\n"
+    ">>> mydict = recarray_to_colmajor(item)"
+   )
            
 add_newdoc('pnumpy', "recycler_enable",
 "Enable recycler to compact memory usage")
