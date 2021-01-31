@@ -104,7 +104,7 @@ add_newdoc('pnumpy', "ledger_isenabled",
 add_newdoc('pnumpy', "ledger_info",
 "Return ledger information")
 
-add_newdoc('recarray_to_colmajor', 
+add_newdoc('pnumpy', 'recarray_to_colmajor', 
    ("Converts a numpy record array (void type) to a dictionary of numpy arrays, col major\n"
     "Inputs\n"
     "------\n"
