@@ -30,7 +30,9 @@ __all__ = [
     'thread_enable', 'thread_disable', 'thread_isenabled', 'thread_getworkers', 'thread_setworkers', 'thread_zigzag',
     'ledger_enable', 'ledger_disable', 'ledger_isenabled', 'ledger_info',
     'recycler_enable', 'recycler_disable', 'recycler_isenabled', 'recycler_info',
-    'timer_gettsc','timer_getutc']
+    'timer_gettsc','timer_getutc', 'benchmark', 'recarray_to_colmajor', 'init', 'enable', 'disable', 'cpu_count_linux',
+    'sort', 'lexsort'
+    ]
 
 import numpy as np
 import numpy.core._multiarray_umath as umath
