@@ -14,6 +14,6 @@ pnumpy functions
 Benchmarking
 ------------
 
-.. automodule:: pnumpy
+.. automodule:: pnumpy.benchmark
     :members: benchmark
 
