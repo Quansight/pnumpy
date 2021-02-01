@@ -84,5 +84,5 @@ def test_threads(name, types, initialize_pnumpy, rng):
             out2 = ufunc(*in_data, out=out_data)
             pnumpy.thread_disable()
             # may not work on datetime
-            if not any([o == 'datetime64' for o in out_dtypes]):
+            if not any([o == 'datetime64' for o in out_dtypes]) and not any([o == 'timedelta64' for o in out_dtypes]):
                 np.testing.assert_allclose(out1, out2, equal_nan=True)

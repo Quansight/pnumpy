@@ -49,7 +49,7 @@ jobs:
         python -m pip install -r test_requirements.txt
         python -m pytest tests -vv --durations 10 
 
-  update_docs:
+  build_docs:
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -74,4 +74,8 @@ jobs:
         python -m pip install --progress-bar=off -r doc_requirements.txt
         make html
         popd
-
+    - name: store docs
+      uses: actions/upload-artifact@v2
+      with:
+        name: docs
+        path: doc_src/build/html

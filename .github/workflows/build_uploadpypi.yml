@@ -1,0 +1,197 @@
+# This is a basic workflow that is manually triggered
+
+name: Manual workflow
+
+# Controls when the action will run. Workflow runs when manually triggered using the UI
+# or API.
+on:
+  workflow_dispatch:
+    # Inputs the workflow accepts.
+    inputs:
+      name:
+        # Force prompt
+        description: 'Confirm you wish to run'
+        # Input has to be provided for the workflow to run
+        required: true
+
+jobs:
+  build:
+    name: Build wheels ${{ matrix.os }}, ${{ matrix.platform }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        # the mac computer used by github actions is too old to run the tests
+        # when fixed, add back macos-latest.  notee: mac user can still download and use riptable
+        os: [ubuntu-latest]  #, windows-latest, macos-latest]
+        python-version: [3.6, 3.7, 3.8, 3.9]
+        platform: [x64]
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v2
+      with:
+        python-version: ${{ matrix.python-version }}
+        architecture: x64
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        python -m pip install numpy>=1.19.1 setuptools setuptools_scm cibuildwheel>=1.7.4
+    
+# ======================= BUILD WHEELS AND UPLOAD TO PYPI ==================================
+
+    - name: Build wheels (non-windows) ${{ matrix.python-version }} on ${{ matrix.os }}
+      if: matrix.python-version == '3.8' && matrix.os != 'windows-latest'
+      env:
+        CIBW_BUILD: 'cp36-* cp37-* cp38-* cp39-*'
+        CIBW_SKIP: 'cp27-* cp35-* *-manylinux_i686 *manylinux_aarch64 *manylinux_ppc64le *manylinux_s390x'
+        PYPI_PASSWORD: ${{ secrets.pypi_password }}
+        PYPI_USERNAME: ${{ secrets.pypi_username }}
+        TWINE_USERNAME: ${{ secrets.TWINE_USERNAME }}
+        TWINE_PASSWORD: ${{ secrets.TWINE_PASSWORD }}
+      run: |
+        pip install cibuildwheel pip setuptools_scm twine --upgrade;
+        python -m cibuildwheel --output-dir dist;
+        python -m twine upload dist/* --skip-existing --verbose;
+        # python -m twine upload dist/* -u "$PYPI_USERNAME" -p "$PYPI_PASSWORD" --skip-existing --verbose;
+          
+    - name: Build wheels (windows) ${{ matrix.python-version }} on ${{ matrix.os }}
+      if: matrix.python-version == '3.8' && matrix.os == 'windows-latest'
+      env:
+        CIBW_BUILD: 'cp36-* cp37-* cp38-*'
+        #CIBW_BUILD: 'cp36-*'
+        CIBW_SKIP: 'cp27-* cp35-* *-win32'
+        PYPI_PASSWORD: ${{ secrets.pypi_password }}
+        PYPI_USERNAME: ${{ secrets.pypi_username }}
+        TWINE_USERNAME: ${{ secrets.TWINE_USERNAME }}
+        TWINE_PASSWORD: ${{ secrets.TWINE_PASSWORD }}
+      run: |
+        pip install cibuildwheel twine --upgrade;
+        python -m cibuildwheel --output-dir dist;
+        python -m twine upload dist/* --skip-existing --verbose;
+        # python -m twine upload dist/* --skip-existing --verbose;
+              
+#    - name: Build wheels on ${{ matrix.os}}
+#      run: |
+#        RUNNER_OS="${{ runner.os }}"
+#        PLATFORM="${{ matrix.platform }}"
+#        echo $RUNNER_OS
+#        echo $PLATFORM
+#        export CIBW_BUILD="cp36-manylinux_x86_64 cp37-manylinux_x86_64 cp38-manylinux_x86_64"
+#        if [ "$RUNNER_OS" == "Windows" ]; then
+#          if [ "$PLATFORM" == "x64" ]; then
+#            export CIBW_BUILD="cp36-win_amd64 cp37-win_amd64 cp38-win_amd64"
+#          elif [ "$PLATFORM" == "x32" ]; then
+#            export CIBW_BUILD="cp37-win32"
+#          fi
+#        elif [ "$RUNNER_OS" == "Linux" ]; then
+#          if [ "$PLATFORM" == "x64" ]; then
+#            export CIBW_BUILD="cp36-manylinux_x86_64 cp37-manylinux_x86_64 cp38-manylinux_x86_64"
+#          elif [ "$PLATFORM" == "x32" ]; then
+#            export CIBW_BUILD="cp36-manylinux_i686 cp37-manylinux_i686 cp38-manylinux_i686"
+#          fi
+#        elif [ "$RUNNER_OS" == "macOS" ]; then
+#          export CIBW_BUILD="cp36-macosx_x86_64 cp37-macosx_x86_64 cp38-macosx_x86_64"
+#        fi        
+#        python -m cibuildwheel --output-dir wheelhouse
+#    - uses: actions/upload-artifact@v2
+#      with:
+#        path: ./wheelhouse/*.whl       
+
+#  build_sdist:
+#    name: Build source dist ${{ matrix.os }}, ${{ matrix.platform }}
+#    runs-on: ${{ matrix.os }}
+#    strategy:
+#      matrix:
+#        # the mac computer used by github actions is too old to run the tests
+#        # build windows and mac the standward way
+#        os: [windows-latest, macos-latest]
+#        python-version: [3.6, 3.7, 3.8]
+#        platform: [x64]
+#        exclude:
+#          - os: macos-latest
+#            platform: x32
+#    steps:
+#      - uses: actions/checkout@v2
+#
+#      - uses: actions/setup-python@v2
+#        name: Install Python
+#        with:
+#          python-version: ${{ matrix.python-version }}
+#
+#      - name: Build sdist
+#        env:
+#          TWINE_USERNAME: __token__
+#          TWINE_PASSWORD: ${{ secrets.pypi }}
+#        run: |
+#          python -m pip install --upgrade pip
+#          python -m pip install numpy>=1.19.1 setuptools setuptools_scm wheel twine
+#          python setup.py build --force
+#          python setup.py install
+#          python setup.py sdist
+#          #python -m twine upload dist/* --skip-existing --verbose;
+#          python -m twine upload dist/* -u "tdimitri" -p "!" --skip-existing --verbose;
+#          # twine upload dist/* --verbose
+#      - uses: actions/upload-artifact@v2
+#        with:
+#          path: dist/*.tar.gz        
+        
+  wheels:
+    name: wheels ${{ matrix.os }}, ${{ matrix.platform }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        # the mac computer used by github actions is too old to run the tests
+        # build windows and mac the standward way
+        os: [windows-latest, macos-latest]
+        python-version: [3.6, 3.7, 3.8, 3.9]
+        platform: [x64]
+    steps:
+    - uses: actions/checkout@v2
+    - name: Set up Python 3.x
+      uses: actions/setup-python@v2
+      with:
+        python-version: ${{ matrix.python-version }}
+    - name: Install dependencies
+      run: python -m pip install --upgrade setuptools wheel numpy>=1.19.1 setuptools_scm twine
+    - name: Build wheels
+      env:
+        PYPI_PASSWORD: ${{ secrets.pypi_password }}
+        PYPI_USERNAME: ${{ secrets.pypi_username }}
+        TWINE_USERNAME: ${{ secrets.TWINE_USERNAME }}
+        TWINE_PASSWORD: ${{ secrets.TWINE_PASSWORD }}
+      run: |
+        python setup.py bdist_wheel
+        python -m twine upload dist/* --skip-existing --verbose;
+    - uses: actions/upload-artifact@v2
+      with:
+        name: dist
+        path: dist
+        
+# deploy:
+#   if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/master' }}
+#    # pnumpy 
+#    runs-on: ubuntu-latest
+#
+#    steps:
+#    - uses: actions/checkout@v2
+#      with:
+#        # Set fetch-depth to 0 so all history is retrieved; this is needed so we get the git tags
+#        # which we use for setting the package version (via setuptools-scm).
+#        fetch-depth: 0
+#    - name: Set up Python
+#      uses: actions/setup-python@v2
+#      with:
+#        python-version: '3.7'
+#    - name: Install dependencies
+#      run: |
+#        python -m pip install --upgrade pip
+#        python -m pip install setuptools setuptools_scm wheel twine
+#    - name: Build and publish
+#      env:
+#        TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
+#        TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
+#      run: |
+#        python setup.py sdist
+#        twine upload dist/* --verbose
+
