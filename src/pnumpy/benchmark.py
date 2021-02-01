@@ -13,7 +13,7 @@ import numpy as np
 # TODO: move this to new location
 def benchmark_timeit(
     func=np.equal,
-    ctypes=[np.bool, np.int8, np.int16, np.int32, np.int64, np.float32, np.float64],
+    ctypes=[np.bool_, np.int8, np.int16, np.int32, np.int64, np.float32, np.float64],
     scalar=False,
     unary = False,
     reduct = False,
@@ -54,7 +54,7 @@ def benchmark_timeit(
         loop_size = 100
         mtimedelta = np.zeros(loop_size, np.int64)
         for ctype in ctypes:
-            if ctype is np.bool:
+            if ctype is np.bool_:
                a=np.arange(s, dtype=np.int8).astype(ctype)+1
             else:
                a=np.arange(s, dtype=ctype)
@@ -84,7 +84,7 @@ def benchmark_timeit(
 
 def benchmark_func(
     func=np.equal,
-    ctypes=[np.bool, np.int8, np.int16, np.int32, np.int64, np.float32, np.float64],
+    ctypes=[np.bool_, np.int8, np.int16, np.int32, np.int64, np.float32, np.float64],
     scalar=False,
     unary = False,
     reduct = False,
@@ -117,7 +117,7 @@ def benchmark_func(
     return t0/t1
 
 def benchmark(
-    ctypes=[np.bool, np.int8, np.int16, np.int32, np.int64, np.float32, np.float64],
+    ctypes=[np.bool_, np.int8, np.int16, np.int32, np.int64, np.float32, np.float64],
     recycle=True,
     atop=True,
     thread=True,
@@ -129,6 +129,11 @@ def benchmark(
 
     Inputs
     ------
+    ctypes :list of numpy dtypes to test, for example [np.int32, npfloat32]
+    recycle: True or False
+    atop: True or False.  Whether or not the atop engine is used in benchmarking.
+    thread: True or False.
+    sizes: list of array sizes to test, for example [100_000, 1_000_000]
 
     Returns
     -------
