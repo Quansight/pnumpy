@@ -33,15 +33,23 @@ except Exception:
         print("**could not install pip or setuptools_scm, version is defaulted")
 
 def myversion():
+    version = '2.0.20'
     try:
-        #version = get_version()
-        version = '2.0.11'
+        mversion = get_version()
+        s = mversion.split('.')
+        if len(s) >=3:
+            # see if we can parse the current version
+            if int(s[0])==2 and int(s[1])==0:
+                version = '2.0.'
+                lastnum = s[2]
+                for i in lastnum:
+                    if i >='0' and i <= '9':
+                        version = version + i
     except Exception:
-        version = '2.0.11'
+        pass
     return version
 
 thisversion=myversion()
-#thisversion = '.'.join(thisversion.split('.')[:3])
 
 def writeversion():
     text_file = open("src/pnumpy/_version.py", "w")
@@ -131,7 +139,7 @@ setup(
     python_requires='>=3.6',
     install_requires=[
         # eg: 'aspectlib==1.1.1', 'six>=1.7',
-        'numpy>=1.19.0',
+        'numpy>=1.18.0',   # has ufunc hooks
     ],
     extras_require={
         # eg:
@@ -149,8 +157,8 @@ setup(
                      'src/pnumpy/conversions.cpp',
                      'src/pnumpy/recycler.cpp',
                      'src/pnumpy/sorting.cpp',
-                     'src/pnumpy/arange.cpp',
-                     'src/pnumpy/item_selection.cpp',
+                      #'src/pnumpy/arange.cpp',
+                      #'src/pnumpy/item_selection.cpp',
                      'src/atop/atop.cpp',
                      'src/atop/threads.cpp',
                      'src/atop/recarray.cpp',
