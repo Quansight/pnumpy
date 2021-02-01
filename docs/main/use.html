@@ -34,7 +34,9 @@
             
   <div class="section" id="how-to-use-it">
 <h1>How to use it?<a class="headerlink" href="#how-to-use-it" title="Permalink to this headline">¶</a></h1>
-<span class="target" id="module-pnumpy"></span><p>Pnumpy now calls <code class="docutils literal notranslate"><span class="pre">init</span></code> at startup to setup the package. This imports NumPy,
+<div class="section" id="module-pnumpy">
+<span id="pnumpy-functions"></span><h2>PNumpy functions<a class="headerlink" href="#module-pnumpy" title="Permalink to this headline">¶</a></h2>
+<p>Pnumpy now calls <code class="docutils literal notranslate"><span class="pre">init</span></code> at startup to setup the package. This imports NumPy,
 replacing all the inner loops of UFuncs with wrapped versions. Then you can
 enable/disable any of the subsystems:</p>
 <blockquote>
@@ -88,108 +90,50 @@ data from the ledger to create more performant memory caches.</p>
 <dd><p>set workers for a func</p>
 </dd></dl>
 
-<dl class="py function">
-<dt id="pnumpy.cpustring">
-<code class="sig-prename descclassname">pnumpy.</code><code class="sig-name descname">cpustring</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#pnumpy.cpustring" title="Permalink to this definition">¶</a></dt>
-<dd><p>Cpu brand string plus features</p>
+</div>
+<div class="section" id="benchmarking">
+<span id="id1"></span><h2>Benchmarking<a class="headerlink" href="#benchmarking" title="Permalink to this headline">¶</a></h2>
+<span class="target" id="module-pnumpy.benchmark"></span><dl class="py function">
+<dt id="pnumpy.benchmark.benchmark">
+<code class="sig-prename descclassname">pnumpy.benchmark.</code><code class="sig-name descname">benchmark</code><span class="sig-paren">(</span><em class="sig-param">ctypes=[&lt;class 'numpy.bool_'&gt;, &lt;class 'numpy.int8'&gt;, &lt;class 'numpy.int16'&gt;, &lt;class 'numpy.int32'&gt;, &lt;class 'numpy.int64'&gt;, &lt;class 'numpy.float32'&gt;, &lt;class 'numpy.float64'&gt;], recycle=True, atop=True, thread=True, sizes=[1000000]</em><span class="sig-paren">)</span><a class="headerlink" href="#pnumpy.benchmark.benchmark" title="Permalink to this definition">¶</a></dt>
+<dd><p>Performs a simple benchmark of the ratio of normal numpy (no threading) vs parallel numpy (threaded).
+The output is formatted to be copied and pasted in a csv file.
+A result above 1.0 indicates an improvement, below 1.0 indicates worse peformance.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>ctypes</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">list</span></code> of <code class="xref py py-class docutils literal notranslate"><span class="pre">numpy</span> <span class="pre">dtypes</span></code> to <code class="xref py py-class docutils literal notranslate"><span class="pre">test</span></code>, <code class="xref py py-class docutils literal notranslate"><span class="pre">for</span> <span class="pre">example</span> <span class="pre">[np.int32</span></code>, <code class="xref py py-class docutils literal notranslate"><span class="pre">npfloat32]</span></code>) – </p></li>
+<li><p><strong>recycle</strong> (<code class="xref py py-obj docutils literal notranslate"><span class="pre">True</span></code> or <code class="xref py py-obj docutils literal notranslate"><span class="pre">False</span></code>) – </p></li>
+<li><p><strong>atop</strong> (<code class="xref py py-obj docutils literal notranslate"><span class="pre">True</span></code> or <code class="xref py py-class docutils literal notranslate"><span class="pre">False.</span>&#160; <span class="pre">Whether</span></code> or <code class="xref py py-class docutils literal notranslate"><span class="pre">not</span> <span class="pre">the</span> <span class="pre">atop</span> <span class="pre">engine</span> <span class="pre">is</span> <span class="pre">used</span> <span class="pre">in</span> <span class="pre">benchmarking.</span></code>) – </p></li>
+<li><p><strong>thread</strong> (<code class="xref py py-obj docutils literal notranslate"><span class="pre">True</span></code> or <code class="xref py py-class docutils literal notranslate"><span class="pre">False.</span></code>) – </p></li>
+<li><p><strong>sizes</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">list</span></code> of <code class="xref py py-class docutils literal notranslate"><span class="pre">array</span> <span class="pre">sizes</span></code> to <code class="xref py py-class docutils literal notranslate"><span class="pre">test</span></code>, <code class="xref py py-class docutils literal notranslate"><span class="pre">for</span> <span class="pre">example</span> <span class="pre">[100_000</span></code>, <code class="xref py py-class docutils literal notranslate"><span class="pre">1_000_000]</span></code>) – </p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p></p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>output text formatted for a .csv file</p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<p>pn.benchmark()
+pn.benchmark(thread=False)
+pn.benchmark(sizes=[2**16])
+pn.benchmark(ctypes=[np.float32, np.float64])</p>
 </dd></dl>
 
 <dl class="py function">
-<dt id="pnumpy.ledger_disable">
-<code class="sig-prename descclassname">pnumpy.</code><code class="sig-name descname">ledger_disable</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#pnumpy.ledger_disable" title="Permalink to this definition">¶</a></dt>
-<dd><p>Disable ledger</p>
+<dt id="pnumpy.benchmark.benchmark_func">
+<code class="sig-prename descclassname">pnumpy.benchmark.</code><code class="sig-name descname">benchmark_func</code><span class="sig-paren">(</span><em class="sig-param">func=&lt;ufunc 'equal'&gt;, ctypes=[&lt;class 'numpy.bool_'&gt;, &lt;class 'numpy.int8'&gt;, &lt;class 'numpy.int16'&gt;, &lt;class 'numpy.int32'&gt;, &lt;class 'numpy.int64'&gt;, &lt;class 'numpy.float32'&gt;, &lt;class 'numpy.float64'&gt;], scalar=False, unary=False, reduct=False, outdtype=None, recycle=True, atop=True, thread=True, sizes=[1000000]</em><span class="sig-paren">)</span><a class="headerlink" href="#pnumpy.benchmark.benchmark_func" title="Permalink to this definition">¶</a></dt>
+<dd><p>Benchmark one function.</p>
+<p class="rubric">Examples</p>
+<p>benchmark_func(np.add)
+benchmark_func(np.add, sizes=[2**16])
+benchmark_func(np.sqrt, unary=True)</p>
 </dd></dl>
 
-<dl class="py function">
-<dt id="pnumpy.ledger_enable">
-<code class="sig-prename descclassname">pnumpy.</code><code class="sig-name descname">ledger_enable</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#pnumpy.ledger_enable" title="Permalink to this definition">¶</a></dt>
-<dd><p>Enable ledger debuggging. This collects statistics on each run of a loop:input signature and dimensions, time to execute the loop and more</p>
-</dd></dl>
-
-<dl class="py function">
-<dt id="pnumpy.ledger_info">
-<code class="sig-prename descclassname">pnumpy.</code><code class="sig-name descname">ledger_info</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#pnumpy.ledger_info" title="Permalink to this definition">¶</a></dt>
-<dd><p>Return ledger information</p>
-</dd></dl>
-
-<dl class="py function">
-<dt id="pnumpy.ledger_isenabled">
-<code class="sig-prename descclassname">pnumpy.</code><code class="sig-name descname">ledger_isenabled</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#pnumpy.ledger_isenabled" title="Permalink to this definition">¶</a></dt>
-<dd><p>Returns True if ledger enabled else False</p>
-</dd></dl>
-
-<dl class="py function">
-<dt id="pnumpy.recycler_disable">
-<code class="sig-prename descclassname">pnumpy.</code><code class="sig-name descname">recycler_disable</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#pnumpy.recycler_disable" title="Permalink to this definition">¶</a></dt>
-<dd><p>Disable recycler</p>
-</dd></dl>
-
-<dl class="py function">
-<dt id="pnumpy.recycler_enable">
-<code class="sig-prename descclassname">pnumpy.</code><code class="sig-name descname">recycler_enable</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#pnumpy.recycler_enable" title="Permalink to this definition">¶</a></dt>
-<dd><p>Enable recycler to compact memory usage</p>
-</dd></dl>
-
-<dl class="py function">
-<dt id="pnumpy.recycler_info">
-<code class="sig-prename descclassname">pnumpy.</code><code class="sig-name descname">recycler_info</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#pnumpy.recycler_info" title="Permalink to this definition">¶</a></dt>
-<dd><p>Return recycler information</p>
-</dd></dl>
-
-<dl class="py function">
-<dt id="pnumpy.recycler_isenabled">
-<code class="sig-prename descclassname">pnumpy.</code><code class="sig-name descname">recycler_isenabled</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#pnumpy.recycler_isenabled" title="Permalink to this definition">¶</a></dt>
-<dd><p>Returns True if recycler enabled else False</p>
-</dd></dl>
-
-<dl class="py function">
-<dt id="pnumpy.thread_disable">
-<code class="sig-prename descclassname">pnumpy.</code><code class="sig-name descname">thread_disable</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#pnumpy.thread_disable" title="Permalink to this definition">¶</a></dt>
-<dd><p>Disable worker threads</p>
-</dd></dl>
-
-<dl class="py function">
-<dt id="pnumpy.thread_enable">
-<code class="sig-prename descclassname">pnumpy.</code><code class="sig-name descname">thread_enable</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#pnumpy.thread_enable" title="Permalink to this definition">¶</a></dt>
-<dd><p>Enable worker threads for inner loops when they are large enough to justifythe extra overhead.</p>
-</dd></dl>
-
-<dl class="py function">
-<dt id="pnumpy.thread_getworkers">
-<code class="sig-prename descclassname">pnumpy.</code><code class="sig-name descname">thread_getworkers</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#pnumpy.thread_getworkers" title="Permalink to this definition">¶</a></dt>
-<dd><p>Get the number of worker threads</p>
-</dd></dl>
-
-<dl class="py function">
-<dt id="pnumpy.thread_isenabled">
-<code class="sig-prename descclassname">pnumpy.</code><code class="sig-name descname">thread_isenabled</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#pnumpy.thread_isenabled" title="Permalink to this definition">¶</a></dt>
-<dd><p>Returns True if worker threads enabled else False</p>
-</dd></dl>
-
-<dl class="py function">
-<dt id="pnumpy.thread_setworkers">
-<code class="sig-prename descclassname">pnumpy.</code><code class="sig-name descname">thread_setworkers</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#pnumpy.thread_setworkers" title="Permalink to this definition">¶</a></dt>
-<dd><p>Set the number of worker threads, return previous value. Must be at least 1.</p>
-</dd></dl>
-
-<dl class="py function">
-<dt id="pnumpy.thread_zigzag">
-<code class="sig-prename descclassname">pnumpy.</code><code class="sig-name descname">thread_zigzag</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#pnumpy.thread_zigzag" title="Permalink to this definition">¶</a></dt>
-<dd><p>toggle zigzag mode</p>
-</dd></dl>
-
-<dl class="py function">
-<dt id="pnumpy.timer_gettsc">
-<code class="sig-prename descclassname">pnumpy.</code><code class="sig-name descname">timer_gettsc</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#pnumpy.timer_gettsc" title="Permalink to this definition">¶</a></dt>
-<dd><p>Get the time stamp counter</p>
-</dd></dl>
-
-<dl class="py function">
-<dt id="pnumpy.timer_getutc">
-<code class="sig-prename descclassname">pnumpy.</code><code class="sig-name descname">timer_getutc</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#pnumpy.timer_getutc" title="Permalink to this definition">¶</a></dt>
-<dd><p>Get the time in utc nanos since unix epoch</p>
-</dd></dl>
-
+</div>
 </div>
 
 
@@ -213,7 +157,11 @@ data from the ledger to create more performant memory caches.</p>
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="roadmap.html">Roadmap</a></li>
 <li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
-<li class="toctree-l1 current"><a class="current reference internal" href="#">How to use it?</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">How to use it?</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#module-pnumpy">PNumpy functions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#benchmarking">Benchmarking</a></li>
+</ul>
+</li>
 </ul>
 
 <div class="relations">

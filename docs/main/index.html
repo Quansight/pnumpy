@@ -45,13 +45,20 @@
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
-<li class="toctree-l1"><a class="reference internal" href="use.html">How to use it?</a></li>
+<li class="toctree-l1"><a class="reference internal" href="use.html">How to use it?</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="use.html#module-pnumpy">PNumpy functions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="use.html#benchmarking">Benchmarking</a></li>
+</ul>
+</li>
 </ul>
 </div>
-<p>Parallel NumPy seamlessly speeds up NumPy for large arrays (64K+ elements) with <em>no change required to your existing NumPy code</em>.</p>
-<p>This first release speeds up NumPy binary and unary ufuncs such as <strong>add, multiply, isnan, abs, sin, log, sum, min and many more</strong>.
-Sped up functions also include: <strong>sort, argsort, lexsort, boolean indexing, and fancy indexing</strong>.
-In the near future we will speed up: <strong>astype, where, putmask, arange, searchsorted</strong>.</p>
+<p>PNumPy seamlessly speeds up NumPy for large arrays (64K+ elements) with <em>no
+change required to your existing NumPy code</em>.</p>
+<p>This first release speeds up NumPy binary and unary ufuncs such as <code class="docutils literal notranslate"><span class="pre">add</span></code>,
+<code class="docutils literal notranslate"><span class="pre">multiply</span></code>, <code class="docutils literal notranslate"><span class="pre">isnan</span></code>, <code class="docutils literal notranslate"><span class="pre">abs</span></code>, <code class="docutils literal notranslate"><span class="pre">sin</span></code>, <code class="docutils literal notranslate"><span class="pre">log</span></code>, <code class="docutils literal notranslate"><span class="pre">sum</span></code>, <code class="docutils literal notranslate"><span class="pre">min</span></code> and many more.
+Sped up functions also include: <code class="docutils literal notranslate"><span class="pre">sort</span></code>, <code class="docutils literal notranslate"><span class="pre">argsort</span></code>, <code class="docutils literal notranslate"><span class="pre">lexsort</span></code>, boolean indexing, and
+fancy indexing.  In the near future we will speed up: <code class="docutils literal notranslate"><span class="pre">astype</span></code>, <code class="docutils literal notranslate"><span class="pre">where</span></code>, <code class="docutils literal notranslate"><span class="pre">putmask</span></code>,
+<code class="docutils literal notranslate"><span class="pre">arange</span></code>, <code class="docutils literal notranslate"><span class="pre">searchsorted</span></code>.</p>
 <div class="section" id="installation">
 <h2>Installation<a class="headerlink" href="#installation" title="Permalink to this headline">¶</a></h2>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">pip</span> <span class="n">install</span> <span class="n">pnumpy</span>
@@ -61,7 +68,8 @@ In the near future we will speed up: <strong>astype, where, putmask, arange, sea
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">pnumpy</span> <span class="k">as</span> <span class="nn">pn</span>
 </pre></div>
 </div>
-<p>Parallel NumPy speeds up NumPy silently under the hood.  To see some benchmarks yourself run</p>
+<p>PNumPy speeds up NumPy silently under the hood.  To see some benchmarks
+yourself <a class="reference internal" href="benchmarking_asv.html#benchmarking-asv"><span class="std std-ref">run ASV</span></a> or use the built-in <a class="reference internal" href="use.html#benchmarking"><span class="std std-ref">benchmark</span></a> function:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">pn</span><span class="o">.</span><span class="n">benchmark</span><span class="p">()</span>
 </pre></div>
 </div>
