@@ -5,7 +5,7 @@ little bit helps, and we will try to give credit appropriately.
 
 # Bug reports
 
-Use the [issue tracker](https://github.com/Quansight/numpy-threading-extensions/issues).
+Use the [issue tracker](https://github.com/Quansight/pnumpy/issues).
 Please include:
 
 * Your operating system name and version.
@@ -30,13 +30,13 @@ If you are proposing a feature:
 
 # Development
 
-To set up `numpy-threading-extensions` for local development:
+To set up `pnumpy` for local development:
 
-1. Fork [numpy-threading-extensions](https://github.com/Quansight/numpy-threading-extensions)
+1. Fork [pnumpy](https://github.com/Quansight/pnumpy)
    (look for the "Fork" button).
 2. Clone your fork locally
    ```
-   git clone git@github.com:YOURGITHUBNAME/numpy-threading-extensions.git
+   git clone git@github.com:YOURGITHUBNAME/pnumpy.git
    ```
 
 3. Create a branch for local development::
@@ -74,7 +74,7 @@ For merging, you should:
 
 <sup>1</sup>If you don't have all the necessary python versions available
 locally you can rely on CI - it will [run the
-tests](https://travis-ci.org/Quansight/numpy-threading-extensions/pull_requests)
+tests](https://travis-ci.org/Quansight/pnumpy/pull_requests)
 for each change you add in the pull request.
 
 It will be slower though ...
