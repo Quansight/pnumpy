@@ -429,6 +429,8 @@ struct stWorkerRing {
     static const int64_t   RING_BUFFER_SIZE = 1024;
     static const int64_t   RING_BUFFER_MASK = 1023;
 
+    // Uee atomic instructions to guard threading
+    volatile int64_t       ExclusiveLock;
     volatile int64_t       MainWorkIndex;
 
     // Thread pools wait on the tracker address
@@ -442,7 +444,9 @@ struct stWorkerRing {
     stMATH_WORKER_ITEM      WorkerQueue[RING_BUFFER_SIZE];
 
     void Init(stGlobalWorkerParams* pGlobalParams) {
+        ExclusiveLock = 0;
         MainWorkIndex = 0;
+
         pParams = pGlobalParams;
 
         for (int j = 0; j < MAX_WORKER_CHANNEL; j++) {
@@ -1055,9 +1059,18 @@ public:
             return NULL;
         }
 
-        // Otherwise allow parallel processing
-        stMATH_WORKER_ITEM* pWorkItem = pWorkerRings[0]->GetWorkItem();
-        return pWorkItem;
+        stWorkerRing* pstRing = pWorkerRings[0];
+
+        // Grab atomic lock in case of threading inside threading
+        if (AtopInterlockedOr(&pstRing->ExclusiveLock, 1) == 0) {
+
+            // Otherwise allow parallel processing
+            stMATH_WORKER_ITEM* pWorkItem = pstRing->GetWorkItem();
+            pstRing->ExclusiveLock = 0;
+            return pWorkItem;
+        }
+        // could not grab lock
+        return NULL;
     }
 
     //------------------------------------------------------------------------------

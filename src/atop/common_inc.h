@@ -148,8 +148,11 @@ typedef unsigned char       BYTE;
 #define InterlockedIncrement64 _InterlockedIncrement64
 #endif
 #define InterlockedIncrement _InterlockedIncrement
+#define InterlockedDecrement _InterlockedDecrement
 
-#define FMInterlockedOr(X,Y) InterlockedOr64((int64_t*)X,Y)
+#define AtopInterlockedOr(X,Y) InterlockedOr64((int64_t*)X,Y)
+#define AtopInterlockedAnd(X,Y) InterlockedAnd64((int64_t*)X,Y)
+#define AtopInterlockedXor(X,Y) InterlockedXor64((int64_t*)X,Y)
 
 #include <intrin.h>
 #ifndef MEM_ALIGN
@@ -174,8 +177,10 @@ typedef unsigned char       BYTE;
 #define InterlockedAdd64(val, len) (__sync_fetch_and_add(val, len) + len)
 #define InterlockedIncrement64(val) (__sync_fetch_and_add(val, 1) + 1)
 #define InterlockedIncrement(val) (__sync_fetch_and_add(val, 1) + 1)
-#define FMInterlockedOr(val, bitpos) (__sync_fetch_and_or(val, bitpos))
-
+#define InterlockedDecrement(val) (__sync_fetch_and_add(val, -1) - 1)
+#define AtopInterlockedOr(val, bitpos) (__sync_fetch_and_or(val, bitpos))
+#define AtopInterlockedAnd(val, bitpos) (__sync_fetch_and_and(val, bitpos))
+#define AtopInterlockedXor(val, bitpos) (__sync_fetch_and_xor(val, bitpos))
 
 #ifndef __GNUC_PREREQ
 #define __GNUC_PREREQ(major, minor) ((((__GNUC__) << 16) + (__GNUC_MINOR__)) >= (((major) << 16) + (minor)))
