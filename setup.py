@@ -33,7 +33,7 @@ except Exception:
         print("**could not install pip or setuptools_scm, version is defaulted")
 
 def myversion():
-    version = '2.0.21'
+    version = '2.0.22'
     try:
         mversion = get_version()
         s = mversion.split('.')
