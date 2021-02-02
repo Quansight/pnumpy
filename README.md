@@ -1,8 +1,10 @@
 # PNumPy
 Parallel NumPy seamlessly speeds up NumPy for large arrays (64K+ elements) with *no change required to your existing NumPy code*.
 
+PNumPy supports Linux, Windows, and MacOS for NumPy >= 1.18 for python 3.6, 3.7, 3.8, and 3.9.
+
 This first release speeds up NumPy binary and unary ufuncs such as **add, multiply, isnan, abs, sin, log, sum, min and many more**.
-Sped up functions also include: **sort, argsort, lexsort, boolean indexing, arange, and fancy indexing**.
+Sped up functions also include: **sort, argsort, lexsort, arange, boolean indexing, and fancy indexing**.
 In the near future we will speed up: **astype, where, putmask, and searchsorted**.
 
 Other packages that use numpy, such as [scikit-learn](https://scikit-learn.org/stable/) or [pandas](https://github.com/pandas-dev/pandas), will also be sped up for large arrays.
