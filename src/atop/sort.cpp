@@ -1600,7 +1600,7 @@ static bool IsBuddyBitSet(int64_t index, int64_t* pBitMask) {
     }
 
     // Get back which bits were set before the OR operation
-    int64_t result = FMInterlockedOr(pBitMask, bitshift);
+    int64_t result = AtopInterlockedOr(pBitMask, bitshift);
 
     // Check if our buddy was already set
     PLOGGING("index -- LEVEL 1: %lld  %lld %lld -- %s\n", index, buddy, (result & buddy), buddy == (result & buddy) ? "GOOD" : "WAIT");
