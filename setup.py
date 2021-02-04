@@ -33,7 +33,7 @@ except Exception:
         print("**could not install pip or setuptools_scm, version is defaulted")
 
 def myversion():
-    version = '2.0.22'
+    version = '2.0.23'
     try:
         mversion = get_version()
         s = mversion.split('.')
@@ -118,6 +118,7 @@ setup(
         'Programming Language :: Python :: 3.6',
         'Programming Language :: Python :: 3.7',
         'Programming Language :: Python :: 3.8',
+        'Programming Language :: Python :: 3.9',
         'Programming Language :: Python :: Implementation :: CPython',
         'Programming Language :: Python :: Implementation :: PyPy',
         'Topic :: Utilities',
