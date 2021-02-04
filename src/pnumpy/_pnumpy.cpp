@@ -345,7 +345,7 @@ stArangeFunc g_ArangeFuncLUT[ATOP_LAST];
 
 
 // set to 0 to disable
-stSettings g_Settings = { 1, 0, 0, 0, 0 };
+stSettings g_Settings = { 1, 0, 0, 0, 0, 0, 0 };
 
 // Macro used just before call a ufunc
 #define LEDGER_START()    g_Settings.LedgerEnabled = 0; int64_t ledgerStartTime = __rdtsc();
@@ -1555,7 +1555,6 @@ PyObject* newinit(PyObject* self, PyObject* args, PyObject* kwargs) {
 
             // Allocate an array of 10
             PyArrayObject* pTemp=  AllocateNumpyArray(1, dims, srcdtype);
-            //PyArray_Descr* pSrcDtype = PyArray_DescrFromType(srcdtype);
             PyArray_Descr* pSrcDtype = PyArray_DESCR(pTemp);
 
             if (pSrcDtype) {
@@ -1662,9 +1661,10 @@ PyObject* newinit(PyObject* self, PyObject* args, PyObject* kwargs) {
                 //    }
                 //}
             }
-            //Py_DECREF(pSrcDtype);
-            
-            //Py_DECREF(arr);
+            //Py_DECREF(pSrcDtype);            
+            //Py_DECREF(pTemp);
+            //
+
         }
         RETURN_NONE;
     }
@@ -1674,6 +1674,94 @@ PyObject* newinit(PyObject* self, PyObject* args, PyObject* kwargs) {
     }
     RETURN_NONE;
 }
+
+//---------------------------------------------------------
+// GetItem hook
+//
+extern "C"
+PyObject * GetItemHook(PyObject* aValues, PyObject* aIndex) {
+
+    // Quick check for an array or we bail
+    if (PyType_IsSubtype(aIndex->ob_type, &PyArray_Type)) {
+        int32_t numpyValuesType = PyArray_TYPE((PyArrayObject*)aValues);
+        int32_t numpyIndexType = PyArray_TYPE((PyArrayObject*)aIndex);
+
+        PyObject* result = NULL;
+        if (numpyIndexType == NPY_BOOL) {
+            // special path for boolean
+            result = BooleanIndexInternal((PyArrayObject*)aValues, (PyArrayObject*)aIndex);
+            if (result) {
+                return result;
+            }
+            // clear error since punting
+            PyErr_Clear();
+
+        } else
+        // TODO: improve this to handle strings/unicode/datetime/other
+        if (numpyIndexType <= NPY_LONGDOUBLE) {
+            result = getitem(aValues, aIndex);
+            if (result) {
+                return result;
+            }
+            PyErr_Clear();
+        }
+    }
+    return g_Settings.NumpyGetItem(aValues, aIndex);
+}
+
+//---------------------------------------------------------
+// Call to get hook
+extern "C"
+PyObject * hook_enable(PyObject * self, PyObject * args) {
+
+    if (g_Settings.NumpyGetItem == NULL) {
+        npy_intp  dims[1] = { 10 };
+
+        // Allocate an array of 10 bools
+        PyArrayObject* pTemp = AllocateNumpyArray(1, dims, 0);
+        if (pTemp) {
+            struct _typeobject* pNumpyType = ((PyObject*)pTemp)->ob_type;
+
+            // Not hooked yet
+            // PyNumberMethods* numbermethods = pNumpyType->tp_as_number;
+            // richcmpfunc comparefunc = pNumpyType->tp_richcompare;
+            // __setitem__
+            // objobjargproc PyMappingMethods.mp_ass_subscript
+
+            // __getitem__
+            // Reroute hook
+            g_Settings.NumpyGetItem= pNumpyType->tp_as_mapping->mp_subscript;
+            pNumpyType->tp_as_mapping->mp_subscript = GetItemHook;
+
+            Py_DECREF(pTemp);
+            RETURN_TRUE;
+        }
+    }
+    RETURN_FALSE;
+}
+
+//---------------------------------------------------------
+// Call to remove previous hook
+extern "C"
+PyObject * hook_disable(PyObject * self, PyObject * args) {
+    if (g_Settings.NumpyGetItem != NULL) {
+        npy_intp  dims[1] = { 10 };
+
+        // Allocate an array of 10 bools
+        PyArrayObject* pTemp = AllocateNumpyArray(1, dims, 0);
+        if (pTemp) {
+            struct _typeobject* pNumpyType = ((PyObject*)pTemp)->ob_type;
+            // __getitem__
+            // Put hook back
+            pNumpyType->tp_as_mapping->mp_subscript = g_Settings.NumpyGetItem;
+            g_Settings.NumpyGetItem = NULL;
+            Py_DECREF(pTemp);
+            RETURN_TRUE;
+        }
+    }
+    RETURN_FALSE;
+}
+
 
 extern "C"
 PyObject * atop_enable(PyObject * self, PyObject * args) {

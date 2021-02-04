@@ -37,6 +37,9 @@ extern "C" PyObject* recycler_disable(PyObject * self, PyObject * args);
 extern "C" PyObject* recycler_isenabled(PyObject * self, PyObject * args);
 extern "C" PyObject* recycler_info(PyObject * self, PyObject * args);
 
+extern "C" PyObject * hook_enable(PyObject * self, PyObject * args);
+extern "C" PyObject * hook_disable(PyObject * self, PyObject * args);
+
 extern "C" PyObject* timer_gettsc(PyObject * self, PyObject * args);
 extern "C" PyObject* timer_getutc(PyObject * self, PyObject * args);
 extern "C" PyObject* cpustring(PyObject * self, PyObject * args);
@@ -69,6 +72,8 @@ static PyMethodDef module_functions[] = {
     {"thread_zigzag",      (PyCFunction)thread_zigzag,  METH_VARARGS, "toggle zigzag mode"},
     {"timer_gettsc",     (PyCFunction)timer_gettsc, METH_VARARGS, TIMER_GETTSC_DOC},
     {"timer_getutc",     (PyCFunction)timer_getutc, METH_VARARGS, TIMER_GETUTC_DOC},
+    {"hook_enable",      (PyCFunction)hook_enable, METH_VARARGS, "Enable hook for numpy array __getitem__ for fancy and bool indexing"},
+    {"hook_disable",     (PyCFunction)hook_disable, METH_VARARGS, "Disable hook for numpy array __getitem__ for fancy and bool indexing"},
     {"ledger_enable",    (PyCFunction)ledger_enable,  METH_VARARGS, LEDGER_ENABLE_DOC},
     {"ledger_disable",   (PyCFunction)ledger_disable,  METH_VARARGS, LEDGER_DISABLE_DOC},
     {"ledger_isenabled", (PyCFunction)ledger_isenabled,  METH_VARARGS, LEDGER_ISENABLED_DOC},

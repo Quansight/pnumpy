@@ -26,6 +26,8 @@ struct stSettings {
     int32_t  RecyclerEnabled;
     int32_t  ZigZag;  // set to 0 to disable
     int32_t  Initialized;
+    int32_t  Reserved;
+    binaryfunc NumpyGetItem;  // optional hook
 };
 
 extern stSettings g_Settings;
@@ -111,6 +113,9 @@ extern ArrayInfo* BuildArrayInfo(
     BOOL convert = TRUE);
 
 extern void FreeArrayInfo(ArrayInfo* pAlloc);
+
+extern PyObject* BooleanIndexInternal(PyArrayObject* aValues, PyArrayObject* aIndex);
+extern "C" PyObject *getitem(PyObject * self, PyObject * args);
 
 #define RETURN_NONE Py_INCREF(Py_None); return Py_None;
 #define RETURN_FALSE Py_XINCREF(Py_False); return Py_False;
